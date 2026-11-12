@@ -68,7 +68,8 @@ export async function generateCarouselCopy({
 
   console.log("prompt", prompt);
   let lastError;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const maxAttempts = 6;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const result = await generativeModel.generateContent(prompt);
       console.log("result", result);
@@ -82,6 +83,13 @@ export async function generateCarouselCopy({
       return data;
     } catch (e) {
       lastError = e;
+      const status = e?.status;
+      const retriable = status === 503 || status === 429 || status === 500;
+      if (attempt < maxAttempts - 1 && (retriable || attempt === 0)) {
+        const waitMs = retriable ? 3000 * (attempt + 1) : 500;
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
     }
   }
   throw lastError;
