@@ -12,6 +12,7 @@ function loadJson(rel) {
 
 const accountsFile = loadJson("config/accounts.json");
 const archetypesFile = loadJson("config/archetypes.json");
+const baitsFile = loadJson("config/baits.json");
 
 export const config = {
   root,
@@ -28,6 +29,7 @@ export const config = {
   port: Number(process.env.PORT || 3000),
   accounts: accountsFile.accounts,
   archetypes: archetypesFile.archetypes,
+  baits: baitsFile.baits,
   media: {
     capas: join(root, "media/01_capas"),
     aleatorias: join(root, "media/02_aleatorias"),

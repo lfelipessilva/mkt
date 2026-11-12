@@ -56,6 +56,7 @@ function available(pool, used, need = 1) {
 export function selectCarousel({
   mediaDirs,
   archetypes,
+  baits,
   persona,
   accountId,
   usage,
@@ -124,11 +125,13 @@ export function selectCarousel({
   }));
 
   const arquetipoTitulo = pickRandom(archetypes);
+  const baitTrigger = pickRandom(baits);
 
   return {
     accountId,
     persona,
     arquetipoTitulo,
+    baitTrigger,
     slides,
     usageUpdate: {
       entries: [

@@ -19,6 +19,7 @@ async function generateOne({ account, dryRun, api, postIndex }) {
   const selection = selectCarousel({
     mediaDirs: config.media,
     archetypes: config.archetypes,
+    baits: config.baits,
     persona: account.persona,
     accountId: account.id,
     usage,
@@ -30,8 +31,10 @@ async function generateOne({ account, dryRun, api, postIndex }) {
     model: config.geminiModel,
     persona: selection.persona,
     arquetipoTitulo: selection.arquetipoTitulo,
+    baitTrigger: selection.baitTrigger,
     slides: selection.slides,
   });
+
 
   const textsByNumero = new Map(
     copy.slides.map((s) => [s.numero, s.texto]),

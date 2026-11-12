@@ -51,7 +51,7 @@ function textSvg(text, style = "pill") {
   // Posição natural no terço superior/médio (longe da legenda inferior do TikTok)
   // Adiciona pequena variação aleatória para parecer posicionado manualmente
   const randomOffsetY = (Math.random() - 0.5) * 90;
-  const randomAngle = (Math.random() - 0.5) * 1.8; // leve inclinação de dedo (-0.9° a +0.9°)
+  const randomAngle = (Math.random() - 0.5) * 1.3; // leve inclinação de dedo (-0.9° a +0.9°)
 
   if (style === "pill") {
     const lineHeight = fontSize * 1.42;

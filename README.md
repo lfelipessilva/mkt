@@ -24,6 +24,7 @@ Health: `http://localhost:3000/health`
 
 - Contas / volume: `config/accounts.json` (`postsPerDay`)
 - Arquétipos de capa: `config/archetypes.json`
+- Baits de comentário: `config/baits.json`
 - Cron: `CRON_SCHEDULE` (default `0 7 * * *`, timezone `TZ`)
 
 ## Telegram

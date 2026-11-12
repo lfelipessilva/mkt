@@ -28,7 +28,10 @@ function toGeminiSchema(schema) {
 }
 
 function parseJson(text) {
-  const cleaned = text.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+  const cleaned = text
+    .replace(/^```json\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
   return JSON.parse(cleaned);
 }
 
@@ -37,6 +40,7 @@ export async function generateCarouselCopy({
   model,
   persona,
   arquetipoTitulo,
+  baitTrigger,
   slides,
 }) {
   if (!apiKey) throw new Error("GEMINI_API_KEY ausente");
@@ -48,27 +52,32 @@ export async function generateCarouselCopy({
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: toGeminiSchema(RESPONSE_SCHEMA),
-      temperature: 0.7,
+      temperature: 0.85,
     },
   });
 
   const prompt = buildUserPrompt({
     persona,
     arquetipoTitulo,
+    baitTrigger,
     slides: slides.map((s) => ({
       filename: s.filename,
       isListo: s.isListo,
     })),
   });
 
+  console.log("prompt", prompt);
   let lastError;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const result = await generativeModel.generateContent(prompt);
+      console.log("result", result);
       const text = result.response.text();
       const data = parseJson(text);
       if (!Array.isArray(data.slides) || data.slides.length !== slides.length) {
-        throw new Error(`gemini retornou ${data.slides?.length ?? 0} slides, esperado ${slides.length}`);
+        throw new Error(
+          `gemini retornou ${data.slides?.length ?? 0} slides, esperado ${slides.length}`,
+        );
       }
       return data;
     } catch (e) {
