@@ -24,10 +24,19 @@ function nextPostIndex(accountDayDir) {
 }
 
 async function generateOne({ account, dryRun, api, postIndex }) {
+  const archetypes = config.archetypesByAccount[account.id];
+  if (!Array.isArray(archetypes) || !archetypes.length) {
+    throw new Error(`arquétipos ausentes pra conta: ${account.id}`);
+  }
+  if (!account.mediaRole) {
+    throw new Error(`mediaRole ausente pra conta: ${account.id}`);
+  }
+
   const usage = loadUsage(config.usagePath);
   const selection = selectCarousel({
-    mediaDirs: config.media,
-    archetypes: config.archetypes,
+    mediaRoot: config.mediaRoot,
+    mediaRole: account.mediaRole,
+    archetypes,
     baits: config.baits,
     persona: account.persona,
     accountId: account.id,

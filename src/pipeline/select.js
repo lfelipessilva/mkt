@@ -3,6 +3,42 @@ import { basename, join } from "node:path";
 
 const IMAGE_RE = /\.(jpe?g|png|webp)$/i;
 
+const MEDIA_ROLES = new Set(["mulher", "homem", "casal"]);
+
+export function resolveMediaForRole(mediaRoot, mediaRole) {
+  if (!MEDIA_ROLES.has(mediaRole)) {
+    throw new Error(`mediaRole inválido: ${mediaRole}`);
+  }
+  return {
+    capas: join(mediaRoot, mediaRole, "capas"),
+    aleatoriasRole: join(mediaRoot, mediaRole, "aleatorias"),
+    aleatoriasShared: join(mediaRoot, "shared", "aleatorias"),
+    listo: join(mediaRoot, "shared", "listo"),
+  };
+}
+
+export function allMediaImageDirs(mediaRoot) {
+  const dirs = [];
+  for (const role of MEDIA_ROLES) {
+    dirs.push(join(mediaRoot, role, "capas"), join(mediaRoot, role, "aleatorias"));
+  }
+  dirs.push(join(mediaRoot, "shared", "aleatorias"), join(mediaRoot, "shared", "listo"));
+  return dirs;
+}
+
+export function unionImages(...pools) {
+  const seen = new Set();
+  const out = [];
+  for (const pool of pools) {
+    for (const img of pool) {
+      if (seen.has(img.filename)) continue;
+      seen.add(img.filename);
+      out.push(img);
+    }
+  }
+  return out;
+}
+
 export function listImages(dir) {
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
@@ -68,7 +104,8 @@ function pickBait(baits, usedBaits) {
 }
 
 export function selectCarousel({
-  mediaDirs,
+  mediaRoot,
+  mediaRole,
   archetypes,
   baits,
   persona,
@@ -78,17 +115,25 @@ export function selectCarousel({
   aleatoriasCount,
   now = Date.now(),
 }) {
+  if (!Array.isArray(archetypes) || archetypes.length === 0) {
+    throw new Error(`arquétipos ausentes pra conta: ${accountId}`);
+  }
+
   const pruned = pruneUsage(usage, usageDays, now);
   const used = recentlyUsedFilenames(pruned);
   const usedBaits = recentlyUsedBaits(pruned);
 
-  const capas = listImages(mediaDirs.capas);
-  const aleatorias = listImages(mediaDirs.aleatorias);
-  const listos = listImages(mediaDirs.listo);
+  const dirs = resolveMediaForRole(mediaRoot, mediaRole);
+  const capas = listImages(dirs.capas);
+  const aleatorias = unionImages(
+    listImages(dirs.aleatoriasRole),
+    listImages(dirs.aleatoriasShared),
+  );
+  const listos = listImages(dirs.listo);
 
   if (!capas.length || !listos.length || aleatorias.length < 3) {
     throw new Error(
-      `mídia insuficiente: capas=${capas.length} aleatorias=${aleatorias.length} listo=${listos.length}`,
+      `mídia insuficiente (${mediaRole}): capas=${capas.length} aleatorias=${aleatorias.length} listo=${listos.length}`,
     );
   }
 
