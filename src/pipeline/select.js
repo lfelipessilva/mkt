@@ -20,9 +20,9 @@ export function resolveMediaForRole(mediaRoot, mediaRole) {
 export function allMediaImageDirs(mediaRoot) {
   const dirs = [];
   for (const role of MEDIA_ROLES) {
-    dirs.push(join(mediaRoot, role, "capas"), join(mediaRoot, role, "aleatorias"));
+    dirs.push(join(mediaRoot, role, "aleatorias"));
   }
-  dirs.push(join(mediaRoot, "shared", "aleatorias"), join(mediaRoot, "shared", "listo"));
+  dirs.push(join(mediaRoot, "shared", "aleatorias"));
   return dirs;
 }
 

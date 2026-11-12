@@ -6,9 +6,12 @@ import { listImages } from "./select.js";
 
 const CAMERA_RE = /^(IMG|DSC|PXL|DSCN|MVIMG)[_-]?\d+/i;
 const DIGITS_RE = /^\d{6,}$/;
+const MAX_STEM = 45;
 const PROMPT =
-  "Descreva esta imagem em português, de forma detalhada (~150 a 200 caracteres). " +
-  "Responda só com a descrição, sem aspas e sem pontuação final.";
+  "Responda só com 2 a 4 palavras-chave do tema central desta foto, em português, separadas por espaço. " +
+  "Foque no assunto estético (ex: skincare autocuidado, carro transito, quarto casa leitura, viagem aeroporto). " +
+  "Ignore ângulo de câmera, cores, marcas, nomes químicos e detalhes irrelevantes. " +
+  "Sem aspas, sem pontuação, sem frases.";
 
 export function slugifyDescription(text, ext) {
   const rawExt = (ext || "").startsWith(".") ? ext : `.${ext || "jpg"}`;
@@ -19,7 +22,11 @@ export function slugifyDescription(text, ext) {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_|_$/g, "")
-    .slice(0, 200);
+    .split("_")
+    .filter(Boolean)
+    .slice(0, 4)
+    .join("_")
+    .slice(0, MAX_STEM);
   return `${stem || "imagem"}${rawExt.toLowerCase()}`;
 }
 
@@ -31,7 +38,8 @@ export function shouldSkip(filename, force = false) {
   if (force) return false;
   const stem = basename(filename, extname(filename));
   if (isCameraLike(stem)) return false;
-  return stem.length >= 40;
+  const words = stem.split("_").filter(Boolean);
+  return words.length >= 2 && words.length <= 5 && stem.length <= MAX_STEM;
 }
 
 export function uniquePath(dir, filename) {

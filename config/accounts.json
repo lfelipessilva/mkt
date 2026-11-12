@@ -7,6 +7,14 @@
       "postsPerRun": 1
     },
     {
+      "id": "camila.e.thiago.ap",
+      "mediaRole": "casal",
+      "persona": "Mulher de 28 anos que recém foi morar junto com o noivo. Focados em juntar dinheiro para viajar e mobiliar o apartamento sem abrir mão de comer bem e sair no fim de semana. Cortam gastos invisíveis e organizam tudo em conjunto para sobrar dinheiro no fim do mês. Fala no feminino e no plural quando faz sentido (a gente, meu noivo, nosso apê).",
+      "postsPerRun": 1
+    }
+  ],
+  "disabledAccounts": [
+    {
       "id": "lucas.mendes.rotina",
       "mediaRole": "homem",
       "persona": "Homem de 27 anos que mora sozinho. Direto ao ponto, prático e avesso a complicação: trata alimentação, treino, compras e finanças como um sistema simples para não perder tempo nem dinheiro à toa. Fala no masculino e no singular (eu, meu apê, cansado, pronto). Nunca mencione namorada ou outras pessoas morando junto.",
@@ -16,12 +24,6 @@
       "id": "renata.sousa.daily",
       "mediaRole": "casal",
       "persona": "Mulher de 26 anos que mora junto com o namorado há 7 anos. Casal prático e bem resolvido que divide contas, mercado e tarefas domésticas numa boa, sem drama nem briga por coisa boba. Fala no feminino e no plural quando faz sentido (a gente, meu namorado, nossa casa).",
-      "postsPerRun": 1
-    },
-    {
-      "id": "camila.e.thiago.ap",
-      "mediaRole": "casal",
-      "persona": "Mulher de 28 anos que recém foi morar junto com o noivo. Focados em juntar dinheiro para viajar e mobiliar o apartamento sem abrir mão de comer bem e sair no fim de semana. Cortam gastos invisíveis e organizam tudo em conjunto para sobrar dinheiro no fim do mês. Fala no feminino e no plural quando faz sentido (a gente, meu noivo, nosso apê).",
       "postsPerRun": 1
     }
   ]
