@@ -90,6 +90,9 @@ export async function generateCarouselCopy({
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
+      if (!retriable && attempt > 0) {
+        throw lastError;
+      }
     }
   }
   throw lastError;
