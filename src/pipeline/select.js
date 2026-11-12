@@ -11,11 +11,15 @@ export function listImages(dir) {
 }
 
 export function loadUsage(usagePath) {
-  if (!existsSync(usagePath)) return { entries: [] };
+  if (!existsSync(usagePath)) return { entries: [], baits: [] };
   try {
-    return JSON.parse(readFileSync(usagePath, "utf8"));
+    const raw = JSON.parse(readFileSync(usagePath, "utf8"));
+    return {
+      entries: raw.entries || [],
+      baits: raw.baits || [],
+    };
   } catch {
-    return { entries: [] };
+    return { entries: [], baits: [] };
   }
 }
 
@@ -28,11 +32,16 @@ export function pruneUsage(usage, days, now = Date.now()) {
   const cutoff = now - days * 24 * 60 * 60 * 1000;
   return {
     entries: (usage.entries || []).filter((e) => new Date(e.at).getTime() >= cutoff),
+    baits: (usage.baits || []).filter((e) => new Date(e.at).getTime() >= cutoff),
   };
 }
 
 export function recentlyUsedFilenames(usage) {
   return new Set((usage.entries || []).map((e) => e.filename));
+}
+
+export function recentlyUsedBaits(usage) {
+  return new Set((usage.baits || []).map((e) => e.bait));
 }
 
 function pickRandom(arr) {
@@ -53,6 +62,11 @@ function available(pool, used, need = 1) {
   return free.length >= need ? free : pool;
 }
 
+function pickBait(baits, usedBaits) {
+  const free = baits.filter((b) => !usedBaits.has(b));
+  return pickRandom(free.length ? free : baits);
+}
+
 export function selectCarousel({
   mediaDirs,
   archetypes,
@@ -66,6 +80,7 @@ export function selectCarousel({
 }) {
   const pruned = pruneUsage(usage, usageDays, now);
   const used = recentlyUsedFilenames(pruned);
+  const usedBaits = recentlyUsedBaits(pruned);
 
   const capas = listImages(mediaDirs.capas);
   const aleatorias = listImages(mediaDirs.aleatorias);
@@ -125,7 +140,8 @@ export function selectCarousel({
   }));
 
   const arquetipoTitulo = pickRandom(archetypes);
-  const baitTrigger = pickRandom(baits);
+  const baitTrigger = Math.random() < 0.5 ? pickBait(baits, usedBaits) : null;
+  const at = new Date(now).toISOString();
 
   return {
     accountId,
@@ -136,8 +152,11 @@ export function selectCarousel({
     usageUpdate: {
       entries: [
         ...pruned.entries,
-        ...slides.map((s) => ({ filename: s.filename, at: new Date(now).toISOString() })),
+        ...slides.map((s) => ({ filename: s.filename, at })),
       ],
+      baits: baitTrigger
+        ? [...pruned.baits, { bait: baitTrigger, at }]
+        : pruned.baits,
     },
   };
 }

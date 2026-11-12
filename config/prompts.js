@@ -10,7 +10,7 @@ ESTILO DE ESCRITA (CRÍTICO):
 REGRAS DE CONTEÚDO:
 1. CONEXÃO NATURAL COM A IMAGEM (NÃO DESCREVA A FOTO): Use a imagem apenas como gancho ou cenário para a dica. A foto ilustra a ideia ou o momento, não precisa ser descrita literalmente.
 2. CAVALO DE TROIA (SLIDE DO APP): No slide marcado como [APP LISTO], mencione de forma casual o hábito de usar um app de lista de compras/despensa para não esquecer nada ou dividir a lista. É PROIBIDO escrever o nome "listo" ou qualquer marca. Fale apenas "esse app" ou "um app de lista".
-3. BAIT DE COMENTÁRIO (1 SLIDE ALEATÓRIO): Em UM dos slides [ALEATORIA], cite o hábito/truque do TEMA DO BAIT pelo nome, sem explicar o que é. Tom de "se você sabe, sabe" ou "pesquisa o que é" — tem que parecer coisa inventada/secreta que só quem mora com você entende, pra gerar comentário de "??? o que é isso".
+3. BAIT DE COMENTÁRIO (SÓ SE O USER PROMPT TIVER TEMA DO BAIT): Se vier TEMA DO BAIT, em UM dos slides [ALEATORIA] cite esse hábito/truque pelo nome, sem explicar o que é. Tom de "se você sabe, sabe" ou "pesquisa o que é". Se NÃO vier TEMA DO BAIT, não invente bait nem truque misterioso.
 4. VARIEDADE REAL: Cada slide deve falar de uma coisa diferente (roupa, comida, trabalho, hábitos estranhos, compras). Nunca repita o mesmo tema no mesmo post.
 5. COERÊNCIA DE PERSONA: Respeite rigorosamente se a persona mora sozinha (singular) ou com namorado (plural).
 
@@ -37,11 +37,15 @@ export function buildUserPrompt({ persona, arquetipoTitulo, baitTrigger, slides 
     })
     .join("\n");
 
+  const baitLine = baitTrigger
+    ? `TEMA DO BAIT PARA UM DOS SLIDES ALEATÓRIOS: ${baitTrigger}`
+    : `SEM BAIT NESTE POST: não cite truques misteriosos nem peça pra pesquisar nada.`;
+
   return `Crie um carrossel inédito respeitando fielmente cada imagem abaixo.
 
 PERSONA: ${persona}
 TÍTULO BASE DA CAPA (adapte ao tom da persona): ${arquetipoTitulo}
-TEMA DO BAIT PARA UM DOS SLIDES ALEATÓRIOS: ${baitTrigger}
+${baitLine}
 
 SLIDES DO CARROSSEL (cada texto DEVE falar sobre o elemento principal descrito no nome do arquivo):
 ${promptImagens}

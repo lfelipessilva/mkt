@@ -35,7 +35,7 @@ export function createBot() {
 
   bot.command("gerar", async (ctx) => {
     const accountId = parseAccountArg(ctx.message?.text || "");
-    await ctx.reply(accountId ? `gerando batch de ${accountId}...` : "gerando batch do dia...");
+    await ctx.reply(accountId ? `gerando ${accountId}...` : "gerando turno (todas as contas)...");
     try {
       const result = await withJobLock(() =>
         runBatch({ accountId, api: bot.api, dryRun: false }),

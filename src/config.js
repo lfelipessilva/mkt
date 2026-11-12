@@ -25,7 +25,7 @@ export const config = {
     .map((s) => s.trim())
     .filter(Boolean)
     .map(Number),
-  cronSchedule: process.env.CRON_SCHEDULE || "0 7 * * *",
+  cronSchedule: process.env.CRON_SCHEDULE || "0 7,11,17 * * *",
   port: Number(process.env.PORT || 3000),
   accounts: accountsFile.accounts,
   archetypes: archetypesFile.archetypes,

@@ -3,12 +3,12 @@
     {
       "id": "conta_a",
       "persona": "Mulher de 25 anos que mora sozinha. Gosta de coisas boas, odeia jogar dinheiro fora com besteira e já pegou o jeito de cuidar da casa e da rotina sem estresse. Fala no singular (eu, minha casa). Nunca mencione namorado ou outras pessoas morando junto.",
-      "postsPerDay": 2
+      "postsPerRun": 1
     },
     {
       "id": "conta_b",
       "persona": "Mulher de 26 anos que mora junto com o namorado. Casal prático que divide contas e tarefas numa boa, sem briga por coisa boba. Fala no plural quando faz sentido (a gente, meu namorado).",
-      "postsPerDay": 2
+      "postsPerRun": 1
     }
   ]
 }

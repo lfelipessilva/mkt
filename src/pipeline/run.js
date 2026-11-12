@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config, getAccount } from "../config.js";
 import { generateCarouselCopy } from "./gemini.js";
@@ -12,6 +12,15 @@ import { sendCarouselAlbum } from "./telegram.js";
 
 function dayStamp(d = new Date()) {
   return d.toISOString().slice(0, 10);
+}
+
+function nextPostIndex(accountDayDir) {
+  if (!existsSync(accountDayDir)) return 1;
+  const nums = readdirSync(accountDayDir)
+    .map((name) => /^post_(\d+)/.exec(name))
+    .filter(Boolean)
+    .map((m) => Number(m[1]));
+  return (nums.length ? Math.max(...nums) : 0) + 1;
 }
 
 async function generateOne({ account, dryRun, api, postIndex }) {
@@ -35,17 +44,13 @@ async function generateOne({ account, dryRun, api, postIndex }) {
     slides: selection.slides,
   });
 
-
   const textsByNumero = new Map(
     copy.slides.map((s) => [s.numero, s.texto]),
   );
 
-  const outDir = join(
-    config.outputDir,
-    dayStamp(),
-    account.id,
-    `post_${String(postIndex).padStart(2, "0")}`,
-  );
+  const accountDayDir = join(config.outputDir, dayStamp(), account.id);
+  const index = postIndex ?? nextPostIndex(accountDayDir);
+  const outDir = join(accountDayDir, `post_${String(index).padStart(2, "0")}`);
   mkdirSync(outDir, { recursive: true });
 
   const imagePaths = await renderCarousel({
@@ -88,9 +93,9 @@ export async function runBatch({ accountId, count, dryRun = false, api } = {}) {
 
   const results = [];
   for (const account of accounts) {
-    const n = count ?? account.postsPerDay ?? 3;
-    for (let i = 1; i <= n; i++) {
-      results.push(await generateOne({ account, dryRun, api, postIndex: i }));
+    const n = count ?? account.postsPerRun ?? account.postsPerDay ?? 1;
+    for (let i = 0; i < n; i++) {
+      results.push(await generateOne({ account, dryRun, api }));
     }
   }
 
@@ -107,12 +112,10 @@ export async function runOneMore({ accountId, dryRun = false, api } = {}) {
 
   if (!account) throw new Error(accountId ? `conta desconhecida: ${accountId}` : "nenhuma conta");
 
-  const stamp = Date.now();
   const result = await generateOne({
     account,
     dryRun,
     api,
-    postIndex: stamp,
   });
 
   return {
