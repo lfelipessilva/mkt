@@ -1,0 +1,22 @@
+{
+  "name": "listo-carousel-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "generate": "node src/index.js --once",
+    "dry-run": "node src/index.js --once --dry-run",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.24.0",
+    "dotenv": "^16.4.7",
+    "grammy": "^1.35.0",
+    "node-cron": "^3.0.3",
+    "sharp": "^0.33.5"
+  }
+}

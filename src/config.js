@@ -1,0 +1,43 @@
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import dotenv from "dotenv";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+dotenv.config({ path: join(root, ".env") });
+
+function loadJson(rel) {
+  return JSON.parse(readFileSync(join(root, rel), "utf8"));
+}
+
+const accountsFile = loadJson("config/accounts.json");
+const archetypesFile = loadJson("config/archetypes.json");
+
+export const config = {
+  root,
+  geminiApiKey: process.env.GEMINI_API_KEY || "",
+  geminiModel: process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN || "",
+  telegramChatId: process.env.TELEGRAM_CHAT_ID || "",
+  allowedUserIds: (process.env.TELEGRAM_ALLOWED_USER_IDS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map(Number),
+  cronSchedule: process.env.CRON_SCHEDULE || "0 7 * * *",
+  port: Number(process.env.PORT || 3000),
+  accounts: accountsFile.accounts,
+  archetypes: archetypesFile.archetypes,
+  media: {
+    capas: join(root, "media/01_capas"),
+    aleatorias: join(root, "media/02_aleatorias"),
+    listo: join(root, "media/03_listo"),
+  },
+  usagePath: join(root, "data/usage.json"),
+  outputDir: join(root, "output"),
+  usageDays: 7,
+};
+
+export function getAccount(id) {
+  return config.accounts.find((a) => a.id === id);
+}
