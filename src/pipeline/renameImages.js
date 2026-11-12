@@ -86,19 +86,17 @@ export async function describeImage({ apiKey, model, imagePath }) {
 }
 
 export async function runRenameImages({
-  mediaDirs,
+  dirs,
   apiKey,
   model,
   force = false,
 }) {
-  const dirs = [mediaDirs.capas, mediaDirs.aleatorias, mediaDirs.listo].filter(
-    Boolean,
-  );
+  const targetDirs = (dirs || []).filter(Boolean);
   const renamed = [];
   const skipped = [];
   const errors = [];
 
-  for (const dir of dirs) {
+  for (const dir of targetDirs) {
     const images = listImages(dir);
     for (const img of images) {
       if (shouldSkip(img.filename, force)) {

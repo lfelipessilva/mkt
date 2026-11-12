@@ -12,7 +12,8 @@ cp .env.example .env
 npm install
 
 # coloque fotos descritivas em:
-# media/01_capas  media/02_aleatorias  media/03_listo
+# media/mulher|homem|casal/{capas,aleatorias}
+# media/shared/{aleatorias,listo}
 
 pm2 start ecosystem.config.cjs
 pm2 save
@@ -23,8 +24,8 @@ Rename batch (Gemini): `POST http://localhost:3000/rename-images` (`?force=1` re
 
 ## Config
 
-- Contas / volume: `config/accounts.json` (`postsPerRun`)
-- Arquétipos de capa: `config/archetypes.json`
+- Contas: `config/accounts.json` (`mediaRole`, `postsPerRun`)
+- Arquétipos por conta: `config/archetypes.json` (`archetypesByAccount`)
 - Baits de comentário: `config/baits.json`
 - Uso recente (imagens + baits): `data/usage.json` (janela de 7 dias)
 - Cron: `CRON_SCHEDULE` (default `0 7,11,17 * * *`, timezone `TZ`)

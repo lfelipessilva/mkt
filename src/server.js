@@ -1,6 +1,7 @@
 import http from "node:http";
 import { config } from "./config.js";
 import { getJobStatus, withJobLock } from "./jobLock.js";
+import { allMediaImageDirs } from "./pipeline/select.js";
 import { runRenameImages } from "./pipeline/renameImages.js";
 
 function json(res, status, body) {
@@ -26,7 +27,7 @@ export function createServer({ port }) {
       try {
         const result = await withJobLock(() =>
           runRenameImages({
-            mediaDirs: config.media,
+            dirs: allMediaImageDirs(config.mediaRoot),
             apiKey: config.geminiApiKey,
             model: config.geminiModel,
             force,
