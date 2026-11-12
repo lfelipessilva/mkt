@@ -13,6 +13,7 @@ REGRAS DE CONTEÚDO:
 3. BAIT DE COMENTÁRIO (SÓ SE O USER PROMPT TIVER TEMA DO BAIT): Se vier TEMA DO BAIT, em UM dos slides [ALEATORIA] cite esse hábito/truque pelo nome, sem explicar o que é. Tom de "se você sabe, sabe" ou "pesquisa o que é". Se NÃO vier TEMA DO BAIT, não invente bait nem truque misterioso.
 4. VARIEDADE REAL: Cada slide deve falar de uma coisa diferente (roupa, comida, trabalho, hábitos estranhos, compras). Nunca repita o mesmo tema no mesmo post.
 5. COERÊNCIA DE PERSONA: Respeite rigorosamente gênero e número da persona (feminino/masculino, singular/plural). Se for solo, nunca mencione namorado/namorada/noivo/noiva nem alguém morando junto. Se for casal, use exatamente o termo da persona (namorado vs noivo) e o plural quando fizer sentido.
+6. VARIE O ARQUÉTIPO NA CAPA: O título do slide 1 (e tema_escolhido) deve parafrasear levemente o título base — mesma ideia, palavras diferentes. Nunca copie o título base palavra por palavra.
 
 FORMATO DE SAÍDA (JSON ESTRITO):
 {
@@ -44,7 +45,7 @@ export function buildUserPrompt({ persona, arquetipoTitulo, baitTrigger, slides 
   return `Crie um carrossel inédito respeitando fielmente cada imagem abaixo.
 
 PERSONA: ${persona}
-TÍTULO BASE DA CAPA (adapte ao tom da persona): ${arquetipoTitulo}
+TÍTULO BASE DA CAPA (mesma ideia, reescreva com outras palavras no tom da persona — não copie literal): ${arquetipoTitulo}
 ${baitLine}
 
 SLIDES DO CARROSSEL (cada texto DEVE falar sobre o elemento principal descrito no nome do arquivo):
