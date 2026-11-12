@@ -46,17 +46,17 @@ function estimateLineWidth(line, fontSize) {
  */
 function textSvg(text, style = "pill") {
   const lines = wrapWords(text, 26);
-  const fontSize = lines.some((l) => l.length > 26) ? 42 : 46;
+  const fontSize = lines.some((l) => l.length > 26) ? 48 : 52;
 
-  // Posição natural no terço superior/médio (longe da legenda inferior do TikTok)
-  // Adiciona pequena variação aleatória para parecer posicionado manualmente
+  // Abaixo da UI do topo (busca/status) e do crop do iPad; acima da legenda inferior
   const randomOffsetY = (Math.random() - 0.5) * 90;
-  const randomAngle = (Math.random() - 0.5) * 1.3; // leve inclinação de dedo (-0.9° a +0.9°)
+  const randomAngle = (Math.random() - 0.5) * 1.3;
+  const anchorY = style === "pill" ? H * 0.32 : H * 0.42;
 
   if (style === "pill") {
     const lineHeight = fontSize * 1.42;
     const blockHeight = lines.length * lineHeight;
-    const startY = H * 0.16 - blockHeight / 2 + randomOffsetY;
+    const startY = anchorY - blockHeight / 2 + randomOffsetY;
     const padX = 26;
     const padY = 12;
     const boxHeight = fontSize + padY * 2;
@@ -93,16 +93,15 @@ function textSvg(text, style = "pill") {
       text-anchor: middle;
     }
   </style>
-  <g transform="rotate(${randomAngle.toFixed(2)} 540 ${(H * 0.42).toFixed(0)})" filter="url(#softShadow)">
+  <g transform="rotate(${randomAngle.toFixed(2)} 540 ${anchorY.toFixed(0)})" filter="url(#softShadow)">
     ${elements}
   </g>
 </svg>`);
   }
 
-  // Estilo "outline": texto branco limpo sem pontas serrilhadas
   const lineHeight = fontSize * 1.28;
   const blockHeight = lines.length * lineHeight;
-  const startY = H * 0.42 - blockHeight / 2 + randomOffsetY;
+  const startY = anchorY - blockHeight / 2 + randomOffsetY;
 
   const tspans = lines
     .map((line, i) => {
@@ -133,7 +132,7 @@ function textSvg(text, style = "pill") {
       text-anchor: middle;
     }
   </style>
-  <g transform="rotate(${randomAngle.toFixed(2)} 540 ${(H * 0.42).toFixed(0)})" filter="url(#textShadow)">
+  <g transform="rotate(${randomAngle.toFixed(2)} 540 ${anchorY.toFixed(0)})" filter="url(#textShadow)">
     <text class="t-outline">${tspans}</text>
   </g>
 </svg>`);
