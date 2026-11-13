@@ -1,6 +1,13 @@
-import { InputFile, InputMediaBuilder } from "grammy";
+import { InputFile, InputMediaBuilder, InlineKeyboard } from "grammy";
 
-const CAPTION_LIMIT = 1024;
+const COPY_TEXT_LIMIT = 256;
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
 
 export async function sendCarouselAlbum({
   api,
@@ -9,19 +16,22 @@ export async function sendCarouselAlbum({
   imagePaths,
   legenda,
 }) {
-  const caption = `[${accountId}]\n${legenda || ""}`.trim();
-  const useCaption = caption.length <= CAPTION_LIMIT ? caption : `[${accountId}]`;
-
   const media = imagePaths.map((path, i) =>
     InputMediaBuilder.photo(
       new InputFile(path),
-      i === 0 ? { caption: useCaption } : undefined,
+      i === 0 ? { caption: `[${accountId}]` } : undefined,
     ),
   );
 
   await api.sendMediaGroup(chatId, media);
 
-  if (caption.length > CAPTION_LIMIT) {
-    await api.sendMessage(chatId, caption);
+  const text = (legenda || "").trim();
+  if (!text) return;
+
+  const opts = { parse_mode: "HTML" };
+  if (text.length <= COPY_TEXT_LIMIT) {
+    opts.reply_markup = new InlineKeyboard().copyText("Copiar legenda", text);
   }
+
+  await api.sendMessage(chatId, `<code>${escapeHtml(text)}</code>`, opts);
 }

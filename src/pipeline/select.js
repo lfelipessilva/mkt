@@ -175,7 +175,9 @@ export function selectCarousel({
     throw new Error(`não deu pra sortear ${count} imagens aleatórias`);
   }
 
-  const mid = shuffle([...pickedAleatorias, listo]);
+  const mid = shuffle([...pickedAleatorias]);
+  const listoAt = mid.length - (mid.length > 1 && Math.random() < 0.5 ? 1 : 0);
+  mid.splice(listoAt, 0, listo);
   const slides = [capa, ...mid].map((img, i) => ({
     numero: i + 1,
     filename: img.filename,

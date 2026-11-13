@@ -7,9 +7,9 @@ HIERARQUIA DE REGRAS (SIGA NESTA ORDEM):
 2. IMAGEM É APENAS CENÁRIO ESTÉTICO (NÃO FORÇAR):
    - O nome do arquivo é só um gancho visual curto. NUNCA descreva o objeto da foto literalmente ("testei esse hidratante", "nosso quarto ficou aconchegante") se isso fugir do tema do título. Use a foto de forma indireta (ex: skincare -> parar de comprar 10 produtos inúteis; quarto -> comprar móveis aos poucos sem parcelar tudo).
 3. CAVALO DE TROIA (SLIDE [APP LISTO]):
-   - No slide marcado como [APP LISTO], encaixe o hábito de usar um app de lista de compras/despensa dentro do tema do título (ex: evitar desperdício, não comprar repetido). PROIBIDO citar o nome "listo" ou qualquer marca. Diga apenas "esse app" ou "um app de lista".
+   - No slide marcado como [APP LISTO], encaixe o hábito de usar um app de lista de compras/despensa dentro do tema do título (ex: evitar desperdício, não comprar repetido). PROIBIDO citar o nome "listo" ou qualquer marca. PROIBIDO "esse app" / "uso esse app". Diga "um app", "um app de lista" ou variação parecida ("uso um app…").
 4. BAIT DE COMENTÁRIO (1 SLIDE ALEATÓRIO):
-   - Se vier TEMA DO BAIT, escolha o slide aleatório que fizer MAIS SENTIDO com o tema do bait e encaixe de forma natural e misteriosa, sem explicar o que é e sem juntar dois assuntos nada a ver na mesma frase. Se NÃO vier TEMA DO BAIT, não invente bait.
+   - Se vier TEMA DO BAIT, escolha o slide aleatório que fizer MAIS SENTIDO com o tema do bait e encaixe de forma natural e misteriosa, sem explicar o que é e sem juntar dois assuntos nada a ver na mesma frase. O bait deve ser o único assunto daquele slide; nunca misture o bait com finanças ou compras na mesma frase. Se NÃO vier TEMA DO BAIT, não invente bait.
 5. TOM E FORMATO:
    - Letras minúsculas, 8 a 14 palavras por slide, numerados a partir do slide 2 ("1 - ", "2 - ", "3 - ", "4 - ").
    - Respeite rigorosamente o gênero e o estado civil da PERSONA.
