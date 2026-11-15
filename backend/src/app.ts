@@ -2,6 +2,8 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { authenticateBearer } from "./platform/auth.js";
 import { isAppError } from "./shared/errors.js";
 import { accountsRoutes } from "./domain/accounts/routes.js";
+import { archetypesRoutes } from "./domain/archetypes/routes.js";
+import { baitsRoutes } from "./domain/baits/routes.js";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -50,6 +52,8 @@ export function buildApp(): FastifyInstance {
       });
 
       v1.register(accountsRoutes, { prefix: "/accounts" });
+      v1.register(archetypesRoutes, { prefix: "/archetypes" });
+      v1.register(baitsRoutes, { prefix: "/baits" });
     },
     { prefix: "/api/v1" }
   );

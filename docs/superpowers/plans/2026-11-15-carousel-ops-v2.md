@@ -181,10 +181,10 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `PUT /api/v1/archetypes` body `{ scope, items: { title, sort_order, active }[] }` (replace list for scope)
   - Same pattern for `/api/v1/baits`
 
-- [ ] **Step 1:** Test PUT archetypes for `couple_men` then GET returns ordered titles.
-- [ ] **Step 2:** Enforce `UNIQUE(scope, title)` on upsert (update in place).
-- [ ] **Step 3:** Implement both resources.
-- [ ] **Step 4:** Commit `feat(content): archetypes and baits by scope`.
+- [x] **Step 1:** Test PUT archetypes for `couple_men` then GET returns ordered titles.
+- [x] **Step 2:** Enforce `UNIQUE(scope, title)` on upsert (update in place).
+- [x] **Step 3:** Implement both resources.
+- [x] **Step 4:** Commit `feat(content): archetypes and baits by scope`.
 
 ---
 
