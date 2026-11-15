@@ -110,17 +110,17 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 - Produces: `runMigrations(pool): Promise<void>`
 - Consumes: `DATABASE_URL` env
 
-- [ ] **Step 1: Write failing test** — with Testcontainers or `DATABASE_URL` test DB, `runMigrations` creates `accounts` table.
+- [x] **Step 1: Write failing test** — with Testcontainers or `DATABASE_URL` test DB, `runMigrations` creates `accounts` table.
 
 ```ts
 // migrate.test.ts — assert to_regclass('public.accounts') is not null after migrate
 ```
 
-- [ ] **Step 2:** Run test → FAIL (no migrate).
-- [ ] **Step 3:** Paste schema from spec into `001_v2_schema.sql` (all enums + tables + FK on `media_usage.run_id`).
-- [ ] **Step 4:** Implement `migrate.ts` (ordered `.sql` files, idempotent `IF NOT EXISTS` only where spec already uses it).
-- [ ] **Step 5:** Test PASS; add `npm run db:migrate`.
-- [ ] **Step 6:** Commit `feat(db): v2 schema migration`.
+- [x] **Step 2:** Run test → FAIL (no migrate).
+- [x] **Step 3:** Paste schema from spec into `001_v2_schema.sql` (all enums + tables + FK on `media_usage.run_id`).
+- [x] **Step 4:** Implement `migrate.ts` (ordered `.sql` files, idempotent `IF NOT EXISTS` only where spec already uses it).
+- [x] **Step 5:** Test PASS; add `npm run db:migrate`.
+- [x] **Step 6:** Commit `feat(db): v2 schema migration`.
 
 ---
 
