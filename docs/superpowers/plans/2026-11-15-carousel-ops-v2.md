@@ -370,9 +370,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 - Baits: `scope = shared`
 - `disabledAccounts` → `enabled: false`
 
-- [ ] **Step 1:** Test seed creates 4 accounts and archetypes for each role used.
-- [ ] **Step 2:** Run `db:migrate` + `db:seed` against dev DB.
-- [ ] **Step 3:** Commit `feat(db): seed from legacy json`.
+- [x] **Step 1:** Test seed creates 4 accounts and archetypes for each role used.
+- [x] **Step 2:** Run `db:migrate` + `db:seed` against dev DB.
+- [x] **Step 3:** Commit `feat(db): seed from legacy json`.
 
 ---
 
