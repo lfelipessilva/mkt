@@ -3,6 +3,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "./app.js";
 import { scanMediaToDb } from "./domain/media/store.js";
+import { createBot } from "./bot.js";
+import { startCron } from "./cron.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,6 +31,30 @@ export async function start() {
 
     await app.listen({ port, host });
     console.log(`Server listening on ${host}:${port}`);
+
+    // Start Telegram bot and Cron schedule if configured and not in test
+    if (process.env.NODE_ENV !== "test") {
+      try {
+        const bot = createBot();
+        if (bot) {
+          bot.start().catch((botErr) => {
+            console.error("[telegram:bot] Bot polling error:", botErr);
+          });
+          console.log("[telegram:bot] Telegram bot started");
+        } else {
+          console.log("[telegram:bot] TELEGRAM_BOT_TOKEN not provided, bot skipped");
+        }
+      } catch (botInitErr) {
+        console.error("[telegram:bot] Failed to initialize bot:", botInitErr);
+      }
+
+      try {
+        startCron();
+        console.log("[cron] Scheduled cron job started");
+      } catch (cronErr: any) {
+        console.warn("[cron] Cron not started:", cronErr.message);
+      }
+    }
   } catch (err) {
     app.log.error(err);
     process.exit(1);

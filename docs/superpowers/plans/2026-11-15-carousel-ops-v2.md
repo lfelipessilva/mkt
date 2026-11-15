@@ -345,9 +345,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 - Produces: Telegram `/gerar`, `/mais`, `/status` calling `generateBatch`
 - Consumes: `generateBatch` from Task 12
 
-- [ ] **Step 1:** Test `generateBatch({})` only includes `enabled` accounts.
-- [ ] **Step 2:** Wire cron schedule; respect `app_settings` key `auto_dispatch_enabled` (default false until Integrações UI).
-- [ ] **Step 3:** Commit `feat(ops): telegram bot and cron on new api`.
+- [x] **Step 1:** Test `generateBatch({})` only includes `enabled` accounts.
+- [x] **Step 2:** Wire cron schedule; respect `app_settings` key `auto_dispatch_enabled` (default false until Integrações UI).
+- [x] **Step 3:** Commit `feat(ops): telegram bot and cron on new api`.
 
 ---
 
