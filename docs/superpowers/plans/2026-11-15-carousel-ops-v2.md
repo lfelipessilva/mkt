@@ -409,9 +409,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `GET /api/v1/tiktok/performance?accountId=&sort=views` — joins runs + `tiktok_posts`; manual fields from row
   - Stub `POST /api/v1/tiktok/sync` no-op except skips `tracking_mode = manual`
 
-- [ ] **Step 1:** Test manual upsert then performance list sorts by `views`.
-- [ ] **Step 2:** Mark run `status = published` when manual publish saved (optional `published_at` set).
-- [ ] **Step 3:** Commit `feat(tiktok): manual publish and performance list`.
+- [x] **Step 1:** Test manual upsert then performance list sorts by `views`.
+- [x] **Step 2:** Mark run `status = published` when manual publish saved (optional `published_at` set).
+- [x] **Step 3:** Commit `feat(tiktok): manual publish and performance list`.
 
 ---
 

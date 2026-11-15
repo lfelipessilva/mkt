@@ -8,6 +8,7 @@ import { baitsRoutes } from "./domain/baits/routes.js";
 import { mediaRoutes } from "./domain/media/routes.js";
 import { runsRoutes } from "./domain/runs/routes.js";
 import { dispatchRoutes } from "./domain/dispatch/routes.js";
+import { tiktokRoutes } from "./domain/tiktok/routes.js";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -68,6 +69,7 @@ export function buildApp(): FastifyInstance {
       v1.register(mediaRoutes, { prefix: "/media" });
       v1.register(runsRoutes, { prefix: "/carousels" });
       v1.register(dispatchRoutes, { prefix: "/carousels" });
+      v1.register(tiktokRoutes, { prefix: "/tiktok" });
     },
     { prefix: "/api/v1" }
   );
