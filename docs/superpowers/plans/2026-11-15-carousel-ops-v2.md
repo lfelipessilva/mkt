@@ -306,9 +306,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `generateOneCarousel({ accountId, jobId?, mockCopy?, skipRender? }): Promise<CarouselRun>`
   - Inserts `carousel_runs`, `carousel_slides`, `media_usage`; writes files under `output/`
 
-- [ ] **Step 1:** Test with `skipRender: true`, `mockCopy` → DB rows `status = generated`, slides count ≥ 1.
-- [ ] **Step 2:** Port `render` + `gemini` from legacy `run.js`; drop `postsPerRun` loops (single iteration).
-- [ ] **Step 3:** Commit `feat(runs): persist carousel generation`.
+- [x] **Step 1:** Test with `skipRender: true`, `mockCopy` → DB rows `status = generated`, slides count ≥ 1.
+- [x] **Step 2:** Port `render` + `gemini` from legacy `run.js`; drop `postsPerRun` loops (single iteration).
+- [x] **Step 3:** Commit `feat(runs): persist carousel generation`.
 
 ---
 
