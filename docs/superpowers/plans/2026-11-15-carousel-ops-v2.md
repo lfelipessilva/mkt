@@ -137,9 +137,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 - Produces: `buildApp(): FastifyInstance` with `preHandler` auth on `/api/v1/*`
 - Consumes: `API_TOKEN` env (same pattern as prior dashboard)
 
-- [ ] **Step 1:** Test `GET /api/v1/ping` without header → 401; with `Authorization: Bearer $API_TOKEN` → 200.
-- [ ] **Step 2:** Implement bearer check; public routes: `/health`, static assets.
-- [ ] **Step 3:** Commit `feat(api): bearer auth shell`.
+- [x] **Step 1:** Test `GET /api/v1/ping` without header → 401; with `Authorization: Bearer $API_TOKEN` → 200.
+- [x] **Step 2:** Implement bearer check; public routes: `/health`, static assets.
+- [x] **Step 3:** Commit `feat(api): bearer auth shell`.
 
 ---
 

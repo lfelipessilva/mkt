@@ -1,7 +1,7 @@
-import Fastify from "fastify";
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildApp } from "./app.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,13 +12,7 @@ dotenv.config();
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || "0.0.0.0";
 
-export const app = Fastify({
-  logger: process.env.NODE_ENV !== "test",
-});
-
-app.get("/health", async (_request, reply) => {
-  return reply.send({ ok: true });
-});
+export const app = buildApp();
 
 export async function start() {
   try {
