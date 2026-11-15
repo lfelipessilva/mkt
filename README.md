@@ -12,7 +12,7 @@ cp .env.example .env
 npm install
 
 # coloque fotos descritivas em:
-# media/mulher|homem|casal/{capas,aleatorias}
+# media/single_woman|single_man|couple_women|couple_men/{capas,aleatorias}
 # media/shared/{aleatorias,listo}
 
 pm2 start ecosystem.config.cjs
