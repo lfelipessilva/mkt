@@ -427,9 +427,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 - Consumes: Task 3 auth token storage
 - Produces: `AccountContext` state: `all | accountId`
 
-- [ ] **Step 1:** Login gate stores bearer token; sidebar leaves match spec nav.
-- [ ] **Step 2:** Context switcher lists accounts from `GET /accounts`.
-- [ ] **Step 3:** Commit `feat(ui): shell and account context`.
+- [x] **Step 1:** Login gate stores bearer token; sidebar leaves match spec nav.
+- [x] **Step 2:** Context switcher lists accounts from `GET /accounts`.
+- [x] **Step 3:** Commit `feat(ui): shell and account context`.
 
 ---
 
