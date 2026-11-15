@@ -389,9 +389,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `POST /api/v1/carousels/runs/:id/send` query `channel=api|telegram`
   - `dispatch_events` rows; updates run status `dispatched` on success
 
-- [ ] **Step 1:** Test telegram send mocked → event `sent`, run status updated.
-- [ ] **Step 2:** API channel POSTs to `DISPATCH_WEBHOOK_URL` with slide paths + legenda JSON.
-- [ ] **Step 3:** Commit `feat(dispatch): manual send api and telegram`.
+- [x] **Step 1:** Test telegram send mocked → event `sent`, run status updated.
+- [x] **Step 2:** API channel POSTs to `DISPATCH_WEBHOOK_URL` with slide paths + legenda JSON.
+- [x] **Step 3:** Commit `feat(dispatch): manual send api and telegram`.
 
 ---
 
