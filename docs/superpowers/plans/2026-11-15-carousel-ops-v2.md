@@ -202,10 +202,10 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `mergeBaits(sharedRows, roleRows): Bait[]` — dedupe by `body.trim().toLowerCase()`, role wins
   - `loadEffectiveForAccount(accountId): Promise<{ archetypes, baits, role }>` — loads from DB
 
-- [ ] **Step 1:** Test duplicate title in shared and role → single row, source role.
-- [ ] **Step 2:** Test duplicate bait body with different casing → one row.
-- [ ] **Step 3:** Implement pure functions + DB loader.
-- [ ] **Step 4:** Commit `feat(content): shared union role dedupe`.
+- [x] **Step 1:** Test duplicate title in shared and role → single row, source role.
+- [x] **Step 2:** Test duplicate bait body with different casing → one row.
+- [x] **Step 3:** Implement pure functions + DB loader.
+- [x] **Step 4:** Commit `feat(content): shared union role dedupe`.
 
 ---
 
