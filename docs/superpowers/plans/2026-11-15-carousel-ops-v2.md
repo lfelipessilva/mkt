@@ -265,10 +265,10 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `selectCarousel(input: { role, archetypes, baits, mediaRoot, usage, usageDays }): Selection`
 - Consumes: Task 6 merge output; Task 7 paths
 
-- [ ] **Step 1:** Port existing `select.js` tests behavior: capas from role only, aleatorias role∪shared, listo shared only.
-- [ ] **Step 2:** Replace `mediaRole` string with `account_role` enum values.
-- [ ] **Step 3:** Remove `archetypesByAccount[accountId]` — use merged lists.
-- [ ] **Step 4:** Commit `feat(pipeline): port selection to role scopes`.
+- [x] **Step 1:** Port existing `select.js` tests behavior: capas from role only, aleatorias role∪shared, listo shared only.
+- [x] **Step 2:** Replace `mediaRole` string with `account_role` enum values.
+- [x] **Step 3:** Remove `archetypesByAccount[accountId]` — use merged lists.
+- [x] **Step 4:** Commit `feat(pipeline): port selection to role scopes`.
 
 ---
 
