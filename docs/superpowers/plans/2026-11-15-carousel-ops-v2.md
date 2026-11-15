@@ -158,11 +158,11 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `deleteAccount(id): Promise<void>`
   - Routes: `GET/POST/PATCH/DELETE /api/v1/accounts`
 
-- [ ] **Step 1:** Test list empty → `[]`; POST with `role: 'single_woman'` → 201; invalid role → 400.
-- [ ] **Step 2:** Zod schema: `id`, `persona`, `role`, `enabled`, optional `display_name`, `tiktok_open_id`.
-- [ ] **Step 3:** Implement store + routes; register in `app.ts`.
-- [ ] **Step 4:** Tests PASS.
-- [ ] **Step 5:** Commit `feat(accounts): crud api`.
+- [x] **Step 1:** Test list empty → `[]`; POST with `role: 'single_woman'` → 201; invalid role → 400.
+- [x] **Step 2:** Zod schema: `id`, `persona`, `role`, `enabled`, optional `display_name`, `tiktok_open_id`.
+- [x] **Step 3:** Implement store + routes; register in `app.ts`.
+- [x] **Step 4:** Tests PASS.
+- [x] **Step 5:** Commit `feat(accounts): crud api`.
 
 ---
 

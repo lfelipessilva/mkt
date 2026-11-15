@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { authenticateBearer } from "./platform/auth.js";
 import { isAppError } from "./shared/errors.js";
+import { accountsRoutes } from "./domain/accounts/routes.js";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -47,6 +48,8 @@ export function buildApp(): FastifyInstance {
       v1.get("/ping", async (_request, reply) => {
         return reply.send({ ok: true });
       });
+
+      v1.register(accountsRoutes, { prefix: "/accounts" });
     },
     { prefix: "/api/v1" }
   );
