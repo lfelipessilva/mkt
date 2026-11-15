@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "./app.js";
+import { scanMediaToDb } from "./domain/media/store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -16,6 +17,16 @@ export const app = buildApp();
 
 export async function start() {
   try {
+    // Scan media into database on dev startup
+    if (process.env.NODE_ENV !== "test" && process.env.NODE_ENV !== "production") {
+      try {
+        const scanned = await scanMediaToDb();
+        console.log(`[media:scan] Initial dev scan synced ${scanned} assets to database`);
+      } catch (scanErr) {
+        console.warn("[media:scan] Initial dev scan skipped or failed:", scanErr);
+      }
+    }
+
     await app.listen({ port, host });
     console.log(`Server listening on ${host}:${port}`);
   } catch (err) {

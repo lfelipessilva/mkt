@@ -1,13 +1,22 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import multipart from "@fastify/multipart";
 import { authenticateBearer } from "./platform/auth.js";
 import { isAppError } from "./shared/errors.js";
 import { accountsRoutes } from "./domain/accounts/routes.js";
 import { archetypesRoutes } from "./domain/archetypes/routes.js";
 import { baitsRoutes } from "./domain/baits/routes.js";
+import { mediaRoutes } from "./domain/media/routes.js";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
     logger: process.env.NODE_ENV !== "test",
+  });
+
+  // Register multipart support for file uploads (50MB limit)
+  app.register(multipart, {
+    limits: {
+      fileSize: 50 * 1024 * 1024,
+    },
   });
 
   app.setErrorHandler((error, _request, reply) => {
@@ -54,6 +63,7 @@ export function buildApp(): FastifyInstance {
       v1.register(accountsRoutes, { prefix: "/accounts" });
       v1.register(archetypesRoutes, { prefix: "/archetypes" });
       v1.register(baitsRoutes, { prefix: "/baits" });
+      v1.register(mediaRoutes, { prefix: "/media" });
     },
     { prefix: "/api/v1" }
   );

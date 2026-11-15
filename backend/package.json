@@ -11,9 +11,11 @@
     "start": "node dist/index.js",
     "build": "tsc -p tsconfig.json",
     "db:migrate": "tsx src/shared/db/migrate.ts",
+    "media:scan": "tsx scripts/scan-media.ts",
     "test": "NODE_ENV=test tsx --test --test-concurrency=1 \"tests/**/*.test.ts\""
   },
   "dependencies": {
+    "@fastify/multipart": "^10.1.8",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
     "pg": "^8.23.1",
