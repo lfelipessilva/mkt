@@ -1,8 +1,22 @@
-export type AccountRole =
-  | "single_man"
-  | "single_woman"
-  | "couple_men"
-  | "couple_women";
+export const ACCOUNT_ROLES = [
+  "single_man",
+  "single_woman",
+  "couple_men",
+  "couple_women",
+] as const;
+
+export type AccountRole = (typeof ACCOUNT_ROLES)[number];
+
+export function isValidRole(role: string): role is AccountRole {
+  return ACCOUNT_ROLES.includes(role as AccountRole);
+}
+
+export const ROLE_LABELS: Record<AccountRole, string> = {
+  single_man: "Homem Solteiro",
+  single_woman: "Mulher Solteira",
+  couple_men: "Casal Homens",
+  couple_women: "Casal Mulheres",
+};
 
 export interface Account {
   id: string;
@@ -11,6 +25,138 @@ export interface Account {
   role: AccountRole;
   enabled: boolean;
   tiktok_open_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface CreateAccountInput {
+  id: string;
+  display_name?: string | null;
+  persona: string;
+  role: AccountRole;
+  enabled?: boolean;
+  tiktok_open_id?: string | null;
+}
+
+export interface UpdateAccountInput {
+  display_name?: string | null;
+  persona?: string;
+  role?: AccountRole;
+  enabled?: boolean;
+  tiktok_open_id?: string | null;
+}
+
+export function validateAccountInput(input: {
+  id?: string;
+  role?: string;
+  persona?: string;
+  enabled?: boolean;
+}): { valid: boolean; error?: string } {
+  if (!input.id || !input.id.trim()) {
+    return { valid: false, error: "ID da conta é obrigatório" };
+  }
+  const cleanId = input.id.trim();
+  if (!/^[a-zA-Z0-9_.-]+$/.test(cleanId)) {
+    return {
+      valid: false,
+      error: "ID deve conter apenas letras, números, sublinhados, pontos ou hífens",
+    };
+  }
+  if (!input.role || !isValidRole(input.role)) {
+    return {
+      valid: false,
+      error: `Role inválido. Permitidos: ${ACCOUNT_ROLES.join(", ")}`,
+    };
+  }
+  return { valid: true };
+}
+
+export const CONTENT_SCOPES = [
+  "shared",
+  "single_man",
+  "single_woman",
+  "couple_men",
+  "couple_women",
+] as const;
+
+export type ContentScope = (typeof CONTENT_SCOPES)[number];
+
+export function resolveDefaultScope(
+  selectedAccountId: string,
+  selectedAccount: Account | null
+): ContentScope {
+  if (selectedAccountId !== "all" && selectedAccount?.role) {
+    return selectedAccount.role;
+  }
+  return "shared";
+}
+
+export const SCOPE_LABELS: Record<ContentScope, string> = {
+  shared: "Compartilhado (Geral)",
+  single_man: "Homem Solteiro",
+  single_woman: "Mulher Solteira",
+  couple_men: "Casal Homens",
+  couple_women: "Casal Mulheres",
+};
+
+export interface Archetype {
+  id: string;
+  scope: ContentScope;
+  title: string;
+  sort_order: number;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ArchetypeInputItem {
+  id?: string;
+  title: string;
+  sort_order?: number;
+  active?: boolean;
+}
+
+export interface Bait {
+  id: string;
+  scope: ContentScope;
+  body: string;
+  sort_order: number;
+  active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface BaitInputItem {
+  id?: string;
+  body: string;
+  sort_order?: number;
+  active?: boolean;
+}
+
+export const MEDIA_CATEGORIES = ["capas", "aleatorias", "listo"] as const;
+export type MediaCategory = (typeof MEDIA_CATEGORIES)[number];
+
+export const MEDIA_CATEGORIES_FOR_SCOPE: Record<
+  ContentScope,
+  readonly MediaCategory[]
+> = {
+  shared: ["aleatorias", "listo"],
+  single_man: ["capas", "aleatorias"],
+  single_woman: ["capas", "aleatorias"],
+  couple_men: ["capas", "aleatorias"],
+  couple_women: ["capas", "aleatorias"],
+};
+
+export interface MediaAsset {
+  id: string;
+  scope: ContentScope;
+  category: MediaCategory;
+  storage_path: string;
+  filename: string;
+  byte_size?: number | null;
+  width?: number | null;
+  height?: number | null;
+  active: boolean;
   created_at?: string;
   updated_at?: string;
 }

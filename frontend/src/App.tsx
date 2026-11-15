@@ -3,6 +3,9 @@ import type { NavTab } from "./types";
 import { AccountProvider, useAccount } from "./context";
 import { LoginGate } from "./components/LoginGate";
 import { Sidebar } from "./components/Sidebar";
+import { AccountsPage } from "./tabs/settings/AccountsPage";
+import { TextsPage } from "./tabs/settings/TextsPage";
+import { MediaPage } from "./tabs/settings/MediaPage";
 
 const TAB_TITLES: Record<NavTab, string> = {
   desempenho: "Desempenho de Carrosséis",
@@ -40,20 +43,28 @@ function ShellContent(): React.JSX.Element {
         </header>
 
         <main className="main-content" data-testid={`tab-content-${currentTab}`}>
-          <div className="scaffold-card">
-            <span className="scaffold-badge">Scaffold / {currentTab}</span>
-            <h3>{TAB_TITLES[currentTab]}</h3>
-            <p>
-              Visualização para a aba <strong>{currentTab}</strong> com contexto
-              ativo em{" "}
-              <strong>
-                {selectedAccountId === "all"
-                  ? "Todas as contas"
-                  : `@${selectedAccount?.id ?? selectedAccountId}`}
-              </strong>
-              .
-            </p>
-          </div>
+          {currentTab === "contas" ? (
+            <AccountsPage />
+          ) : currentTab === "textos" ? (
+            <TextsPage />
+          ) : currentTab === "midias" ? (
+            <MediaPage />
+          ) : (
+            <div className="scaffold-card">
+              <span className="scaffold-badge">Scaffold / {currentTab}</span>
+              <h3>{TAB_TITLES[currentTab]}</h3>
+              <p>
+                Visualização para a aba <strong>{currentTab}</strong> com contexto
+                ativo em{" "}
+                <strong>
+                  {selectedAccountId === "all"
+                    ? "Todas as contas"
+                    : `@${selectedAccount?.id ?? selectedAccountId}`}
+                </strong>
+                .
+              </p>
+            </div>
+          )}
         </main>
       </div>
     </div>

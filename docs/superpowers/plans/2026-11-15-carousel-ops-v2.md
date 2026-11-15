@@ -440,11 +440,11 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 **Files:**
 - Create: `frontend/src/tabs/settings/AccountsPage.tsx`, `TextsPage.tsx`, `MediaPage.tsx`, `components/AuthImage.tsx`
 
-- [ ] **Step 1:** Accounts CRUD forms with role select (4 enums).
-- [ ] **Step 2:** Texts page: scope tabs `shared` + 4 roles; edit archetypes + baits lists.
-- [ ] **Step 3:** Media grid by scope/category; upload/delete; thumbnails via `/api/v1/media/file`.
-- [ ] **Step 4:** Pinned account opens role scope by default.
-- [ ] **Step 5:** Commit `feat(ui): configuration pages`.
+- [x] **Step 1:** Accounts CRUD forms with role select (4 enums).
+- [x] **Step 2:** Texts page: scope tabs `shared` + 4 roles; edit archetypes + baits lists.
+- [x] **Step 3:** Media grid by scope/category; upload/delete; thumbnails via `/api/v1/media/file`.
+- [x] **Step 4:** Pinned account opens role scope by default.
+- [x] **Step 5:** Commit `feat(ui): configuration pages`.
 
 ---
 
