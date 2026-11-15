@@ -161,6 +161,44 @@ export interface MediaAsset {
   updated_at?: string;
 }
 
+export interface GenerationJobProgress {
+  id: string;
+  jobId: string;
+  status: "pending" | "running" | "completed" | "failed";
+  account_ids: string[];
+  total: number;
+  completed: number;
+  failed: number;
+  started_at?: string | null;
+  finished_at?: string | null;
+  error_message?: string | null;
+  created_at?: string;
+  job?: any;
+  runs?: CarouselRunSummary[];
+}
+
+export interface CarouselRunSummary {
+  id: string;
+  job_id?: string | null;
+  account_id: string;
+  account_role?: AccountRole;
+  archetype_title?: string;
+  bait_body?: string | null;
+  tema?: string | null;
+  legenda?: string;
+  status: "generating" | "generated" | "dispatching" | "dispatched" | "published" | "failed";
+  output_dir?: string | null;
+  error_message?: string | null;
+  generated_at?: string | null;
+  created_at?: string;
+}
+
+export interface GenerateCarouselsInput {
+  accountIds?: string[];
+  mockCopy?: any;
+  skipRender?: boolean;
+}
+
 export type NavTab =
   | "desempenho"
   | "galeria"

@@ -455,9 +455,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 **Files:**
 - Create: `frontend/src/tabs/GeneratePage.tsx`
 
-- [ ] **Step 1:** Modes: all enabled | checkbox accounts; show count = selected accounts.
-- [ ] **Step 2:** Poll job/run status; toast on complete.
-- [ ] **Step 3:** Commit `feat(ui): generate console`.
+- [x] **Step 1:** Modes: all enabled | checkbox accounts; show count = selected accounts.
+- [x] **Step 2:** Poll job/run status; toast on complete.
+- [x] **Step 3:** Commit `feat(ui): generate console`.
 
 ---
 

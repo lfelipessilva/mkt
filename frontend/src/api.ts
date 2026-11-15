@@ -9,7 +9,11 @@ import type {
   ContentScope,
   MediaAsset,
   MediaCategory,
+  GenerateCarouselsInput,
+  GenerationJobProgress,
 } from "./types";
+
+export type { GenerateCarouselsInput, GenerationJobProgress };
 
 export const TOKEN_STORAGE_KEY = "listo_api_token";
 
@@ -260,4 +264,52 @@ export async function fetchMediaBlob(storagePath: string): Promise<string> {
   }
   const blob = await response.blob();
   return URL.createObjectURL(blob);
+}
+
+export async function generateCarousels(
+  input: GenerateCarouselsInput = {}
+): Promise<GenerationJobProgress> {
+  return apiFetch<GenerationJobProgress>("/carousels/generate", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getGenerationJob(
+  jobId: string
+): Promise<GenerationJobProgress> {
+  return apiFetch<GenerationJobProgress>(
+    `/carousels/jobs/${encodeURIComponent(jobId)}`
+  );
+}
+
+export interface PollJobOptions {
+  intervalMs?: number;
+  maxAttempts?: number;
+  onProgress?: (progress: GenerationJobProgress) => void;
+}
+
+export async function pollGenerationJob(
+  jobId: string,
+  options: PollJobOptions = {}
+): Promise<GenerationJobProgress> {
+  const intervalMs = options.intervalMs ?? 1500;
+  const maxAttempts = options.maxAttempts ?? 120; // ~3 mins max by default
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    attempts++;
+    const progress = await getGenerationJob(jobId);
+    if (options.onProgress) {
+      options.onProgress(progress);
+    }
+
+    if (progress.status === "completed" || progress.status === "failed") {
+      return progress;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  throw new Error(`Tempo limite de polling excedido para a geração do job ${jobId}`);
 }
