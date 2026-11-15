@@ -52,7 +52,21 @@ export function getMediaRoot(customRoot?: string): string {
 }
 
 /**
- * Safely resolves a media path against the media root directory, preventing any path traversal.
+ * Resolves the absolute output root directory.
+ */
+export function getOutputDir(customRoot?: string): string {
+  if (customRoot) return path.resolve(customRoot);
+  if (process.env.OUTPUT_DIR) return path.resolve(process.env.OUTPUT_DIR);
+  const cwdOutput = path.resolve(process.cwd(), "output");
+  if (fs.existsSync(cwdOutput)) return cwdOutput;
+  const parentOutput = path.resolve(process.cwd(), "../output");
+  if (fs.existsSync(parentOutput)) return parentOutput;
+  return cwdOutput;
+}
+
+/**
+ * Safely resolves a media path against the media root directory (or output root for generated slides),
+ * preventing any path traversal.
  */
 export function safeResolveMediaPath(inputPath: string, mediaRoot?: string): string {
   if (!inputPath || typeof inputPath !== "string" || !inputPath.trim()) {
@@ -60,6 +74,36 @@ export function safeResolveMediaPath(inputPath: string, mediaRoot?: string): str
   }
 
   const raw = inputPath.trim().replace(/\\/g, "/");
+
+  // Output directory check for generated slide images
+  const outRoot = getOutputDir();
+  const normalizedOutRoot = outRoot.replace(/\\/g, "/");
+  if (
+    raw.startsWith("output/") ||
+    raw.startsWith("/output/") ||
+    (raw.startsWith("/") && raw.startsWith(normalizedOutRoot))
+  ) {
+    let cleanOutput = raw;
+    if (cleanOutput.startsWith("/output/")) {
+      cleanOutput = cleanOutput.slice(8);
+    } else if (cleanOutput.startsWith("output/")) {
+      cleanOutput = cleanOutput.slice(7);
+    } else if (cleanOutput.startsWith(normalizedOutRoot)) {
+      cleanOutput = cleanOutput.slice(normalizedOutRoot.length);
+      if (cleanOutput.startsWith("/")) cleanOutput = cleanOutput.slice(1);
+    }
+
+    const resolvedOutput = path.resolve(outRoot, cleanOutput);
+    const relOutput = path.relative(outRoot, resolvedOutput);
+    if (relOutput.startsWith("..") || path.isAbsolute(relOutput)) {
+      throw new AppError(
+        `Path traversal rejected: path '${inputPath}' resolves outside output root`,
+        400,
+        "invalid_path"
+      );
+    }
+    return resolvedOutput;
+  }
 
   // Reject explicit absolute system paths unless prefixed by /media/
   if (raw.startsWith("/") && !raw.startsWith("/media/")) {

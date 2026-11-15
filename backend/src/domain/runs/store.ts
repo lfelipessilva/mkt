@@ -231,7 +231,30 @@ export async function listCarouselRuns(
   `;
 
   const result = await p.query(query, params);
-  return result.rows.map(mapCarouselRunRow);
+  const runs = result.rows.map(mapCarouselRunRow);
+
+  if (runs.length > 0) {
+    const runIds = runs.map((r) => r.id);
+    const slidesResult = await p.query(
+      `SELECT id, run_id, position, storage_path, media_id
+       FROM carousel_slides
+       WHERE run_id = ANY($1)
+       ORDER BY position ASC`,
+      [runIds]
+    );
+    const slidesByRun = new Map<string, CarouselSlide[]>();
+    for (const row of slidesResult.rows) {
+      const slide = mapCarouselSlideRow(row);
+      const list = slidesByRun.get(slide.run_id) || [];
+      list.push(slide);
+      slidesByRun.set(slide.run_id, list);
+    }
+    for (const run of runs) {
+      run.slides = slidesByRun.get(run.id) || [];
+    }
+  }
+
+  return runs;
 }
 
 export async function deleteCarouselRun(

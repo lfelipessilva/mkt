@@ -7,6 +7,8 @@ import { AccountsPage } from "./tabs/settings/AccountsPage";
 import { TextsPage } from "./tabs/settings/TextsPage";
 import { MediaPage } from "./tabs/settings/MediaPage";
 import { GeneratePage } from "./tabs/GeneratePage";
+import { GalleryPage } from "./tabs/GalleryPage";
+import { PerformancePage } from "./tabs/PerformancePage";
 
 const TAB_TITLES: Record<NavTab, string> = {
   desempenho: "Desempenho de Carrosséis",
@@ -44,7 +46,11 @@ function ShellContent(): React.JSX.Element {
         </header>
 
         <main className="main-content" data-testid={`tab-content-${currentTab}`}>
-          {currentTab === "gerar" ? (
+          {currentTab === "desempenho" ? (
+            <PerformancePage />
+          ) : currentTab === "galeria" ? (
+            <GalleryPage />
+          ) : currentTab === "gerar" ? (
             <GeneratePage />
           ) : currentTab === "contas" ? (
             <AccountsPage />

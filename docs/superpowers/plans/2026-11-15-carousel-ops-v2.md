@@ -468,10 +468,10 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 **Files:**
 - Create: `frontend/src/tabs/GalleryPage.tsx`, `PerformancePage.tsx`, `components/RunCard.tsx`, `ManualTikTokModal.tsx`
 
-- [ ] **Step 1:** Gallery filmstrip per run; **Send** calls Task 15.
-- [ ] **Step 2:** Desempenho table from Task 16; sort by views; account filter respects context.
-- [ ] **Step 3:** Modal **Marcar como publicado manualmente** → PUT tiktok post.
-- [ ] **Step 4:** Commit `feat(ui): gallery performance manual tiktok`.
+- [x] **Step 1:** Gallery filmstrip per run; **Send** calls Task 15.
+- [x] **Step 2:** Desempenho table from Task 16; sort by views; account filter respects context.
+- [x] **Step 3:** Modal **Marcar como publicado manualmente** → PUT tiktok post.
+- [x] **Step 4:** Commit `feat(ui): gallery performance manual tiktok`.
 
 ---
 

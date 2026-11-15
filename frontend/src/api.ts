@@ -11,6 +11,11 @@ import type {
   MediaCategory,
   GenerateCarouselsInput,
   GenerationJobProgress,
+  CarouselRun,
+  DispatchResult,
+  TikTokPerformanceItem,
+  TikTokPost,
+  UpsertTikTokPostInput,
 } from "./types";
 
 export type { GenerateCarouselsInput, GenerationJobProgress };
@@ -313,3 +318,93 @@ export async function pollGenerationJob(
 
   throw new Error(`Tempo limite de polling excedido para a geração do job ${jobId}`);
 }
+
+export interface GetCarouselRunsFilters {
+  accountId?: string;
+  jobId?: string;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export async function getCarouselRuns(
+  filters: GetCarouselRunsFilters = {}
+): Promise<CarouselRun[]> {
+  const params = new URLSearchParams();
+  if (filters.accountId) params.set("accountId", filters.accountId);
+  if (filters.jobId) params.set("jobId", filters.jobId);
+  if (filters.status && filters.status !== "all") params.set("status", filters.status);
+  if (filters.limit !== undefined) params.set("limit", String(filters.limit));
+  if (filters.offset !== undefined) params.set("offset", String(filters.offset));
+
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<CarouselRun[]>(`/carousels/runs${query}`);
+}
+
+export async function getCarouselRun(id: string): Promise<CarouselRun> {
+  return apiFetch<CarouselRun>(`/carousels/runs/${encodeURIComponent(id)}`);
+}
+
+export async function dispatchCarouselRun(
+  runId: string,
+  channel: "telegram" | "api" = "telegram"
+): Promise<DispatchResult> {
+  return apiFetch<DispatchResult>(
+    `/carousels/runs/${encodeURIComponent(runId)}/send?channel=${encodeURIComponent(channel)}`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export interface GetTikTokPerformanceFilters {
+  accountId?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
+export async function getTikTokPerformance(
+  filters: GetTikTokPerformanceFilters = {}
+): Promise<TikTokPerformanceItem[]> {
+  const params = new URLSearchParams();
+  if (filters.accountId && filters.accountId !== "all") {
+    params.set("accountId", filters.accountId);
+  }
+  if (filters.sort) params.set("sort", filters.sort);
+  if (filters.order) params.set("order", filters.order);
+  if (filters.limit !== undefined) params.set("limit", String(filters.limit));
+  if (filters.offset !== undefined) params.set("offset", String(filters.offset));
+
+  const query = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<TikTokPerformanceItem[]>(`/tiktok/performance${query}`);
+}
+
+export async function upsertTikTokPost(
+  runId: string,
+  data: UpsertTikTokPostInput
+): Promise<{ ok: boolean; post: TikTokPost; run: CarouselRun }> {
+  return apiFetch<{ ok: boolean; post: TikTokPost; run: CarouselRun }>(
+    `/tiktok/posts/${encodeURIComponent(runId)}`,
+    {
+      method: "PUT",
+      body: JSON.stringify(data),
+    }
+  );
+}
+
+export interface TikTokSyncResult {
+  ok: boolean;
+  status: string;
+  posts_updated: number;
+  skipped_manual: number;
+  sync_run_id: string;
+}
+
+export async function syncTikTok(): Promise<TikTokSyncResult> {
+  return apiFetch<TikTokSyncResult>("/tiktok/sync", {
+    method: "POST",
+  });
+}
+

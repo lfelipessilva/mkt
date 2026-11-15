@@ -161,6 +161,115 @@ export interface MediaAsset {
   updated_at?: string;
 }
 
+export interface CarouselSlide {
+  id: string;
+  run_id: string;
+  position: number;
+  storage_path: string;
+  media_id?: string | null;
+}
+
+export type RunStatus =
+  | "generating"
+  | "generated"
+  | "dispatching"
+  | "dispatched"
+  | "published"
+  | "failed";
+
+export interface CarouselRun {
+  id: string;
+  job_id?: string | null;
+  account_id: string;
+  account_role?: AccountRole;
+  archetype_title: string;
+  bait_body?: string | null;
+  tema?: string | null;
+  legenda: string;
+  status: RunStatus;
+  output_dir?: string | null;
+  error_message?: string | null;
+  generated_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  slides?: CarouselSlide[];
+}
+
+export interface DispatchResult {
+  ok: boolean;
+  id: string;
+  status: "pending" | "sent" | "failed";
+  event: any;
+  run: CarouselRun;
+}
+
+export type TikTokTrackingMode = "manual" | "api";
+
+export interface TikTokPost {
+  id: string;
+  run_id: string;
+  tracking_mode: TikTokTrackingMode;
+  video_id?: string | null;
+  video_url?: string | null;
+  published_at?: string | null;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  metrics_note?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TikTokPerformanceItem {
+  id: string;
+  tiktok_post_id: string;
+  run_id: string;
+  account_id: string;
+  account_role: string;
+  account_display_name?: string | null;
+  archetype_title: string;
+  bait_body?: string | null;
+  tema?: string | null;
+  legenda: string;
+  status: string;
+  output_dir?: string | null;
+  tracking_mode: TikTokTrackingMode | string;
+  video_id?: string | null;
+  video_url?: string | null;
+  published_at?: string | null;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  metrics_note?: string | null;
+  generated_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  run?: CarouselRun;
+  post?: TikTokPost;
+}
+
+export interface UpsertTikTokPostInput {
+  video_url?: string | null;
+  video_id?: string | null;
+  published_at?: string | Date | null;
+  views?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  metrics_note?: string | null;
+  tracking_mode?: TikTokTrackingMode;
+}
+
+export type TikTokPerformanceSortField =
+  | "views"
+  | "likes"
+  | "comments"
+  | "shares"
+  | "published_at"
+  | "created_at";
+
 export interface GenerationJobProgress {
   id: string;
   jobId: string;
