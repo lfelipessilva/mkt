@@ -286,9 +286,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `recordMediaUsage(runId, mediaIds[]): Promise<void>`
   - `recentlyUsedFilenames(role, days): Promise<Set<string>>` replacing `loadUsage` JSON
 
-- [ ] **Step 1:** Test after record, filename excluded from `available()` pool within window.
-- [ ] **Step 2:** Wire `usageDays = 7` from env default.
-- [ ] **Step 3:** Commit `feat(media): pg-backed usage rotation`.
+- [x] **Step 1:** Test after record, filename excluded from `available()` pool within window.
+- [x] **Step 2:** Wire `usageDays = 7` from env default.
+- [x] **Step 3:** Commit `feat(media): pg-backed usage rotation`.
 
 ---
 

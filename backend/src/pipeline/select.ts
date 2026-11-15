@@ -1,6 +1,7 @@
 import { readdirSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { Pool } from "pg";
+import { getPool } from "../shared/db/client.js";
 import { AppError } from "../shared/errors.js";
 import {
   AccountRoleSchema,
@@ -9,8 +10,15 @@ import {
 import { getAccount } from "../domain/accounts/store.js";
 import { loadEffectiveForAccount } from "../domain/content/effective.js";
 import { getMediaRoot } from "../domain/media/paths.js";
+import {
+  getUsageDays,
+  recordMediaUsage,
+  recentlyUsedFilenames,
+} from "../domain/media/store.js";
 import type { Archetype } from "../domain/archetypes/schemas.js";
 import type { Bait } from "../domain/baits/schemas.js";
+
+export { getUsageDays, recordMediaUsage, recentlyUsedFilenames };
 
 const IMAGE_RE = /\.(jpe?g|png|webp)$/i;
 
@@ -70,6 +78,7 @@ export interface SelectCarouselInput {
   persona?: string;
   accountId?: string;
   usage?: UsageData | null;
+  usedFilenames?: Set<string>;
   usageDays?: number;
   aleatoriasCount?: number;
   now?: number;
@@ -147,10 +156,6 @@ export function pruneUsage(usage?: UsageData | null, days = 7, now = Date.now())
   };
 }
 
-export function recentlyUsedFilenames(usage?: UsageData | null): Set<string> {
-  return new Set((usage?.entries || []).map((e) => e.filename));
-}
-
 export function recentlyUsedBaits(usage?: UsageData | null): Set<string> {
   return new Set((usage?.baits || []).map((e) => e.bait));
 }
@@ -178,7 +183,7 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function available(pool: MediaImage[], used: Set<string>, need = 1): MediaImage[] {
+export function available(pool: MediaImage[], used: Set<string>, need = 1): MediaImage[] {
   const free = pool.filter((img) => !used.has(img.filename));
   return free.length >= need ? free : pool;
 }
@@ -196,7 +201,8 @@ export function selectCarousel({
   persona,
   accountId,
   usage,
-  usageDays = 7,
+  usedFilenames,
+  usageDays,
   aleatoriasCount,
   now = Date.now(),
 }: SelectCarouselInput): CarouselSelection {
@@ -216,8 +222,12 @@ export function selectCarousel({
     typeof b === "string" ? b : b.body
   );
 
-  const pruned = pruneUsage(usage, usageDays, now);
-  const used = recentlyUsedFilenames(pruned);
+  const effectiveUsageDays = getUsageDays(usageDays);
+  const pruned = pruneUsage(usage, effectiveUsageDays, now);
+  const legacyUsed = new Set((pruned.entries || []).map((e) => e.filename));
+  const used = usedFilenames
+    ? new Set([...usedFilenames, ...legacyUsed])
+    : legacyUsed;
   const usedBaits = recentlyUsedBaits(pruned);
 
   const dirs = resolveMediaForRole(mediaRoot, role);
@@ -322,19 +332,32 @@ export async function selectCarouselForAccount(
     pool?: Pool;
     mediaRoot?: string;
     usage?: UsageData;
+    usedFilenames?: Set<string>;
     usageDays?: number;
     aleatoriasCount?: number;
     now?: number;
   } = {}
 ): Promise<CarouselSelection> {
-  const account = await getAccount(accountId, options.pool);
+  const p = options.pool || getPool();
+  const account = await getAccount(accountId, p);
   if (!account) {
     throw new AppError(`Account not found: ${accountId}`, 404, "not_found");
   }
 
-  const effective = await loadEffectiveForAccount(accountId, options.pool, {
+  const effective = await loadEffectiveForAccount(accountId, p, {
     activeOnly: true,
   });
+
+  const usageDays = getUsageDays(options.usageDays);
+
+  let usedFilenames = options.usedFilenames;
+  if (!usedFilenames && !options.usage) {
+    try {
+      usedFilenames = await recentlyUsedFilenames(account.role, usageDays, p);
+    } catch {
+      usedFilenames = new Set<string>();
+    }
+  }
 
   return selectCarousel({
     role: account.role,
@@ -344,7 +367,8 @@ export async function selectCarouselForAccount(
     accountId: account.id,
     mediaRoot: options.mediaRoot,
     usage: options.usage,
-    usageDays: options.usageDays,
+    usedFilenames,
+    usageDays,
     aleatoriasCount: options.aleatoriasCount,
     now: options.now,
   });

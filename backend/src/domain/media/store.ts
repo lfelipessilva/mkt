@@ -4,6 +4,7 @@ import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
 import { AppError } from "../../shared/errors.js";
 import type { ContentScope } from "../archetypes/schemas.js";
+import type { AccountRole } from "../accounts/schemas.js";
 import {
   MEDIA_SCOPES,
   validCategoriesForScope,
@@ -287,4 +288,103 @@ export async function deleteMediaAsset(
     // If safeResolve fails or file doesn't exist, log and proceed
     console.warn(`[media:delete] Could not unlink disk file for '${storagePath}':`, err);
   }
+}
+
+/**
+ * Returns the effective usageDays window, defaulting to 7 or the USAGE_DAYS environment variable.
+ */
+export function getUsageDays(override?: number): number {
+  if (override !== undefined && !Number.isNaN(override)) {
+    return override;
+  }
+  const fromEnv = Number(process.env.USAGE_DAYS);
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 7;
+}
+
+/**
+ * Records usage of media assets for a carousel run in the media_usage table.
+ */
+export async function recordMediaUsage(
+  runId: string,
+  mediaIds: string[],
+  poolInstance?: Pool,
+  usedAt?: Date
+): Promise<void> {
+  if (!mediaIds || mediaIds.length === 0) {
+    return;
+  }
+
+  const p = poolInstance || getPool();
+  const uniqueMediaIds = [...new Set(mediaIds)];
+
+  const values: string[] = [];
+  const params: unknown[] = [runId];
+
+  if (usedAt) {
+    params.push(usedAt);
+    const dateParamIdx = params.length;
+    for (let i = 0; i < uniqueMediaIds.length; i++) {
+      params.push(uniqueMediaIds[i]);
+      values.push(`($${params.length}, $1, $${dateParamIdx})`);
+    }
+  } else {
+    for (let i = 0; i < uniqueMediaIds.length; i++) {
+      params.push(uniqueMediaIds[i]);
+      values.push(`($${params.length}, $1, NOW())`);
+    }
+  }
+
+  const query = `
+    INSERT INTO media_usage (media_id, run_id, used_at)
+    VALUES ${values.join(", ")}
+    ON CONFLICT (media_id, run_id) DO UPDATE SET used_at = EXCLUDED.used_at
+  `;
+
+  await p.query(query, params);
+}
+
+/**
+ * Returns a set of filenames of media assets recently used for a given role within the day window.
+ */
+export async function recentlyUsedFilenames(
+  roleOrUsage: AccountRole | { entries?: Array<{ filename: string }> } | null | undefined,
+  days?: number | Pool,
+  poolInstance?: Pool
+): Promise<Set<string>> {
+  if (
+    roleOrUsage &&
+    typeof roleOrUsage === "object" &&
+    !("length" in roleOrUsage) &&
+    "entries" in roleOrUsage
+  ) {
+    return new Set((roleOrUsage.entries || []).map((e) => e.filename));
+  }
+
+  const role = roleOrUsage as AccountRole;
+  let effectiveDays: number;
+  let p: Pool;
+
+  if (typeof days === "number") {
+    effectiveDays = days;
+    p = poolInstance || getPool();
+  } else if (days && typeof days === "object" && "query" in days) {
+    effectiveDays = getUsageDays();
+    p = days as Pool;
+  } else {
+    effectiveDays = getUsageDays();
+    p = poolInstance || getPool();
+  }
+
+  const query = `
+    SELECT DISTINCT ma.filename
+    FROM media_usage mu
+    JOIN media_assets ma ON mu.media_id = ma.id
+    JOIN carousel_runs cr ON mu.run_id = cr.id
+    WHERE (cr.account_role::text = $1::text OR ma.scope::text = $1::text)
+      AND mu.used_at >= NOW() - ($2 * INTERVAL '1 day')
+    ORDER BY ma.filename ASC
+  `;
+
+  const result = await p.query(query, [role, effectiveDays]);
+  return new Set(result.rows.map((row: { filename: string }) => row.filename));
 }
