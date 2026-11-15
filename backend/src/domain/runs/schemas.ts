@@ -73,3 +73,77 @@ export interface ListCarouselRunsFilters {
   limit?: number;
   offset?: number;
 }
+
+export const JOB_STATUSES = [
+  "pending",
+  "running",
+  "completed",
+  "failed",
+] as const;
+
+export const JobStatusSchema = z.enum(JOB_STATUSES);
+export type JobStatus = (typeof JOB_STATUSES)[number];
+
+export const GenerationJobSchema = z.object({
+  id: z.string().uuid(),
+  status: JobStatusSchema.default("pending"),
+  account_ids: z.array(z.string()),
+  started_at: z.coerce.date().nullable().optional(),
+  finished_at: z.coerce.date().nullable().optional(),
+  error_message: z.string().nullable().optional(),
+  created_at: z.coerce.date().optional(),
+});
+
+export type GenerationJob = z.infer<typeof GenerationJobSchema>;
+
+export interface CreateGenerationJobInput {
+  id?: string;
+  status?: JobStatus;
+  account_ids: string[];
+  started_at?: Date | null;
+  finished_at?: Date | null;
+  error_message?: string | null;
+}
+
+export interface GenerationJobProgress extends GenerationJob {
+  total: number;
+  completed: number;
+  failed: number;
+  runs?: CarouselRun[];
+}
+
+export const GenerateCarouselsBodySchema = z.object({
+  accountIds: z.array(z.string().min(1)).optional(),
+  mockCopy: z.any().optional(),
+  skipRender: z.boolean().optional(),
+});
+
+export type GenerateCarouselsBody = z.infer<typeof GenerateCarouselsBodySchema>;
+
+export const ListCarouselRunsQuerySchema = z.object({
+  accountId: z
+    .string()
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  jobId: z
+    .string()
+    .uuid()
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  status: z
+    .preprocess(
+      (v) => (v === "" ? undefined : v),
+      RunStatusSchema.optional()
+    ),
+  limit: z.preprocess(
+    (v) => (v === "" || v === undefined ? undefined : v),
+    z.coerce.number().int().positive().optional()
+  ),
+  offset: z.preprocess(
+    (v) => (v === "" || v === undefined ? undefined : v),
+    z.coerce.number().int().min(0).optional()
+  ),
+});
+
+export type ListCarouselRunsQuery = z.infer<typeof ListCarouselRunsQuerySchema>;
+

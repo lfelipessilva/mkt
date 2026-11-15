@@ -326,9 +326,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
   - `GET /api/v1/carousels/runs?accountId=&limit=&offset=`
   - `GET /api/v1/carousels/runs/:id` with slides
 
-- [ ] **Step 1:** Test unknown `accountId` → 404; multi-id creates one job + N runs.
-- [ ] **Step 2:** Return job progress fields for UI polling.
-- [ ] **Step 3:** Commit `feat(api): batch carousel generate`.
+- [x] **Step 1:** Test unknown `accountId` → 404; multi-id creates one job + N runs.
+- [x] **Step 2:** Return job progress fields for UI polling.
+- [x] **Step 3:** Commit `feat(api): batch carousel generate`.
 
 ---
 

@@ -12,8 +12,14 @@ import {
   type GeneratedCarouselCopy,
 } from "../../pipeline/gemini.js";
 import { renderCarousel } from "../../pipeline/render.js";
-import type { CarouselRun, CarouselSlide } from "./schemas.js";
-import { createCarouselRun, createCarouselSlides } from "./store.js";
+import type { CarouselRun, CarouselSlide, GenerationJobProgress } from "./schemas.js";
+import {
+  createCarouselRun,
+  createCarouselSlides,
+  createGenerationJob,
+  updateGenerationJob,
+  getGenerationJobProgress,
+} from "./store.js";
 
 export interface GenerateOneCarouselOptions {
   accountId: string;
@@ -230,4 +236,98 @@ export async function generateOneCarousel(
 
   run.slides = createdSlides;
   return run;
+}
+
+export interface GenerateBatchOptions {
+  accountIds?: string[];
+  mockCopy?: GeneratedCarouselCopy;
+  skipRender?: boolean;
+  pool?: Pool;
+  mediaRoot?: string;
+  outputDir?: string;
+  geminiApiKey?: string;
+  geminiModel?: string;
+  now?: number;
+}
+
+export interface GenerateBatchResult {
+  job: GenerationJobProgress;
+  runs: CarouselRun[];
+}
+
+export async function generateBatch(
+  options: GenerateBatchOptions = {}
+): Promise<GenerateBatchResult> {
+  const p = options.pool || getPool();
+
+  let targetAccountIds: string[];
+  if (options.accountIds !== undefined) {
+    // Validate that each requested account exists
+    for (const accountId of options.accountIds) {
+      const account = await getAccount(accountId, p);
+      if (!account) {
+        throw new AppError(`Account not found: ${accountId}`, 404, "not_found");
+      }
+    }
+    targetAccountIds = options.accountIds;
+  } else {
+    // When omitted, select all enabled accounts
+    const enabledRes = await p.query<{ id: string }>(
+      `SELECT id FROM accounts WHERE enabled = true ORDER BY created_at ASC, id ASC`
+    );
+    targetAccountIds = enabledRes.rows.map((r) => r.id);
+  }
+
+  // Create job row in database
+  const job = await createGenerationJob(
+    {
+      account_ids: targetAccountIds,
+      status: "running",
+      started_at: new Date(options.now ?? Date.now()),
+    },
+    p
+  );
+
+  const runs: CarouselRun[] = [];
+  let hasError = false;
+  let lastErrorMessage: string | null = null;
+
+  for (const accountId of targetAccountIds) {
+    try {
+      const run = await generateOneCarousel({
+        accountId,
+        jobId: job.id,
+        mockCopy: options.mockCopy,
+        skipRender: options.skipRender,
+        pool: p,
+        mediaRoot: options.mediaRoot,
+        outputDir: options.outputDir,
+        geminiApiKey: options.geminiApiKey,
+        geminiModel: options.geminiModel,
+        now: options.now,
+      });
+      runs.push(run);
+    } catch (err: any) {
+      hasError = true;
+      lastErrorMessage = err?.message || String(err);
+    }
+  }
+
+  const finalStatus = hasError && runs.length === 0 ? "failed" : "completed";
+  await updateGenerationJob(
+    job.id,
+    {
+      status: finalStatus,
+      error_message: hasError ? lastErrorMessage : null,
+      finished_at: new Date(options.now ?? Date.now()),
+    },
+    p
+  );
+
+  const progress = await getGenerationJobProgress(job.id, p);
+
+  return {
+    job: progress!,
+    runs,
+  };
 }

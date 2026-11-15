@@ -6,6 +6,7 @@ import { accountsRoutes } from "./domain/accounts/routes.js";
 import { archetypesRoutes } from "./domain/archetypes/routes.js";
 import { baitsRoutes } from "./domain/baits/routes.js";
 import { mediaRoutes } from "./domain/media/routes.js";
+import { runsRoutes } from "./domain/runs/routes.js";
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -64,6 +65,7 @@ export function buildApp(): FastifyInstance {
       v1.register(archetypesRoutes, { prefix: "/archetypes" });
       v1.register(baitsRoutes, { prefix: "/baits" });
       v1.register(mediaRoutes, { prefix: "/media" });
+      v1.register(runsRoutes, { prefix: "/carousels" });
     },
     { prefix: "/api/v1" }
   );

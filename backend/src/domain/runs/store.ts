@@ -7,7 +7,22 @@ import type {
   CreateCarouselRunInput,
   CreateCarouselSlideInput,
   ListCarouselRunsFilters,
+  GenerationJob,
+  CreateGenerationJobInput,
+  GenerationJobProgress,
 } from "./schemas.js";
+
+function mapGenerationJobRow(row: any): GenerationJob {
+  return {
+    id: row.id,
+    status: row.status,
+    account_ids: row.account_ids,
+    started_at: row.started_at ? new Date(row.started_at) : null,
+    finished_at: row.finished_at ? new Date(row.finished_at) : null,
+    error_message: row.error_message ?? null,
+    created_at: new Date(row.created_at),
+  };
+}
 
 function mapCarouselRunRow(row: any): CarouselRun {
   return {
@@ -226,4 +241,131 @@ export async function deleteCarouselRun(
   const p = poolInstance || getPool();
   const result = await p.query("DELETE FROM carousel_runs WHERE id = $1", [id]);
   return (result.rowCount ?? 0) > 0;
+}
+
+export async function createGenerationJob(
+  input: CreateGenerationJobInput,
+  poolInstance?: Pool
+): Promise<GenerationJob> {
+  const p = poolInstance || getPool();
+  const status = input.status || "pending";
+  const result = await p.query(
+    `INSERT INTO generation_jobs (
+      ${input.id ? "id, " : ""}status, account_ids, started_at, finished_at, error_message
+    )
+    VALUES (${input.id ? "$6, " : ""}$1, $2, $3, $4, $5)
+    RETURNING id, status, account_ids, started_at, finished_at, error_message, created_at`,
+    [
+      status,
+      input.account_ids,
+      input.started_at ?? null,
+      input.finished_at ?? null,
+      input.error_message ?? null,
+      ...(input.id ? [input.id] : []),
+    ]
+  );
+  return mapGenerationJobRow(result.rows[0]);
+}
+
+export async function getGenerationJob(
+  id: string,
+  poolInstance?: Pool
+): Promise<GenerationJob | null> {
+  const p = poolInstance || getPool();
+  const result = await p.query(
+    `SELECT id, status, account_ids, started_at, finished_at, error_message, created_at
+     FROM generation_jobs
+     WHERE id = $1`,
+    [id]
+  );
+  if (!result.rows[0]) return null;
+  return mapGenerationJobRow(result.rows[0]);
+}
+
+export async function updateGenerationJob(
+  id: string,
+  updates: Partial<CreateGenerationJobInput>,
+  poolInstance?: Pool
+): Promise<GenerationJob> {
+  const p = poolInstance || getPool();
+  const setClauses: string[] = [];
+  const params: unknown[] = [id];
+
+  const allowedKeys: Array<keyof CreateGenerationJobInput> = [
+    "status",
+    "account_ids",
+    "started_at",
+    "finished_at",
+    "error_message",
+  ];
+
+  for (const key of allowedKeys) {
+    if (updates[key] !== undefined) {
+      params.push(updates[key]);
+      setClauses.push(`${key} = $${params.length}`);
+    }
+  }
+
+  if (setClauses.length === 0) {
+    const existing = await getGenerationJob(id, p);
+    if (!existing) {
+      throw new AppError(`GenerationJob not found: ${id}`, 404, "not_found");
+    }
+    return existing;
+  }
+
+  const query = `
+    UPDATE generation_jobs
+    SET ${setClauses.join(", ")}
+    WHERE id = $1
+    RETURNING id, status, account_ids, started_at, finished_at, error_message, created_at
+  `;
+
+  const result = await p.query(query, params);
+  if (!result.rows[0]) {
+    throw new AppError(`GenerationJob not found: ${id}`, 404, "not_found");
+  }
+  return mapGenerationJobRow(result.rows[0]);
+}
+
+export async function getGenerationJobProgress(
+  id: string,
+  poolInstance?: Pool
+): Promise<GenerationJobProgress | null> {
+  const p = poolInstance || getPool();
+  const job = await getGenerationJob(id, p);
+  if (!job) return null;
+
+  const runs = await listCarouselRuns({ jobId: id }, p);
+  const total = job.account_ids.length;
+  const completed = runs.filter(
+    (r) =>
+      r.status === "generated" ||
+      r.status === "dispatched" ||
+      r.status === "published"
+  ).length;
+  const failed = runs.filter((r) => r.status === "failed").length;
+
+  return {
+    ...job,
+    total,
+    completed,
+    failed,
+    runs,
+  };
+}
+
+export async function listGenerationJobs(
+  limit: number = 50,
+  poolInstance?: Pool
+): Promise<GenerationJob[]> {
+  const p = poolInstance || getPool();
+  const result = await p.query(
+    `SELECT id, status, account_ids, started_at, finished_at, error_message, created_at
+     FROM generation_jobs
+     ORDER BY created_at DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return result.rows.map(mapGenerationJobRow);
 }
