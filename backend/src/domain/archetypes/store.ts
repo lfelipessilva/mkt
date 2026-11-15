@@ -61,24 +61,55 @@ export async function replaceArchetypesForScope(
 
     for (let index = 0; index < items.length; index++) {
       const item = items[index];
-      const id = item.id || crypto.randomUUID();
       const sortOrder = item.sort_order !== undefined ? item.sort_order : index;
       const active = item.active !== undefined ? item.active : true;
 
-      const result = await client.query<Archetype>(
-        `INSERT INTO archetypes (id, scope, title, sort_order, active, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
-         ON CONFLICT (scope, title) DO UPDATE SET
-           sort_order = EXCLUDED.sort_order,
-           active = EXCLUDED.active,
-           updated_at = NOW()
-         RETURNING id, scope, title, sort_order, active, created_at, updated_at`,
-        [id, scope, item.title, sortOrder, active]
-      );
+      let existingId: string | null = null;
 
-      const saved = result.rows[0];
-      if (saved && !keptIds.includes(saved.id)) {
-        keptIds.push(saved.id);
+      if (item.id) {
+        const checkById = await client.query<{ id: string }>(
+          `SELECT id FROM archetypes WHERE id = $1 AND scope = $2`,
+          [item.id, scope]
+        );
+        if (checkById.rows[0]) {
+          existingId = checkById.rows[0].id;
+        }
+      }
+
+      if (!existingId) {
+        const checkByTitle = await client.query<{ id: string }>(
+          `SELECT id FROM archetypes WHERE scope = $1 AND title = $2 LIMIT 1`,
+          [scope, item.title]
+        );
+        if (checkByTitle.rows[0]) {
+          existingId = checkByTitle.rows[0].id;
+        }
+      }
+
+      let savedId: string;
+
+      if (existingId) {
+        const updateRes = await client.query<Archetype>(
+          `UPDATE archetypes
+           SET title = $1, sort_order = $2, active = $3, updated_at = NOW()
+           WHERE id = $4
+           RETURNING id`,
+          [item.title, sortOrder, active, existingId]
+        );
+        savedId = updateRes.rows[0].id;
+      } else {
+        const insertId = item.id || crypto.randomUUID();
+        const insertRes = await client.query<Archetype>(
+          `INSERT INTO archetypes (id, scope, title, sort_order, active, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+           RETURNING id`,
+          [insertId, scope, item.title, sortOrder, active]
+        );
+        savedId = insertRes.rows[0].id;
+      }
+
+      if (savedId && !keptIds.includes(savedId)) {
+        keptIds.push(savedId);
       }
     }
 

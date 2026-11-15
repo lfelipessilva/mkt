@@ -141,6 +141,67 @@ describe("scoped archetypes & baits CRUD (by scope)", { timeout: 60000 }, () => 
       assert.equal(dbCheck.rows[0].count, 1);
     });
 
+    it("renames existing archetype when existing id is provided with changed title (rename-by-id)", async () => {
+      // 1. Initial insert
+      const initialPut = await app.inject({
+        method: "PUT",
+        url: "/api/v1/archetypes",
+        headers: authHeaders,
+        payload: {
+          scope: "couple_men",
+          items: [
+            { title: "Titulo Antigo", sort_order: 0, active: true },
+          ],
+        },
+      });
+      assert.equal(initialPut.statusCode, 200);
+      const [initialItem] = initialPut.json();
+      const initialId = initialItem.id;
+      assert.ok(initialId);
+
+      // 2. PUT with existing ID but changed title
+      const renamePut = await app.inject({
+        method: "PUT",
+        url: "/api/v1/archetypes",
+        headers: authHeaders,
+        payload: {
+          scope: "couple_men",
+          items: [
+            { id: initialId, title: "Titulo Novo Renomeado", sort_order: 2, active: true },
+          ],
+        },
+      });
+      assert.equal(renamePut.statusCode, 200);
+      const [renamedItem] = renamePut.json();
+      assert.equal(renamedItem.id, initialId, "Must preserve the existing archetype id");
+      assert.equal(renamedItem.title, "Titulo Novo Renomeado");
+      assert.equal(renamedItem.sort_order, 2);
+
+      // 3. Verify via GET
+      const getRes = await app.inject({
+        method: "GET",
+        url: "/api/v1/archetypes?scope=couple_men",
+        headers: authHeaders,
+      });
+      assert.equal(getRes.statusCode, 200);
+      const items = getRes.json();
+      assert.equal(items.length, 1);
+      assert.equal(items[0].id, initialId);
+      assert.equal(items[0].title, "Titulo Novo Renomeado");
+
+      // 4. Verify in DB
+      const oldCheck = await pool.query(
+        "SELECT COUNT(*)::int as count FROM archetypes WHERE scope = 'couple_men' AND title = 'Titulo Antigo'"
+      );
+      assert.equal(oldCheck.rows[0].count, 0);
+
+      const newCheck = await pool.query(
+        "SELECT COUNT(*)::int as count FROM archetypes WHERE scope = 'couple_men' AND title = 'Titulo Novo Renomeado' AND id = $1",
+        [initialId]
+      );
+      assert.equal(newCheck.rows[0].count, 1);
+    });
+
     it("replaces list for the scope by removing items no longer in the payload", async () => {
       // Seed with 2 items
       await app.inject({
