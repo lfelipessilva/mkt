@@ -1,5 +1,5 @@
 {
-  "name": "listo-carousel-generator",
+  "name": "listo-marketing-ops-root",
   "version": "1.0.0",
   "private": true,
   "type": "module",
@@ -7,10 +7,18 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node src/index.js",
+    "dev": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "start": "npm --prefix backend run start",
+    "build": "npm --prefix backend run build && npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "test": "npm --prefix backend run test",
+    "test:backend": "npm --prefix backend run test",
+    "test:frontend": "npm --prefix frontend run test",
     "generate": "node src/index.js --once",
-    "dry-run": "node src/index.js --once --dry-run",
-    "test": "node --test test/*.test.js"
+    "dry-run": "node src/index.js --once --dry-run"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.0",
