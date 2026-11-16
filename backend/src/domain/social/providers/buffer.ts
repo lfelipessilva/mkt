@@ -93,45 +93,63 @@ export class BufferPublisherAdapter implements SocialPublisherProvider {
   }
 
   async listConnectedAccounts(): Promise<SocialAccount[]> {
-    const query = `
-      query GetChannels {
+    const orgsQuery = `
+      query GetOrganizations {
         account {
           organizations {
-            channels {
-              id
-              service
-              name
-            }
+            id
+            name
           }
         }
       }
     `;
 
-    interface ChannelsResponse {
+    interface OrgsResponse {
       account?: {
         organizations?: Array<{
-          channels?: Array<{
-            id: string;
-            service: string;
-            name: string;
-          }>;
+          id: string;
+          name?: string;
         }>;
       };
     }
 
-    const data = await this.requestGraphQL<ChannelsResponse>(query);
+    const orgsData = await this.requestGraphQL<OrgsResponse>(orgsQuery);
+    const orgs = orgsData.account?.organizations || [];
+
+    const channelsQuery = `
+      query GetChannels($input: ChannelsInput!) {
+        channels(input: $input) {
+          id
+          name
+          displayName
+          service
+        }
+      }
+    `;
+
+    interface ChannelsResponse {
+      channels?: Array<{
+        id: string;
+        name: string;
+        displayName?: string | null;
+        service: string;
+      }>;
+    }
 
     const accounts: SocialAccount[] = [];
-    const orgs = data.account?.organizations || [];
 
     for (const org of orgs) {
-      for (const channel of org.channels || []) {
+      const channelsData = await this.requestGraphQL<ChannelsResponse>(channelsQuery, {
+        input: { organizationId: org.id },
+      });
+
+      for (const channel of channelsData.channels || []) {
         if (channel.service === "tiktok") {
           accounts.push({
             internalAccountId: channel.id,
             provider: "buffer",
             externalAccountId: channel.id,
-            username: channel.name,
+            username: channel.displayName || channel.name,
             service: "tiktok",
             isActive: true,
           });
