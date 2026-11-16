@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount } from "../context";
 import type { Account, CarouselRun, CarouselSlide } from "../types";
-import { getCarouselRuns } from "../api";
+import { getCarouselRuns, generateCarousels, pollGenerationJob } from "../api";
 import { RunCard } from "../components/RunCard";
 import { ManualTikTokModal } from "../components/ManualTikTokModal";
-import { RefreshCw, Search, X } from "lucide-react";
+import { RefreshCw, Search, Sparkles, X } from "lucide-react";
 
 export function resolveGalleryTargetAccountIds(
   selectedAccountId: string,
@@ -14,6 +14,47 @@ export function resolveGalleryTargetAccountIds(
     return [selectedAccountId];
   }
   return accounts.filter((a) => a.enabled).map((a) => a.id);
+}
+
+export interface ExecuteGalleryGenerationOptions {
+  selectedAccountId: string;
+  accounts: Account[];
+  onToast: (message: string, type: "success" | "error" | "info") => void;
+  onRefresh: () => Promise<void> | void;
+  generateFn?: (input: { accountIds?: string[] }) => Promise<any>;
+  pollFn?: (jobId: string, options?: any) => Promise<any>;
+}
+
+export async function executeGalleryGeneration({
+  selectedAccountId,
+  accounts,
+  onToast,
+  onRefresh,
+  generateFn = generateCarousels,
+  pollFn = pollGenerationJob,
+}: ExecuteGalleryGenerationOptions): Promise<boolean> {
+  const targetAccountIds = resolveGalleryTargetAccountIds(selectedAccountId, accounts);
+  if (targetAccountIds.length === 0) {
+    onToast("Nenhuma conta ativa para gerar carrossel.", "info");
+    return false;
+  }
+
+  onToast("Iniciando geração de carrossel...", "info");
+
+  try {
+    const job = await generateFn({ accountIds: targetAccountIds });
+    const result = await pollFn(job.id, { intervalMs: 1500 });
+    if (result && result.status === "failed") {
+      throw new Error(result.error_message || "O job de geração finalizou com status de falha.");
+    }
+    onToast("Geração concluída com sucesso!", "success");
+    await onRefresh();
+    return true;
+  } catch (err: any) {
+    const message = err?.message || String(err);
+    onToast(`Erro ao gerar carrossel: ${message}`, "error");
+    return false;
+  }
 }
 
 export function orderSlides(slides: CarouselSlide[]): CarouselSlide[] {
@@ -58,11 +99,12 @@ export function filterRunsBySearch(
 }
 
 export function GalleryPage(): React.JSX.Element {
-  const { selectedAccountId, selectedAccount } = useAccount();
+  const { selectedAccountId, selectedAccount, accounts } = useAccount();
 
   const [runs, setRuns] = useState<CarouselRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -114,6 +156,28 @@ export function GalleryPage(): React.JSX.Element {
     showToast(`Carrossel marcado como publicado no TikTok com sucesso!`, "success");
   };
 
+  const handleGenerateCarousels = async () => {
+    if (isGenerating || loading) return;
+
+    const targetAccountIds = resolveGalleryTargetAccountIds(selectedAccountId, accounts);
+    if (targetAccountIds.length === 0) {
+      showToast("Nenhuma conta ativa para gerar carrossel.", "info");
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      await executeGalleryGeneration({
+        selectedAccountId,
+        accounts,
+        onToast: showToast,
+        onRefresh: loadRuns,
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const filteredRuns = useMemo(() => {
     let list = filterRunsByAccount(runs, selectedAccountId);
     list = filterRunsByStatus(list, statusFilter);
@@ -146,9 +210,24 @@ export function GalleryPage(): React.JSX.Element {
         <div className="header-actions">
           <button
             type="button"
+            className="btn btn-primary flex items-center gap-1.5"
+            onClick={handleGenerateCarousels}
+            disabled={isGenerating || loading}
+          >
+            <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} />
+            <span>
+              {isGenerating
+                ? "Gerando carrossel..."
+                : selectedAccountId !== "all"
+                ? `Gerar Carrossel (@${selectedAccount?.id ?? selectedAccountId})`
+                : `Gerar para Todas as Contas`}
+            </span>
+          </button>
+          <button
+            type="button"
             className="btn btn-secondary btn-refresh flex items-center gap-1.5"
             onClick={loadRuns}
-            disabled={loading}
+            disabled={loading || isGenerating}
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
             <span>{loading ? "Carregando..." : "Atualizar"}</span>
@@ -235,8 +314,25 @@ export function GalleryPage(): React.JSX.Element {
           <p>
             {searchQuery || statusFilter !== "all"
               ? "Tente ajustar os filtros ou a busca acima."
-              : "Dispare uma nova geração na aba Gerar Carrosséis para visualizar o resultado aqui."}
+              : "Clique em Gerar Carrossel acima para criar novos carrosséis."}
           </p>
+          {!searchQuery && statusFilter === "all" && (
+            <button
+              type="button"
+              className="btn btn-primary flex items-center gap-1.5"
+              onClick={handleGenerateCarousels}
+              disabled={isGenerating || loading}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} />
+              <span>
+                {isGenerating
+                  ? "Gerando carrossel..."
+                  : selectedAccountId !== "all"
+                  ? `Gerar Carrossel (@${selectedAccount?.id ?? selectedAccountId})`
+                  : `Gerar para Todas as Contas`}
+              </span>
+            </button>
+          )}
         </div>
       )}
 
