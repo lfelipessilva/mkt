@@ -32,6 +32,9 @@ export const CreateAccountSchema = z.object({
   role: AccountRoleSchema,
   enabled: z.boolean().default(true),
   tiktok_open_id: z.string().nullable().optional(),
+  external_account_id: z.string().nullable().optional(),
+  social_provider: z.string().nullable().optional(),
+  social_account_metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type CreateAccountInput = z.infer<typeof CreateAccountSchema>;
@@ -43,6 +46,9 @@ export const UpdateAccountSchema = z.object({
   role: AccountRoleSchema.optional(),
   enabled: z.boolean().optional(),
   tiktok_open_id: z.string().nullable().optional(),
+  external_account_id: z.string().nullable().optional(),
+  social_provider: z.string().nullable().optional(),
+  social_account_metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type UpdateAccountInput = z.infer<typeof UpdateAccountSchema>;
