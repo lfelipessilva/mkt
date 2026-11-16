@@ -20,6 +20,13 @@ import type {
   UpsertTikTokPostInput,
   TikTokSyncRun,
   AppSettings,
+  AutomationSchedule,
+} from "./types";
+
+export {
+  formatScheduleStatus,
+  formatScheduleChannel,
+  formatPublicationStatus,
 } from "./types";
 
 export type { GenerateCarouselsInput, GenerationJobProgress };
@@ -359,10 +366,27 @@ export async function getCarouselRun(id: string): Promise<CarouselRun> {
 
 export async function dispatchCarouselRun(
   runId: string,
-  channel: "telegram" | "api" = "telegram"
+  channel: "telegram" | "api" | "buffer" | "social" = "telegram"
 ): Promise<DispatchResult> {
   return apiFetch<DispatchResult>(
     `/carousels/runs/${encodeURIComponent(runId)}/send?channel=${encodeURIComponent(channel)}`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export interface ApproveAutomationRunResult {
+  ok: true;
+  already?: boolean;
+  run: CarouselRun;
+}
+
+export async function approveAutomationRun(
+  runId: string
+): Promise<ApproveAutomationRunResult> {
+  return apiFetch<ApproveAutomationRunResult>(
+    `/automation/runs/${encodeURIComponent(runId)}/approve`,
     {
       method: "POST",
     }
@@ -452,4 +476,19 @@ export async function testDispatch(): Promise<{ ok: boolean; message: string; ru
     return { ok: true, message: "Disparo de teste simulado com sucesso" };
   });
 }
+
+export async function getAutomationSchedule(
+  date?: string,
+  optionsOrSignal?: { signal?: AbortSignal } | AbortSignal
+): Promise<AutomationSchedule> {
+  const query = date ? `?date=${encodeURIComponent(date)}` : "";
+  const signal =
+    optionsOrSignal instanceof AbortSignal
+      ? optionsOrSignal
+      : optionsOrSignal?.signal;
+  return apiFetch<AutomationSchedule>(`/automation/schedule${query}`, {
+    signal,
+  });
+}
+
 

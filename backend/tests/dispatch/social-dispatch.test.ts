@@ -222,6 +222,63 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     );
   });
 
+  it("treats provider status=failed as dispatch error without marking run dispatched", async () => {
+    const runId = await createSampleRun();
+
+    const mockProvider: SocialPublisherProvider = {
+      async listConnectedAccounts() {
+        return [];
+      },
+      async publishPost(): Promise<PublishPostResponse> {
+        return {
+          externalPostId: "ext_buf_failed_1",
+          status: "failed",
+          errorMessage: "MutationError: channel rejected",
+          rawResponse: { error: "MutationError" },
+        };
+      },
+      async getPostStatus(id: string) {
+        return { externalPostId: id, status: "failed", rawResponse: {} };
+      },
+      async getPostMetrics(id: string) {
+        return { externalPostId: id, views: 0, likes: 0, comments: 0, shares: 0, rawMetrics: {} };
+      },
+    };
+
+    await assert.rejects(
+      async () => {
+        await dispatchCarouselRun({
+          runId,
+          channel: "buffer",
+          pool,
+          socialPublisherProvider: mockProvider,
+        });
+      },
+      (err: any) => {
+        assert.equal(err.statusCode, 502);
+        assert.equal(err.code, "dispatch_failed");
+        assert.match(String(err.message), /MutationError|failed|rejected/i);
+        return true;
+      }
+    );
+
+    const runRes = await pool.query(`SELECT status FROM carousel_runs WHERE id = $1`, [runId]);
+    assert.equal(runRes.rows[0].status, "generated");
+
+    const postRes = await pool.query(
+      `SELECT publish_status, external_post_id FROM tiktok_posts WHERE run_id = $1`,
+      [runId]
+    );
+    assert.equal(postRes.rows.length, 1);
+    assert.equal(postRes.rows[0].publish_status, "failed");
+    assert.equal(postRes.rows[0].external_post_id, "ext_buf_failed_1");
+
+    const events = await getDispatchEvents(runId, pool);
+    assert.equal(events.length, 1);
+    assert.equal(events[0].status, "failed");
+    assert.equal(events[0].channel, "buffer");
+  });
+
   it("POST /api/v1/carousels/runs/:id/send?channel=buffer routes properly through API endpoint", async () => {
     const runId = await createSampleRun();
 

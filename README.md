@@ -46,8 +46,13 @@ Painel Web: `http://localhost:3000/`
 | `GEMINI_MODEL` | Modelo Gemini utilizado | `gemini-2.5-flash` |
 | `TELEGRAM_BOT_TOKEN` | Token do Bot Telegram | *(opcional)* |
 | `TELEGRAM_CHAT_ID` | Chat ID padrão de destino para envios do Telegram | *(opcional)* |
+| `TELEGRAM_NOTIFY_CHAT_ID` | Chat ID específico para notificações de automação e botões de aprovação (fallback para `TELEGRAM_CHAT_ID`) | `1234567` *(opcional)* |
 | `TELEGRAM_ALLOWED_USER_IDS` | IDs autorizados no Telegram (separados por vírgula) | `1234567,9876543` |
-| `CRON_SCHEDULE` | Expressão cron para geração agendada | `0 7,11,17 * * *` |
+| `APP_BASE_URL` | URL base pública da aplicação web para compor deep links nos botões de aprovação | `https://painel.exemplo.com` *(opcional)* |
+| `AUTOMATION_TZ` | Timezone da automação do agendador (`app_settings.auto_post_timezone` > `AUTOMATION_TZ` > `TZ` > `America/Sao_Paulo`) | `America/Sao_Paulo` |
+| `AUTO_POST_WINDOWS` | Janelas de postagem padrão em JSON (`app_settings.auto_post_windows` > `AUTO_POST_WINDOWS` > default) | `[{"id":"morning","start":"07:00","end":"09:00"},{"id":"midday","start":"11:30","end":"12:30"},{"id":"evening","start":"18:00","end":"20:00"}]` |
+| `AUTOMATION_CRON_SCHEDULE` | Expressão cron do ticker de automação (agenda e despacho) | `* * * * *` |
+| `CRON_SCHEDULE` | *(Obsoleto para geração automática; substituído pelo motor de automação por slots)* Expressão cron legada | `0 7,11,17 * * *` |
 | `TZ` | Timezone do agendador e timestamps | `America/Sao_Paulo` |
 | `OUTPUT_DIR` | Diretório temporário base onde os carrosséis são montados antes do upload ao Silo | `os.tmpdir()` / `./output` |
 | `USAGE_DAYS` | Janela de dias para deduplicação/rotação de imagens | `7` |
@@ -71,6 +76,15 @@ A plataforma suporta publicação automática de carrosséis gerados para perfis
 2. **Despacho / Publicação:** Ao despachar com o canal `buffer` (`POST /api/v1/carousels/runs/:id/send?channel=buffer`), as imagens dos slides são resolvidas via URLs públicas do Silo e enviadas para a API do Buffer.
 3. **Polling Worker:** Rotina periódica consulta o Buffer para atualizar o status de posts `queued`/`processing` para `published` ou `failed`.
 4. **Métricas Diárias:** Worker diário sincroniza visualizações, curtidas, comentários e compartilhamentos de posts publicados há menos de 30 dias (`syncTikTokMetricsDailyJob`), atualizando rankings em `GET /api/v1/tiktok/performance`.
+
+### Fluxo de Aprovação e Publicação via Buffer
+
+O fluxo de envio para o Buffer pode operar em modo manual ou com aprovação interativa integrada ao Telegram e à interface web:
+
+- **Notificação e Botão no Telegram:** Quando um carrossel é gerado em um slot com aprovação pendente (`awaiting_approval`), o bot do Telegram envia uma notificação no chat configurado (`TELEGRAM_NOTIFY_CHAT_ID` ou `TELEGRAM_CHAT_ID`) contendo o botão inline **"Confirmar envio"** e, se `APP_BASE_URL` estiver configurado, um link direto para visualização do carrossel no painel web.
+- **Aprovação via Telegram ou API:** O clique no botão inline executa o callback `approve_buffer:<runId>` que aciona o despacho direto para a API do Buffer e edita a mensagem confirmando o envio. Alternativamente, a aprovação pode ser feita via endpoint `POST /api/v1/automation/runs/:runId/approve`.
+- **Publicação Manual no Painel (Galeria):** Na tela de Galeria de Carrosséis, o botão **"Publicar no Buffer"** permite o envio direto para a fila do Buffer para contas com canal TikTok vinculado, exibindo modal de confirmação e atualizando o status do item após o despacho bem-sucedido.
+
 
 ## Estrutura de Mídia e Silo (MinIO)
 

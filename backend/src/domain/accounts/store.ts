@@ -9,6 +9,7 @@ export interface UpsertAccountInput {
   persona?: string;
   role?: AccountRole;
   enabled?: boolean;
+  auto_post_enabled?: boolean;
   tiktok_open_id?: string | null;
   social_provider?: string | null;
   external_account_id?: string | null;
@@ -18,7 +19,7 @@ export interface UpsertAccountInput {
 export async function listAccounts(poolInstance?: Pool): Promise<Account[]> {
   const p = poolInstance || getPool();
   const result = await p.query<Account>(
-    `SELECT id, display_name, persona, role, enabled, tiktok_open_id,
+    `SELECT id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id,
             social_provider, external_account_id, social_account_metadata,
             created_at, updated_at
      FROM accounts
@@ -33,7 +34,7 @@ export async function getAccount(
 ): Promise<Account | null> {
   const p = poolInstance || getPool();
   const result = await p.query<Account>(
-    `SELECT id, display_name, persona, role, enabled, tiktok_open_id,
+    `SELECT id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id,
             social_provider, external_account_id, social_account_metadata,
             created_at, updated_at
      FROM accounts
@@ -61,6 +62,10 @@ export async function upsertAccount(
     input.role !== undefined ? input.role : (existing?.role ?? "single_woman");
   const enabled =
     input.enabled !== undefined ? input.enabled : (existing?.enabled ?? true);
+  const autoPostEnabled =
+    input.auto_post_enabled !== undefined
+      ? input.auto_post_enabled
+      : (existing?.auto_post_enabled ?? true);
   const tiktokOpenId =
     input.tiktok_open_id !== undefined
       ? input.tiktok_open_id
@@ -81,20 +86,21 @@ export async function upsertAccount(
           : "{}");
 
   const result = await p.query<Account>(
-    `INSERT INTO accounts (id, display_name, persona, role, enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+    `INSERT INTO accounts (id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
      ON CONFLICT (id) DO UPDATE SET
        display_name = EXCLUDED.display_name,
        persona = EXCLUDED.persona,
        role = EXCLUDED.role,
        enabled = EXCLUDED.enabled,
+       auto_post_enabled = EXCLUDED.auto_post_enabled,
        tiktok_open_id = EXCLUDED.tiktok_open_id,
        social_provider = EXCLUDED.social_provider,
        external_account_id = EXCLUDED.external_account_id,
        social_account_metadata = EXCLUDED.social_account_metadata,
        updated_at = NOW()
-     RETURNING id, display_name, persona, role, enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, created_at, updated_at`,
-    [id, displayName, persona, role, enabled, tiktokOpenId, socialProvider, externalAccountId, socialAccountMetadata]
+     RETURNING id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, created_at, updated_at`,
+    [id, displayName, persona, role, enabled, autoPostEnabled, tiktokOpenId, socialProvider, externalAccountId, socialAccountMetadata]
   );
 
   return result.rows[0];

@@ -2,11 +2,14 @@ import { Bot, type Context } from "grammy";
 import { getJobStatus, withJobLock } from "./jobLock.js";
 import { generateBatch } from "./domain/runs/generate.js";
 import { getPool } from "./shared/db/client.js";
+import { approveBufferRun } from "./domain/automation/approve.js";
 
 export interface BotConfig {
   token?: string;
   allowedUserIds?: number[];
   pool?: any;
+  botInfo?: any;
+  approveBufferRunFn?: (runId: string, options?: any) => Promise<any>;
 }
 
 function getAllowedUserIds(): number[] {
@@ -36,7 +39,10 @@ export function createBot(options: BotConfig = {}): Bot | null {
   const allowedUserIds = options.allowedUserIds ?? getAllowedUserIds();
   const pool = options.pool || getPool();
 
-  const bot = new Bot(token);
+  const bot = new Bot(
+    token,
+    options.botInfo ? { botInfo: options.botInfo } : undefined
+  );
 
   bot.use(async (ctx, next) => {
     if (!isAllowed(ctx, allowedUserIds)) {
@@ -105,6 +111,77 @@ export function createBot(options: BotConfig = {}): Bot | null {
       await ctx.reply(`ok: ${result.summary}`);
     } catch (e: any) {
       await ctx.reply(`erro: ${e.message}`);
+    }
+  });
+
+  bot.on("callback_query:data", async (ctx) => {
+    const data = ctx.callbackQuery?.data;
+    if (!data || !data.startsWith("approve_buffer:")) {
+      await ctx.answerCallbackQuery().catch(() => {});
+      return;
+    }
+
+    const runId = data.slice("approve_buffer:".length).trim();
+    if (!runId) {
+      await ctx.answerCallbackQuery({ text: "ID do carrossel inválido" });
+      await ctx.editMessageText("❌ ID do carrossel inválido").catch(() => {});
+      return;
+    }
+
+    const approveFn = options.approveBufferRunFn || approveBufferRun;
+
+    try {
+      const result = await approveFn(runId, {
+        pool,
+        telegramApi: ctx.api as any,
+      });
+
+      if (result.already) {
+        await ctx.answerCallbackQuery({
+          text: "Carrossel já enviado ao Buffer.",
+        });
+        const account = result.run?.account_id ? `@${result.run.account_id}` : "carrossel";
+        await ctx
+          .editMessageText(`📤 Enviado ao Buffer — ${account} (já processado)`)
+          .catch(() => {});
+      } else {
+        await ctx.answerCallbackQuery({
+          text: "Enviado ao Buffer com sucesso!",
+        });
+        const account = result.run?.account_id ? `@${result.run.account_id}` : "carrossel";
+        await ctx
+          .editMessageText(
+            `📤 Enviado ao Buffer — ${account} — aguardando confirmação do TikTok`
+          )
+          .catch(() => {});
+      }
+    } catch (err: any) {
+      const status = err?.statusCode;
+      const code = err?.code;
+      const msg = err?.message || String(err);
+
+      if (status === 410 || code === "approval_expired") {
+        await ctx.answerCallbackQuery({
+          text: "Aprovação expirada (janela encerrada).",
+        });
+        await ctx
+          .editMessageText("⏱️ Aprovação expirada — janela de publicação encerrada.")
+          .catch(() => {});
+      } else if (status === 409 || code === "slot_not_awaiting_approval") {
+        await ctx.answerCallbackQuery({
+          text: `Não está aguardando aprovação: ${msg}`,
+        });
+        await ctx
+          .editMessageText(`⚠️ Não está aguardando aprovação: ${msg}`)
+          .catch(() => {});
+      } else {
+        await ctx.answerCallbackQuery({
+          text: `Erro: ${msg}`,
+        });
+        await ctx
+          .editMessageText(`❌ Falha ao enviar ao Buffer: ${msg}`)
+          .catch(() => {});
+      }
     }
   });
 

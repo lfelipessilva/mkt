@@ -363,6 +363,14 @@ export async function dispatchCarouselRun(
           publishRes.publishedAt ? new Date(publishRes.publishedAt) : (publishRes.status === "published" ? new Date() : null),
         ]
       );
+
+      if (publishRes.status === "failed") {
+        throw new AppError(
+          publishRes.errorMessage || "Social publisher returned failed status",
+          502,
+          "dispatch_failed"
+        );
+      }
     }
 
     // 6. On success: update dispatch_event to 'sent'

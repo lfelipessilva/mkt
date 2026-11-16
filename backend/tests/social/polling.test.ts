@@ -30,7 +30,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
 
   beforeEach(async () => {
     await pool.query(
-      "TRUNCATE TABLE tiktok_posts, dispatch_events, media_usage, carousel_slides, carousel_runs, generation_jobs, media_assets, baits, archetypes, accounts CASCADE;"
+      "TRUNCATE TABLE auto_post_slots, tiktok_posts, dispatch_events, media_usage, carousel_slides, carousel_runs, generation_jobs, media_assets, baits, archetypes, accounts CASCADE;"
     );
 
     await pool.query(
@@ -50,34 +50,52 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
     }
   });
 
+  async function createTestSlot(options: {
+    accountId?: string;
+    status?: string;
+  } = {}) {
+    const res = await pool.query(
+      `INSERT INTO auto_post_slots (
+        slot_date, window_id, account_id, channel, scheduled_at, window_end, status
+      ) VALUES (
+        CURRENT_DATE, 'morning', $1, 'buffer', NOW(), NOW() + INTERVAL '2 hours', $2
+      ) RETURNING id`,
+      [options.accountId || "acc_polling_test", options.status || "done"]
+    );
+    return res.rows[0].id as string;
+  }
+
   async function createTestRunAndPost(options: {
     runId?: string;
     publishStatus: string;
     externalPostId?: string;
     scheduledAt?: Date | null;
     createdAt?: Date;
+    autoPostSlotId?: string | null;
+    notifiedAt?: Date | null;
   }) {
     const runRes = await pool.query(
       `INSERT INTO carousel_runs (
         account_id, account_role, archetype_title, bait_body, tema,
-        legenda, status, output_dir, generated_at
+        legenda, status, output_dir, generated_at, auto_post_slot_id
       ) VALUES ($1, 'single_woman', 'Archetype Title', 'Bait body', 'Tema teste Polling',
-        'Legenda teste', 'generated', '/tmp/dummy', NOW())
+        'Legenda teste', 'generated', '/tmp/dummy', NOW(), $2)
       RETURNING id`,
-      ["acc_polling_test"]
+      ["acc_polling_test", options.autoPostSlotId ?? null]
     );
     const runId = options.runId || runRes.rows[0].id;
 
     const postRes = await pool.query(
       `INSERT INTO tiktok_posts (
-        run_id, tracking_mode, provider, external_post_id, publish_status, scheduled_at, created_at, updated_at
-      ) VALUES ($1, 'api', 'buffer', $2, $3, $4, COALESCE($5, NOW()), NOW())
-      RETURNING id, run_id, publish_status, external_post_id, published_at`,
+        run_id, tracking_mode, provider, external_post_id, publish_status, scheduled_at, notified_at, created_at, updated_at
+      ) VALUES ($1, 'api', 'buffer', $2, $3, $4, $5, COALESCE($6, NOW()), NOW())
+      RETURNING id, run_id, publish_status, external_post_id, published_at, notified_at`,
       [
         runId,
         options.externalPostId ?? "ext_post_123",
         options.publishStatus,
         options.scheduledAt ?? null,
+        options.notifiedAt ?? null,
         options.createdAt ?? null,
       ]
     );
@@ -216,5 +234,198 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
     );
     assert.equal(postCheck.rows[0].external_post_id, "buf_released_123");
     assert.equal(postCheck.rows[0].publish_status, "queued");
+  });
+
+  describe("Auto slot polling notifications (§5.11 item 28)", () => {
+    it("notifies publish_ok and sets notified_at when auto-scheduled post transitions to published", async () => {
+      const slotId = await createTestSlot();
+      const { runId } = await createTestRunAndPost({
+        publishStatus: "queued",
+        externalPostId: "ext_post_auto_ok",
+        autoPostSlotId: slotId,
+      });
+
+      const mockSentAt = new Date().toISOString();
+      const mockProvider: SocialPublisherProvider = {
+        providerName: "buffer",
+        async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
+        async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
+          throw new Error("not called");
+        },
+        async getPostStatus(externalPostId: string): Promise<PublishPostResponse> {
+          return {
+            externalPostId,
+            status: "published",
+            publishedAt: mockSentAt,
+            rawResponse: { id: externalPostId, status: "sent" },
+          };
+        },
+        async getPostMetrics(_id: string): Promise<PostMetrics | null> { return null; },
+      };
+
+      const notifications: Array<{ event: string; payload: any }> = [];
+      const notifyFn = async (event: any, payload: any) => {
+        notifications.push({ event, payload });
+      };
+
+      const res = await (pollPendingPostsJob as any)(pool, mockProvider, { notifyFn });
+      assert.equal(res.checkedCount, 1);
+      assert.equal(res.updatedCount, 1);
+
+      assert.equal(notifications.length, 1);
+      assert.equal(notifications[0].event, "publish_ok");
+      assert.equal(notifications[0].payload.account, "acc_polling_test");
+      assert.equal(notifications[0].payload.archetype, "Archetype Title");
+      assert.equal(notifications[0].payload.runId, runId);
+
+      const postCheck = await pool.query(
+        "SELECT publish_status, notified_at FROM tiktok_posts WHERE run_id = $1",
+        [runId]
+      );
+      assert.equal(postCheck.rows[0].publish_status, "published");
+      assert.ok(postCheck.rows[0].notified_at, "notified_at should be populated");
+    });
+
+    it("notifies publish_failed and sets notified_at when auto-scheduled post transitions to failed", async () => {
+      const slotId = await createTestSlot();
+      const { runId } = await createTestRunAndPost({
+        publishStatus: "processing",
+        externalPostId: "ext_post_auto_fail",
+        autoPostSlotId: slotId,
+      });
+
+      const mockProvider: SocialPublisherProvider = {
+        providerName: "buffer",
+        async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
+        async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
+          throw new Error("not called");
+        },
+        async getPostStatus(externalPostId: string): Promise<PublishPostResponse> {
+          return {
+            externalPostId,
+            status: "failed",
+            errorMessage: "TikTok account expired",
+            rawResponse: { id: externalPostId, error: "expired" },
+          };
+        },
+        async getPostMetrics(_id: string): Promise<PostMetrics | null> { return null; },
+      };
+
+      const notifications: Array<{ event: string; payload: any }> = [];
+      const notifyFn = async (event: any, payload: any) => {
+        notifications.push({ event, payload });
+      };
+
+      const res = await (pollPendingPostsJob as any)(pool, mockProvider, { notifyFn });
+      assert.equal(res.checkedCount, 1);
+      assert.equal(res.updatedCount, 1);
+
+      assert.equal(notifications.length, 1);
+      assert.equal(notifications[0].event, "publish_failed");
+      assert.equal(notifications[0].payload.account, "acc_polling_test");
+      assert.equal(notifications[0].payload.reason, "TikTok account expired");
+      assert.equal(notifications[0].payload.archetype, "Archetype Title");
+      assert.equal(notifications[0].payload.runId, runId);
+
+      const postCheck = await pool.query(
+        "SELECT publish_status, notified_at FROM tiktok_posts WHERE run_id = $1",
+        [runId]
+      );
+      assert.equal(postCheck.rows[0].publish_status, "failed");
+      assert.ok(postCheck.rows[0].notified_at, "notified_at should be populated");
+    });
+
+    it("stays silent and leaves notified_at null for manual post (no auto_post_slot_id)", async () => {
+      const { runId } = await createTestRunAndPost({
+        publishStatus: "queued",
+        externalPostId: "ext_post_manual_ok",
+        autoPostSlotId: null,
+      });
+
+      const mockProvider: SocialPublisherProvider = {
+        providerName: "buffer",
+        async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
+        async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
+          throw new Error("not called");
+        },
+        async getPostStatus(externalPostId: string): Promise<PublishPostResponse> {
+          return {
+            externalPostId,
+            status: "published",
+            publishedAt: new Date().toISOString(),
+            rawResponse: { id: externalPostId, status: "sent" },
+          };
+        },
+        async getPostMetrics(_id: string): Promise<PostMetrics | null> { return null; },
+      };
+
+      const notifications: Array<{ event: string; payload: any }> = [];
+      const notifyFn = async (event: any, payload: any) => {
+        notifications.push({ event, payload });
+      };
+
+      const res = await (pollPendingPostsJob as any)(pool, mockProvider, { notifyFn });
+      assert.equal(res.checkedCount, 1);
+      assert.equal(res.updatedCount, 1);
+
+      assert.equal(notifications.length, 0, "no notifications should be sent for manual posts");
+
+      const postCheck = await pool.query(
+        "SELECT publish_status, notified_at FROM tiktok_posts WHERE run_id = $1",
+        [runId]
+      );
+      assert.equal(postCheck.rows[0].publish_status, "published");
+      assert.equal(postCheck.rows[0].notified_at, null, "notified_at should remain null");
+    });
+
+    it("deduplicates notification when notified_at is already set", async () => {
+      const slotId = await createTestSlot();
+      const existingNotifiedAt = new Date("2026-11-16T10:00:00.000Z");
+      const { runId } = await createTestRunAndPost({
+        publishStatus: "queued",
+        externalPostId: "ext_post_already_notified",
+        autoPostSlotId: slotId,
+        notifiedAt: existingNotifiedAt,
+      });
+
+      const mockProvider: SocialPublisherProvider = {
+        providerName: "buffer",
+        async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
+        async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
+          throw new Error("not called");
+        },
+        async getPostStatus(externalPostId: string): Promise<PublishPostResponse> {
+          return {
+            externalPostId,
+            status: "published",
+            publishedAt: new Date().toISOString(),
+            rawResponse: { id: externalPostId, status: "sent" },
+          };
+        },
+        async getPostMetrics(_id: string): Promise<PostMetrics | null> { return null; },
+      };
+
+      const notifications: Array<{ event: string; payload: any }> = [];
+      const notifyFn = async (event: any, payload: any) => {
+        notifications.push({ event, payload });
+      };
+
+      const res = await (pollPendingPostsJob as any)(pool, mockProvider, { notifyFn });
+      assert.equal(res.checkedCount, 1);
+      assert.equal(res.updatedCount, 1);
+
+      assert.equal(notifications.length, 0, "no notification should be sent if already notified");
+
+      const postCheck = await pool.query(
+        "SELECT publish_status, notified_at FROM tiktok_posts WHERE run_id = $1",
+        [runId]
+      );
+      assert.equal(postCheck.rows[0].publish_status, "published");
+      assert.equal(
+        new Date(postCheck.rows[0].notified_at).getTime(),
+        existingNotifiedAt.getTime(),
+        "notified_at should not be overwritten"
+      );
+    });
   });
 });

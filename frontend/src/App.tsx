@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import type { NavTab } from "./types";
 import { AccountProvider, useAccount } from "./context";
 import { LoginGate } from "./components/LoginGate";
@@ -19,9 +19,63 @@ const TAB_TITLES: Record<NavTab, string> = {
   integracoes: "Integrações & Despacho",
 };
 
+const VALID_TABS: readonly NavTab[] = [
+  "desempenho",
+  "galeria",
+  "contas",
+  "textos",
+  "midias",
+  "integracoes",
+];
+
+export function parseDeepLinkParams(search: string): { tab?: NavTab; runId?: string } {
+  if (!search) return {};
+  const query = search.startsWith("?") ? search.slice(1) : search;
+  if (!query) return {};
+
+  const params = new URLSearchParams(query);
+  const rawTab = params.get("tab");
+  const rawRun = params.get("run") || params.get("runId");
+
+  const result: { tab?: NavTab; runId?: string } = {};
+
+  if (rawTab && (VALID_TABS as readonly string[]).includes(rawTab)) {
+    result.tab = rawTab as NavTab;
+  }
+  if (rawRun && rawRun.trim().length > 0) {
+    result.runId = rawRun.trim();
+  }
+
+  return result;
+}
+
 function ShellContent(): React.JSX.Element {
-  const [currentTab, setCurrentTab] = useState<NavTab>("desempenho");
+  const initialDeepLink =
+    typeof window !== "undefined" ? parseDeepLinkParams(window.location.search) : {};
+  const [currentTab, setCurrentTab] = useState<NavTab>(
+    initialDeepLink.tab ?? "desempenho"
+  );
+  const [focusedRunId, setFocusedRunId] = useState<string | undefined>(
+    initialDeepLink.runId
+  );
   const { selectedAccountId, selectedAccount } = useAccount();
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handlePopState = () => {
+      const params = parseDeepLinkParams(window.location.search);
+      if (params.tab) {
+        setCurrentTab(params.tab);
+      }
+      setFocusedRunId(params.runId);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
   return (
     <div className="app-shell">
@@ -48,7 +102,7 @@ function ShellContent(): React.JSX.Element {
           {currentTab === "desempenho" ? (
             <PerformancePage />
           ) : currentTab === "galeria" ? (
-            <GalleryPage />
+            <GalleryPage focusedRunId={focusedRunId} />
           ) : currentTab === "contas" ? (
             <AccountsPage />
           ) : currentTab === "textos" ? (
