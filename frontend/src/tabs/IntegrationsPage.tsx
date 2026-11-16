@@ -8,6 +8,7 @@ import {
   type TikTokSyncResult,
 } from "../api";
 import type { AppSettings, TikTokSyncRun } from "../types";
+import { RefreshCw, Send, Zap } from "lucide-react";
 
 export function IntegrationsPage(): React.JSX.Element {
   const [settings, setSettings] = useState<AppSettings>({});
@@ -118,11 +119,12 @@ export function IntegrationsPage(): React.JSX.Element {
         </div>
         <button
           type="button"
-          className="btn btn-outline"
+          className="btn btn-outline flex items-center gap-1.5"
           onClick={() => void loadData()}
           disabled={loading || Boolean(savingKey) || testingDispatch || syncingTikTok}
         >
-          {loading ? "Atualizando..." : "Recarregar"}
+          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
+          <span>{loading ? "Atualizando..." : "Recarregar"}</span>
         </button>
       </div>
 
@@ -187,12 +189,13 @@ export function IntegrationsPage(): React.JSX.Element {
           <div className="card-actions">
             <button
               type="button"
-              className="btn btn-outline"
+              className="btn btn-outline flex items-center gap-1.5"
               onClick={() => void handleTestDispatch()}
               disabled={testingDispatch || loading}
               data-testid="btn-test-dispatch"
             >
-              {testingDispatch ? "Disparando..." : "Testar Disparo de Canal"}
+              <Send className="w-3.5 h-3.5" />
+              <span>{testingDispatch ? "Disparando..." : "Testar Disparo de Canal"}</span>
             </button>
           </div>
         </div>
@@ -237,12 +240,13 @@ export function IntegrationsPage(): React.JSX.Element {
           <div className="card-actions">
             <button
               type="button"
-              className="btn btn-primary"
+              className="btn btn-primary flex items-center gap-1.5"
               onClick={() => void handleSyncTikTok()}
               disabled={syncingTikTok || loading}
               data-testid="btn-tiktok-sync"
             >
-              {syncingTikTok ? "Sincronizando..." : "Sincronizar TikTok Agora"}
+              <Zap className={`w-3.5 h-3.5 ${syncingTikTok ? "animate-pulse" : ""}`} />
+              <span>{syncingTikTok ? "Sincronizando..." : "Sincronizar TikTok Agora"}</span>
             </button>
           </div>
         </div>

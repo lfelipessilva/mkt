@@ -10,6 +10,7 @@ import {
   type UpdateAccountInput,
 } from "../../types";
 import { createAccount, updateAccount, deleteAccount } from "../../api";
+import { UserPlus } from "lucide-react";
 
 interface AccountFormState {
   id: string;
@@ -171,11 +172,12 @@ export function AccountsPage(): React.JSX.Element {
         </div>
         <button
           type="button"
-          className="btn btn-primary"
+          className="btn btn-primary flex items-center gap-1.5"
           onClick={handleOpenCreate}
           data-testid="btn-add-account"
         >
-          + Adicionar Conta
+          <UserPlus className="w-4 h-4" />
+          <span>Adicionar Conta</span>
         </button>
       </div>
 
