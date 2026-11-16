@@ -429,6 +429,17 @@ export function GalleryPage({ focusedRunId }: GalleryPageProps = {}): React.JSX.
             key={run.id}
             run={run}
             account={accountsById.get(run.account_id)}
+            metrics={
+              (run as any).metrics ||
+              ((run as any).views !== undefined
+                ? {
+                    views: (run as any).views,
+                    likes: (run as any).likes,
+                    comments: (run as any).comments,
+                    shares: (run as any).shares,
+                  }
+                : undefined)
+            }
             isFocused={Boolean(focusedRunId && run.id === focusedRunId)}
             onDispatched={handleRunUpdated}
             onOpenManualPublish={handleOpenManualModal}
