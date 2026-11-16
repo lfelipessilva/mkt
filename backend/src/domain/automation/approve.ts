@@ -37,6 +37,28 @@ export interface ApproveBufferRunResult {
   run: CarouselRun;
 }
 
+async function waitForRunningSlot(
+  slotId: string,
+  initialSlot: AutoPostSlot,
+  pool: Pool,
+  maxWaitMs = 1500,
+  intervalMs = 50
+): Promise<AutoPostSlot> {
+  let currentSlot = initialSlot;
+  const maxAttempts = Math.ceil(maxWaitMs / intervalMs);
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, intervalMs));
+    const polled = await getSlotById(slotId, pool);
+    if (polled) {
+      currentSlot = polled;
+      if (polled.status !== "running") {
+        break;
+      }
+    }
+  }
+  return currentSlot;
+}
+
 /**
  * Approves and publishes a carousel run to Buffer for auto-post schedule (spec §5.4.1).
  * Idempotent: returns { ok: true, already: true, run } if slot is already done.
@@ -100,16 +122,8 @@ export async function approveBufferRun(
 
   // 5. If slot is already running (concurrent approval in progress), wait for it to settle
   if (slot.status === "running") {
-    let currentSlot: AutoPostSlot | null = slot;
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 50));
-      const polled = await getSlotById(slot.id, pool);
-      if (polled && polled.status !== "running") {
-        currentSlot = polled;
-        break;
-      }
-    }
-    if (currentSlot?.status === "done") {
+    const settled = await waitForRunningSlot(slot.id, slot, pool);
+    if (settled.status === "done") {
       const freshRun = await getCarouselRun(runId, pool);
       return {
         ok: true,
@@ -117,11 +131,11 @@ export async function approveBufferRun(
         run: (freshRun || run) as CarouselRun,
       };
     }
-    if (currentSlot?.status === "skipped" && currentSlot.last_error === "aprovação expirada") {
+    if (settled.status === "skipped" && settled.last_error === "aprovação expirada") {
       throw new AppError("aprovação expirada", 410, "approval_expired");
     }
     throw new AppError(
-      `Slot is not awaiting approval (status: ${currentSlot?.status})`,
+      `Slot is not awaiting approval (status: ${settled.status})`,
       409,
       "slot_not_awaiting_approval"
     );
@@ -136,10 +150,11 @@ export async function approveBufferRun(
     );
   }
 
-  // 7. Concurrency claim: atomic update
+  // 7. Concurrency claim: atomic update (sets started_at = now so failStaleRunningSlots won't fail it mid-dispatch)
   const claimRes = await pool.query(
     `UPDATE auto_post_slots
      SET status = 'running',
+         started_at = $1,
          approved_at = $1,
          updated_at = $1
      WHERE id = $2 AND status = 'awaiting_approval'
@@ -148,22 +163,14 @@ export async function approveBufferRun(
   );
 
   if ((claimRes.rowCount ?? 0) === 0) {
-    // Another caller or worker claimed it
-    let currentSlot = await getSlotById(slot.id, pool);
+    // Another caller or worker claimed it concurrently
+    const currentSlot = await getSlotById(slot.id, pool);
+    const settled =
+      currentSlot?.status === "running"
+        ? await waitForRunningSlot(slot.id, currentSlot, pool)
+        : currentSlot;
 
-    // If another caller is actively executing, wait briefly for it to settle
-    if (currentSlot?.status === "running") {
-      for (let i = 0; i < 30; i++) {
-        await new Promise((r) => setTimeout(r, 50));
-        const polled = await getSlotById(slot.id, pool);
-        if (polled && polled.status !== "running") {
-          currentSlot = polled;
-          break;
-        }
-      }
-    }
-
-    if (currentSlot?.status === "done") {
+    if (settled?.status === "done") {
       const freshRun = await getCarouselRun(runId, pool);
       return {
         ok: true,
@@ -171,11 +178,11 @@ export async function approveBufferRun(
         run: (freshRun || run) as CarouselRun,
       };
     }
-    if (currentSlot?.status === "skipped" && currentSlot.last_error === "aprovação expirada") {
+    if (settled?.status === "skipped" && settled.last_error === "aprovação expirada") {
       throw new AppError("aprovação expirada", 410, "approval_expired");
     }
     throw new AppError(
-      `Slot is not awaiting approval (status: ${currentSlot?.status})`,
+      `Slot is not awaiting approval (status: ${settled?.status})`,
       409,
       "slot_not_awaiting_approval"
     );

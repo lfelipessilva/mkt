@@ -614,7 +614,7 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
     assert.match(editCall.payload.text, /❌ Falha ao enviar ao Buffer/);
   });
 
-  it("Item 24: bot callback query with unrelated data is ignored", async () => {
+  it("Item 24: bot callback query with unrelated data answers callback query to clear spinner", async () => {
     const bot = createBot({
       token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
       allowedUserIds: [],
@@ -654,7 +654,117 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
       },
     });
 
-    assert.equal(apiCalls.length, 0, "no bot API calls for unrelated callback data");
+    const answerCall = apiCalls.find((c) => c.method === "answerCallbackQuery");
+    assert.ok(answerCall, "answerCallbackQuery must be called to dismiss the spinner for unrelated callbacks");
+  });
+
+  it("P1: approveBufferRun sets started_at=now on approval claim so failStaleRunningSlots won't fail it mid-dispatch", async () => {
+    const pastStartedAt = new Date(Date.now() - 30 * 60 * 1000); // 30 min ago
+    const { run, slot } = await createTestRunAndSlot({
+      accountId: "acc-started-at-test",
+    });
+    // Set started_at in the past
+    await updateSlot(slot.id, { started_at: pastStartedAt }, pool);
+
+    const now = new Date();
+    await approveBufferRun(run.id, {
+      pool,
+      now,
+    });
+
+    const updated = await getSlotById(slot.id, pool);
+    assert.equal(updated?.status, "done");
+    assert.ok(updated?.started_at);
+    assert.equal(
+      updated?.started_at.getTime(),
+      now.getTime(),
+      "started_at must be reset to now on approval claim"
+    );
+  });
+
+  it("P2: bot 409 path calls editMessageText and answerCallbackQuery", async () => {
+    const { run } = await createTestRunAndSlot({
+      accountId: "acc-bot-409",
+      slotStatus: "failed",
+      lastError: "geração anterior falhou",
+    });
+
+    const bot = createBot({
+      token: "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11",
+      allowedUserIds: [],
+      pool,
+      botInfo: {
+        id: 123456,
+        is_bot: true,
+        first_name: "RedHorseBot",
+        username: "redhorse_bot",
+        can_join_groups: true,
+        can_read_all_group_messages: false,
+        supports_inline_queries: false,
+        can_connect_to_business: false,
+        has_main_web_app: false,
+      },
+    });
+
+    const apiCalls: Array<{ method: string; payload: any }> = [];
+    bot!.api.config.use(async (_prev, method, payload) => {
+      apiCalls.push({ method, payload });
+      return { ok: true, result: true } as any;
+    });
+
+    await bot!.handleUpdate({
+      update_id: 106,
+      callback_query: {
+        id: "cb-query-409",
+        from: { id: 999, is_bot: false, first_name: "Tester" },
+        message: {
+          message_id: 889,
+          chat: { id: 999, type: "private" },
+          date: Math.floor(Date.now() / 1000),
+          text: "🕐 Aguardando aprovação — @acc-bot-409",
+        },
+        chat_instance: "ci-106",
+        data: `approve_buffer:${run.id}`,
+      },
+    });
+
+    const answerCall = apiCalls.find((c) => c.method === "answerCallbackQuery");
+    assert.ok(answerCall, "answerCallbackQuery must be called on 409");
+    assert.match(answerCall.payload.text, /não está aguardando aprovação/i);
+
+    const editCall = apiCalls.find((c) => c.method === "editMessageText");
+    assert.ok(editCall, "editMessageText must be called on 409 per spec §5.4.1");
+    assert.match(editCall.payload.text, /não está aguardando aprovação/i);
+  });
+
+  it("P3: HTTP POST /api/v1/automation/runs/:runId/approve handles dispatch failure and returns error while slot retries", async () => {
+    const { run, slot } = await createTestRunAndSlot({
+      accountId: "acc-http-fail",
+    });
+
+    setSocialPublisherProvider({
+      async listConnectedAccounts() {
+        return [];
+      },
+      async publishPost() {
+        return {
+          status: "failed",
+          errorMessage: "Buffer rejected post: invalid media aspect ratio",
+        };
+      },
+    });
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/api/v1/automation/runs/${run.id}/approve`,
+      headers: authHeaders,
+    });
+
+    assert.notEqual(res.statusCode, 200, "Should return an error status code on dispatch failure");
+
+    const slotAfter = await getSlotById(slot.id, pool);
+    assert.equal(slotAfter?.status, "pending", "Slot must be placed in pending retry on dispatch failure");
+    assert.match(slotAfter?.last_error || "", /Buffer rejected post/);
   });
 });
 

@@ -117,12 +117,14 @@ export function createBot(options: BotConfig = {}): Bot | null {
   bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery?.data;
     if (!data || !data.startsWith("approve_buffer:")) {
+      await ctx.answerCallbackQuery().catch(() => {});
       return;
     }
 
     const runId = data.slice("approve_buffer:".length).trim();
     if (!runId) {
       await ctx.answerCallbackQuery({ text: "ID do carrossel inválido" });
+      await ctx.editMessageText("❌ ID do carrossel inválido").catch(() => {});
       return;
     }
 
@@ -169,6 +171,9 @@ export function createBot(options: BotConfig = {}): Bot | null {
         await ctx.answerCallbackQuery({
           text: `Não está aguardando aprovação: ${msg}`,
         });
+        await ctx
+          .editMessageText(`⚠️ Não está aguardando aprovação: ${msg}`)
+          .catch(() => {});
       } else {
         await ctx.answerCallbackQuery({
           text: `Erro: ${msg}`,
