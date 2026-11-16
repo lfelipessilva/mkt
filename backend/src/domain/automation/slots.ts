@@ -327,3 +327,59 @@ export async function failStaleRunningSlots(
   );
   return res.rowCount ?? 0;
 }
+
+/**
+ * Gets a slot linked to a carousel run either by slot.run_id or carousel_runs.auto_post_slot_id.
+ */
+export async function getSlotByRunId(
+  runId: string,
+  poolInstance?: Pool
+): Promise<AutoPostSlot | null> {
+  const p = poolInstance || getPool();
+  const res = await p.query(
+    `SELECT * FROM auto_post_slots
+     WHERE run_id = $1
+        OR id = (SELECT auto_post_slot_id FROM carousel_runs WHERE id = $1)
+     LIMIT 1`,
+    [runId]
+  );
+  if (!res.rows[0]) return null;
+  return mapSlotRow(res.rows[0]);
+}
+
+/**
+ * Handles retry for a slot:
+ * - If attempts < 2 and now + 5min < window_end: sets pending, scheduled_at = now + 5min.
+ * - Otherwise: sets failed, finished_at = now.
+ */
+export async function handleSlotRetry(
+  slot: AutoPostSlot,
+  errorMessage: string,
+  now: Date,
+  poolInstance?: Pool
+): Promise<void> {
+  const p = poolInstance || getPool();
+  const retryTime = new Date(now.getTime() + 5 * 60 * 1000);
+  if (slot.attempts < 2 && retryTime.getTime() < slot.window_end.getTime()) {
+    await updateSlot(
+      slot.id,
+      {
+        status: "pending",
+        scheduled_at: retryTime,
+        last_error: errorMessage,
+      },
+      p
+    );
+  } else {
+    await updateSlot(
+      slot.id,
+      {
+        status: "failed",
+        last_error: errorMessage,
+        finished_at: now,
+      },
+      p
+    );
+  }
+}
+
