@@ -101,7 +101,6 @@ export class BufferPublisherAdapter implements SocialPublisherProvider {
               id
               service
               name
-              serviceUsername
             }
           }
         }
@@ -115,7 +114,6 @@ export class BufferPublisherAdapter implements SocialPublisherProvider {
             id: string;
             service: string;
             name: string;
-            serviceUsername?: string | null;
           }>;
         }>;
       };
@@ -133,7 +131,7 @@ export class BufferPublisherAdapter implements SocialPublisherProvider {
             internalAccountId: channel.id,
             provider: "buffer",
             externalAccountId: channel.id,
-            username: channel.serviceUsername || channel.name,
+            username: channel.name,
             service: "tiktok",
             isActive: true,
           });
