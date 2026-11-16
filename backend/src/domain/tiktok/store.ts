@@ -343,3 +343,15 @@ export async function runTikTokSyncStub(poolInstance?: Pool): Promise<TikTokSync
     sync_run_id: syncRunRes.rows[0].id,
   };
 }
+
+export async function getLatestTikTokSyncRun(poolInstance?: Pool): Promise<any | null> {
+  const p = poolInstance || getPool();
+  const res = await p.query(
+    `SELECT id, started_at, finished_at, posts_updated, status, error_message
+     FROM tiktok_sync_runs
+     ORDER BY started_at DESC
+     LIMIT 1`
+  );
+  if (!res.rows[0]) return null;
+  return res.rows[0];
+}

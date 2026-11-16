@@ -1,5 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import path from "node:path";
+import fs from "node:fs";
 import { authenticateBearer } from "./platform/auth.js";
 import { isAppError } from "./shared/errors.js";
 import { accountsRoutes } from "./domain/accounts/routes.js";
@@ -9,6 +12,22 @@ import { mediaRoutes } from "./domain/media/routes.js";
 import { runsRoutes } from "./domain/runs/routes.js";
 import { dispatchRoutes } from "./domain/dispatch/routes.js";
 import { tiktokRoutes } from "./domain/tiktok/routes.js";
+import { settingsRoutes } from "./domain/settings/routes.js";
+
+function resolveFrontendDist(): string | null {
+  const candidateDirs = [
+    process.env.FRONTEND_DIST_DIR,
+    path.resolve(process.cwd(), "frontend/dist"),
+    path.resolve(process.cwd(), "../frontend/dist"),
+    path.resolve("/app/frontend/dist"),
+  ];
+  for (const dir of candidateDirs) {
+    if (dir && fs.existsSync(path.join(dir, "index.html"))) {
+      return dir;
+    }
+  }
+  return null;
+}
 
 export function buildApp(): FastifyInstance {
   const app = Fastify({
@@ -21,6 +40,15 @@ export function buildApp(): FastifyInstance {
       fileSize: 50 * 1024 * 1024,
     },
   });
+
+  const frontendDist = resolveFrontendDist();
+  if (frontendDist) {
+    app.register(fastifyStatic, {
+      root: frontendDist,
+      prefix: "/",
+      wildcard: false,
+    });
+  }
 
   app.setErrorHandler((error, _request, reply) => {
     if (isAppError(error)) {
@@ -70,9 +98,27 @@ export function buildApp(): FastifyInstance {
       v1.register(runsRoutes, { prefix: "/carousels" });
       v1.register(dispatchRoutes, { prefix: "/carousels" });
       v1.register(tiktokRoutes, { prefix: "/tiktok" });
+      v1.register(settingsRoutes, { prefix: "/settings" });
     },
     { prefix: "/api/v1" }
   );
+
+  // SPA fallback for non-API client routes
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.url.startsWith("/api/")) {
+      return reply.code(404).send({
+        error: "not_found",
+        message: "API endpoint not found",
+      });
+    }
+    if (frontendDist && fs.existsSync(path.join(frontendDist, "index.html"))) {
+      return reply.sendFile("index.html");
+    }
+    return reply.code(404).send({
+      error: "not_found",
+      message: "Resource not found",
+    });
+  });
 
   return app;
 }

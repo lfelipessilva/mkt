@@ -9,6 +9,7 @@ import {
   getTikTokPostByRunId,
   listTikTokPerformance,
   runTikTokSyncStub,
+  getLatestTikTokSyncRun,
 } from "./store.js";
 
 export const tiktokRoutes: FastifyPluginAsync = async (app) => {
@@ -66,5 +67,11 @@ export const tiktokRoutes: FastifyPluginAsync = async (app) => {
   app.post("/sync", async (_request, reply) => {
     const result = await runTikTokSyncStub();
     return reply.send(result);
+  });
+
+  // GET /api/v1/tiktok/sync/latest
+  app.get("/sync/latest", async (_request, reply) => {
+    const latest = await getLatestTikTokSyncRun();
+    return reply.send({ latest });
   });
 };

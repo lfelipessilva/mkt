@@ -308,6 +308,20 @@ export interface GenerateCarouselsInput {
   skipRender?: boolean;
 }
 
+export interface TikTokSyncRun {
+  id: string;
+  started_at: string;
+  finished_at?: string | null;
+  posts_updated: number;
+  status: "pending" | "running" | "completed" | "failed";
+  error_message?: string | null;
+}
+
+export interface AppSettings {
+  auto_dispatch_enabled?: boolean;
+  [key: string]: any;
+}
+
 export type NavTab =
   | "desempenho"
   | "galeria"

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.8",
+    "@fastify/static": "^10.1.11",
     "@google/generative-ai": "^0.24.1",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",

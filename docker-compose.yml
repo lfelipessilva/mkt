@@ -1,0 +1,23 @@
+services:
+  ops:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: listo-marketing-ops
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4002}:4002"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - PORT=4002
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:m0f21wwlba2zbwo2j8dn@config.luislab.xyz:6969/personal?sslmode=disable}
+      - API_KEY=${API_KEY:-dev-token}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - MEDIA_ROOT=/app/media
+    volumes:
+      - ./media:/app/media

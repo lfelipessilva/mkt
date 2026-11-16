@@ -9,6 +9,7 @@ import { MediaPage } from "./tabs/settings/MediaPage";
 import { GeneratePage } from "./tabs/GeneratePage";
 import { GalleryPage } from "./tabs/GalleryPage";
 import { PerformancePage } from "./tabs/PerformancePage";
+import { IntegrationsPage } from "./tabs/IntegrationsPage";
 
 const TAB_TITLES: Record<NavTab, string> = {
   desempenho: "Desempenho de Carrosséis",
@@ -58,6 +59,8 @@ function ShellContent(): React.JSX.Element {
             <TextsPage />
           ) : currentTab === "midias" ? (
             <MediaPage />
+          ) : currentTab === "integracoes" ? (
+            <IntegrationsPage />
           ) : (
             <div className="scaffold-card">
               <span className="scaffold-badge">Scaffold / {currentTab}</span>
