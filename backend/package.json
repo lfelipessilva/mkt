@@ -16,6 +16,7 @@
     "test": "NODE_ENV=test tsx --test --test-concurrency=1 \"tests/**/*.test.ts\""
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1169.0",
     "@fastify/multipart": "^10.1.8",
     "@fastify/static": "^10.1.11",
     "@google/generative-ai": "^0.24.1",

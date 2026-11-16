@@ -89,11 +89,24 @@ export function resolveMediaForRole(mediaRoot: string = getMediaRoot(), role: Ac
     throw new Error(`role inválido: ${role}`);
   }
   const root = getMediaRoot(mediaRoot);
+  const coverDir = existsSync(join(root, role, "cover"))
+    ? join(root, role, "cover")
+    : join(root, role, "capas");
+  const randomRoleDir = existsSync(join(root, role, "random"))
+    ? join(root, role, "random")
+    : join(root, role, "aleatorias");
+  const randomSharedDir = existsSync(join(root, "shared", "random"))
+    ? join(root, "shared", "random")
+    : join(root, "shared", "aleatorias");
+  const listoDir = existsSync(join(root, "listo"))
+    ? join(root, "listo")
+    : join(root, "shared", "listo");
+
   return {
-    capas: join(root, role, "capas"),
-    aleatoriasRole: join(root, role, "aleatorias"),
-    aleatoriasShared: join(root, "shared", "aleatorias"),
-    listo: join(root, "shared", "listo"),
+    capas: coverDir,
+    aleatoriasRole: randomRoleDir,
+    aleatoriasShared: randomSharedDir,
+    listo: listoDir,
   };
 }
 
@@ -101,9 +114,15 @@ export function allMediaImageDirs(mediaRoot?: string): string[] {
   const root = getMediaRoot(mediaRoot);
   const dirs: string[] = [];
   for (const role of AccountRoleSchema.options) {
-    dirs.push(join(root, role, "aleatorias"));
+    const rDir = existsSync(join(root, role, "random"))
+      ? join(root, role, "random")
+      : join(root, role, "aleatorias");
+    dirs.push(rDir);
   }
-  dirs.push(join(root, "shared", "aleatorias"));
+  const sharedDir = existsSync(join(root, "shared", "random"))
+    ? join(root, "shared", "random")
+    : join(root, "shared", "aleatorias");
+  dirs.push(sharedDir);
   return dirs;
 }
 

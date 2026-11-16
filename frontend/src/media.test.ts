@@ -36,19 +36,20 @@ describe("Media library configuration & API", () => {
 
   describe("Categories by Scope", () => {
     it("defines valid categories for shared and role scopes", () => {
-      assert.deepEqual(MEDIA_CATEGORIES, ["capas", "aleatorias", "listo"]);
-      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.shared, ["aleatorias", "listo"]);
-      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.single_man, ["capas", "aleatorias"]);
-      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.single_woman, ["capas", "aleatorias"]);
-      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.couple_men, ["capas", "aleatorias"]);
-      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.couple_women, ["capas", "aleatorias"]);
+      assert.deepEqual(MEDIA_CATEGORIES, ["cover", "random", "listo"]);
+      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.shared, ["random"]);
+      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.single_man, ["cover", "random"]);
+      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.single_woman, ["cover", "random"]);
+      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.couple_men, ["cover", "random"]);
+      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.couple_women, ["cover", "random"]);
+      assert.deepEqual(MEDIA_CATEGORIES_FOR_SCOPE.listo, ["listo"]);
     });
 
     it("generates correct media file url", () => {
-      const url = getMediaFileUrl("media/shared/aleatorias/image1.jpg");
+      const url = getMediaFileUrl("media/shared/random/image1.jpg");
       assert.equal(
         url,
-        "/api/v1/media/file?path=media%2Fshared%2Faleatorias%2Fimage1.jpg"
+        "/api/v1/media/file?path=media%2Fshared%2Frandom%2Fimage1.jpg"
       );
     });
   });
@@ -67,8 +68,8 @@ describe("Media library configuration & API", () => {
             {
               id: "media_1",
               scope: "single_woman",
-              category: "capas",
-              storage_path: "media/single_woman/capas/capa1.jpg",
+              category: "cover",
+              storage_path: "media/single_woman/cover/capa1.jpg",
               filename: "capa1.jpg",
               byte_size: 10240,
               width: 1080,
@@ -80,11 +81,11 @@ describe("Media library configuration & API", () => {
         );
       };
 
-      const result = await getMedia({ scope: "single_woman", category: "capas" });
+      const result = await getMedia({ scope: "single_woman", category: "cover" });
 
       assert.equal(
         requestedUrl,
-        "/api/v1/media?scope=single_woman&category=capas"
+        "/api/v1/media?scope=single_woman&category=cover"
       );
       assert.equal(requestedHeaders?.get("Authorization"), "Bearer test-token-media");
       assert.equal(result.length, 1);
@@ -108,8 +109,8 @@ describe("Media library configuration & API", () => {
           JSON.stringify({
             id: "media_uploaded",
             scope: "shared",
-            category: "aleatorias",
-            storage_path: "media/shared/aleatorias/new.png",
+            category: "random",
+            storage_path: "media/shared/random/new.png",
             filename: "new.png",
             byte_size: 500,
             width: 800,
@@ -125,7 +126,7 @@ describe("Media library configuration & API", () => {
       }) as any;
       fakeFile.name = "new.png";
 
-      const result = await uploadMedia(fakeFile, "shared", "aleatorias");
+      const result = await uploadMedia(fakeFile, "shared", "random");
 
       assert.equal(requestedUrl, "/api/v1/media/upload");
       assert.equal(requestedMethod, "POST");
@@ -147,17 +148,17 @@ describe("Media library configuration & API", () => {
         requestedBody = String(init?.body);
 
         return new Response(
-          JSON.stringify({ ok: true, deleted: "media/shared/aleatorias/old.png" }),
+          JSON.stringify({ ok: true, deleted: "media/shared/random/old.png" }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         );
       };
 
-      const result = await deleteMedia("media/shared/aleatorias/old.png");
+      const result = await deleteMedia("media/shared/random/old.png");
 
       assert.equal(requestedUrl, "/api/v1/media");
       assert.equal(requestedMethod, "DELETE");
       assert.deepEqual(JSON.parse(requestedBody), {
-        storage_path: "media/shared/aleatorias/old.png",
+        storage_path: "media/shared/random/old.png",
       });
       assert.equal(result.ok, true);
     });
@@ -178,11 +179,11 @@ describe("Media library configuration & API", () => {
 
       (globalThis as any).URL.createObjectURL = (_blob: Blob) => "blob:http://localhost/mock-uuid";
 
-      const blobUrl = await fetchMediaBlob("media/single_man/capas/capa.jpg");
+      const blobUrl = await fetchMediaBlob("media/single_man/cover/capa.jpg");
 
       assert.equal(
         requestedUrl,
-        "/api/v1/media/file?path=media%2Fsingle_man%2Fcapas%2Fcapa.jpg"
+        "/api/v1/media/file?path=media%2Fsingle_man%2Fcover%2Fcapa.jpg"
       );
       assert.equal(requestedHeaders?.get("Authorization"), "Bearer test-token-media");
       assert.equal(blobUrl, "blob:http://localhost/mock-uuid");

@@ -3,6 +3,12 @@ import path from "node:path";
 import type { FastifyPluginAsync } from "fastify";
 import { AppError } from "../../shared/errors.js";
 import {
+  isSiloEnabled,
+  uploadMediaToSilo,
+  getMediaStreamFromSilo,
+  getCarouselStreamFromSilo,
+} from "../../shared/storage/silo.js";
+import {
   safeResolveMediaPath,
   contentTypeForPath,
   getMediaRoot,
@@ -34,13 +40,33 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
 
     const resolved = safeResolveMediaPath(parsed.data.path);
 
-    if (!fs.existsSync(resolved)) {
-      throw new AppError(`File not found: '${parsed.data.path}'`, 404, "not_found");
+    if (fs.existsSync(resolved)) {
+      const contentType = contentTypeForPath(resolved);
+      const stream = fs.createReadStream(resolved);
+      return reply.type(contentType).send(stream);
     }
 
-    const contentType = contentTypeForPath(resolved);
-    const stream = fs.createReadStream(resolved);
-    return reply.type(contentType).send(stream);
+    // Fall back to Silo S3 if enabled
+    if (isSiloEnabled()) {
+      try {
+        const raw = parsed.data.path.trim().replace(/\\/g, "/");
+        if (raw.startsWith("output/") || raw.startsWith("/output/")) {
+          const siloRes = await getCarouselStreamFromSilo(raw);
+          return reply
+            .type(siloRes.contentType || contentTypeForPath(raw))
+            .send(siloRes.stream);
+        } else {
+          const siloRes = await getMediaStreamFromSilo(raw);
+          return reply
+            .type(siloRes.contentType || contentTypeForPath(raw))
+            .send(siloRes.stream);
+        }
+      } catch {
+        // fall through to 404
+      }
+    }
+
+    throw new AppError(`File not found: '${parsed.data.path}'`, 404, "not_found");
   });
 
   // GET /api/v1/media?scope=&category=
@@ -129,7 +155,7 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
     // Write file under scopeToDir(scope)/category/
     const mediaRoot = getMediaRoot();
     const sanitizedFilename = path.basename(originalFilename);
-    const targetDir = path.join(mediaRoot, scope, category);
+    const targetDir = scope === "listo" ? path.join(mediaRoot, "listo") : path.join(mediaRoot, scope, category);
     fs.mkdirSync(targetDir, { recursive: true });
 
     const targetFilePath = path.join(targetDir, sanitizedFilename);
@@ -137,7 +163,9 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
 
     // Parse image dimensions
     const dims = extractImageDimensions(fileBuffer);
-    const storagePath = path.posix.join("media", scope, category, sanitizedFilename);
+    const storagePath = scope === "listo"
+      ? path.posix.join("media", "listo", sanitizedFilename)
+      : path.posix.join("media", scope, category, sanitizedFilename);
 
     // Upsert into DB
     const asset = await upsertMediaAsset({
@@ -150,6 +178,14 @@ export const mediaRoutes: FastifyPluginAsync = async (app) => {
       height: dims.height,
       active: true,
     });
+
+    if (isSiloEnabled()) {
+      try {
+        await uploadMediaToSilo(storagePath, fileBuffer, contentTypeForPath(sanitizedFilename));
+      } catch (err) {
+        console.warn(`[silo:upload] Failed to upload ${storagePath} to silo:`, err);
+      }
+    }
 
     return reply.code(201).send(asset);
   });

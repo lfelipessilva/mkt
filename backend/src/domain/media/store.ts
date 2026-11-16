@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
 import { AppError } from "../../shared/errors.js";
+import { isSiloEnabled, deleteMediaFromSilo } from "../../shared/storage/silo.js";
 import type { ContentScope } from "../archetypes/schemas.js";
 import type { AccountRole } from "../accounts/schemas.js";
 import {
@@ -95,6 +96,54 @@ export async function scanMediaToDb(
   let count = 0;
 
   for (const scope of MEDIA_SCOPES) {
+    if (scope === "listo") {
+      const listoDir = path.join(root, "listo");
+      if (fs.existsSync(listoDir)) {
+        const entries = fs.readdirSync(listoDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (!entry.isFile() || entry.name.startsWith(".")) continue;
+          const ext = path.extname(entry.name).toLowerCase();
+          if (!SUPPORTED_IMAGE_EXTENSIONS.has(ext)) continue;
+
+          const filePath = path.join(listoDir, entry.name);
+          const stat = fs.statSync(filePath);
+          const storagePath = path.posix.join("media", "listo", entry.name);
+
+          let width: number | null = null;
+          let height: number | null = null;
+          try {
+            const fd = fs.openSync(filePath, "r");
+            const buffer = Buffer.alloc(Math.min(stat.size, 65536));
+            fs.readSync(fd, buffer, 0, buffer.length, 0);
+            fs.closeSync(fd);
+            const dims = extractImageDimensions(buffer);
+            width = dims.width;
+            height = dims.height;
+          } catch {
+            // Ignore dimension read errors
+          }
+
+          await p.query(
+            `INSERT INTO media_assets (scope, category, storage_path, filename, byte_size, width, height, active, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW())
+             ON CONFLICT (storage_path) DO UPDATE SET
+               scope = EXCLUDED.scope,
+               category = EXCLUDED.category,
+               filename = EXCLUDED.filename,
+               byte_size = EXCLUDED.byte_size,
+               width = COALESCE(EXCLUDED.width, media_assets.width),
+               height = COALESCE(EXCLUDED.height, media_assets.height),
+               active = true,
+               updated_at = NOW()`,
+            ["listo", "listo", storagePath, entry.name, stat.size, width, height]
+          );
+
+          count++;
+        }
+      }
+      continue;
+    }
+
     const categories = validCategoriesForScope(scope);
 
     for (const category of categories) {
@@ -287,6 +336,15 @@ export async function deleteMediaAsset(
   } catch (err) {
     // If safeResolve fails or file doesn't exist, log and proceed
     console.warn(`[media:delete] Could not unlink disk file for '${storagePath}':`, err);
+  }
+
+  // Remove from Silo if enabled
+  if (isSiloEnabled()) {
+    try {
+      await deleteMediaFromSilo(asset.storage_path);
+    } catch (err) {
+      console.warn(`[media:delete] Could not delete silo object for '${storagePath}':`, err);
+    }
   }
 }
 

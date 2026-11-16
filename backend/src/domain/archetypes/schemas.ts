@@ -6,6 +6,7 @@ export const ContentScopeSchema = z.enum([
   "single_woman",
   "couple_men",
   "couple_women",
+  "listo",
 ]);
 
 export type ContentScope = z.infer<typeof ContentScopeSchema>;

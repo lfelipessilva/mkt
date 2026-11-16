@@ -40,8 +40,12 @@ describe("media directory layout & paths", () => {
       assert.ok(!womanCategories.includes("listo"));
     });
 
-    test("MEDIA_CATEGORIES defines capas, aleatorias, listo", () => {
-      assert.deepEqual([...MEDIA_CATEGORIES].sort(), ["aleatorias", "capas", "listo"].sort());
+    test("MEDIA_CATEGORIES defines cover, random, listo, capas, aleatorias", () => {
+      assert.ok(MEDIA_CATEGORIES.includes("cover"));
+      assert.ok(MEDIA_CATEGORIES.includes("random"));
+      assert.ok(MEDIA_CATEGORIES.includes("listo"));
+      assert.ok(MEDIA_CATEGORIES.includes("capas"));
+      assert.ok(MEDIA_CATEGORIES.includes("aleatorias"));
     });
   });
 

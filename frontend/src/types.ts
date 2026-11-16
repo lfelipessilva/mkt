@@ -81,6 +81,17 @@ export const CONTENT_SCOPES = [
 
 export type ContentScope = (typeof CONTENT_SCOPES)[number];
 
+export const MEDIA_SCOPES = [
+  "shared",
+  "single_man",
+  "single_woman",
+  "couple_men",
+  "couple_women",
+  "listo",
+] as const;
+
+export type MediaScope = (typeof MEDIA_SCOPES)[number];
+
 export function resolveDefaultScope(
   selectedAccountId: string,
   selectedAccount: Account | null
@@ -97,6 +108,15 @@ export const SCOPE_LABELS: Record<ContentScope, string> = {
   single_woman: "Mulher Solteira",
   couple_men: "Casal Homens",
   couple_women: "Casal Mulheres",
+};
+
+export const MEDIA_SCOPE_LABELS: Record<MediaScope, string> = {
+  shared: "Compartilhado (Geral)",
+  single_man: "Homem Solteiro",
+  single_woman: "Mulher Solteira",
+  couple_men: "Casal Homens",
+  couple_women: "Casal Mulheres",
+  listo: "Listo Brand",
 };
 
 export interface Archetype {
@@ -133,23 +153,24 @@ export interface BaitInputItem {
   active?: boolean;
 }
 
-export const MEDIA_CATEGORIES = ["capas", "aleatorias", "listo"] as const;
+export const MEDIA_CATEGORIES = ["cover", "random", "listo"] as const;
 export type MediaCategory = (typeof MEDIA_CATEGORIES)[number];
 
 export const MEDIA_CATEGORIES_FOR_SCOPE: Record<
-  ContentScope,
+  MediaScope,
   readonly MediaCategory[]
 > = {
-  shared: ["aleatorias", "listo"],
-  single_man: ["capas", "aleatorias"],
-  single_woman: ["capas", "aleatorias"],
-  couple_men: ["capas", "aleatorias"],
-  couple_women: ["capas", "aleatorias"],
+  shared: ["random"],
+  single_man: ["cover", "random"],
+  single_woman: ["cover", "random"],
+  couple_men: ["cover", "random"],
+  couple_women: ["cover", "random"],
+  listo: ["listo"],
 };
 
 export interface MediaAsset {
   id: string;
-  scope: ContentScope;
+  scope: MediaScope;
   category: MediaCategory;
   storage_path: string;
   filename: string;

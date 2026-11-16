@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount } from "../../context";
 import {
-  CONTENT_SCOPES,
-  SCOPE_LABELS,
+  MEDIA_SCOPES,
+  MEDIA_SCOPE_LABELS,
   MEDIA_CATEGORIES_FOR_SCOPE,
   resolveDefaultScope,
-  type ContentScope,
+  type MediaScope,
   type MediaCategory,
   type MediaAsset,
 } from "../../types";
@@ -13,8 +13,8 @@ import { getMedia, uploadMedia, deleteMedia } from "../../api";
 import { AuthImage } from "../../components/AuthImage";
 
 const CATEGORY_LABELS: Record<MediaCategory, string> = {
-  capas: "Capas (Slide 1)",
-  aleatorias: "Aleatórias (Slides 2-5)",
+  cover: "Cover (Slide 1)",
+  random: "Random (Slides 2-5)",
   listo: "Listo Brand (Final)",
 };
 
@@ -29,7 +29,7 @@ export function MediaPage(): React.JSX.Element {
   const { selectedAccountId, selectedAccount } = useAccount();
 
   // Step 4: Default scope opens pinned account role or "shared"
-  const [activeScope, setActiveScope] = useState<ContentScope>(() =>
+  const [activeScope, setActiveScope] = useState<MediaScope>(() =>
     resolveDefaultScope(selectedAccountId, selectedAccount)
   );
 
@@ -44,13 +44,13 @@ export function MediaPage(): React.JSX.Element {
   }, [activeScope]);
 
   const [activeCategory, setActiveCategory] = useState<MediaCategory>(
-    validCategories[0] || "aleatorias"
+    validCategories[0] || "random"
   );
 
   // Keep active category in sync if scope switches to one where current category is not allowed
   useEffect(() => {
     if (!validCategories.includes(activeCategory)) {
-      setActiveCategory(validCategories[0] || "aleatorias");
+      setActiveCategory(validCategories[0] || "random");
     }
   }, [validCategories, activeCategory]);
 
@@ -184,7 +184,7 @@ export function MediaPage(): React.JSX.Element {
       <div className="scope-tabs-container">
         <label className="scope-label">Escopo:</label>
         <div className="scope-tabs" role="tablist">
-          {CONTENT_SCOPES.map((scope) => {
+          {MEDIA_SCOPES.map((scope) => {
             const isActive = activeScope === scope;
             const isPinnedDefault =
               selectedAccountId !== "all" && selectedAccount?.role === scope;
@@ -198,7 +198,7 @@ export function MediaPage(): React.JSX.Element {
                 className={`scope-tab ${isActive ? "active" : ""}`}
                 onClick={() => setActiveScope(scope)}
               >
-                <span>{SCOPE_LABELS[scope]}</span>
+                <span>{MEDIA_SCOPE_LABELS[scope]}</span>
                 {isPinnedDefault && (
                   <span className="scope-pinned-tag" title="Role da conta em foco">
                     pinned
@@ -268,7 +268,7 @@ export function MediaPage(): React.JSX.Element {
       <div className="media-grid-section">
         <div className="media-grid-header">
           <h4>
-            Mídias ({assets.length}) — {SCOPE_LABELS[activeScope]} /{" "}
+            Mídias ({assets.length}) — {MEDIA_SCOPE_LABELS[activeScope]} /{" "}
             {CATEGORY_LABELS[activeCategory]}
           </h4>
         </div>

@@ -9,17 +9,25 @@ export const MEDIA_SCOPES = [
   "single_woman",
   "couple_men",
   "couple_women",
+  "listo",
 ] as const;
 
-export const MEDIA_CATEGORIES = ["capas", "aleatorias", "listo"] as const;
+export const MEDIA_CATEGORIES = [
+  "cover",
+  "random",
+  "listo",
+  "capas",
+  "aleatorias",
+] as const;
 export type MediaCategory = (typeof MEDIA_CATEGORIES)[number];
 
 export const CATEGORIES_BY_SCOPE: Record<ContentScope, readonly MediaCategory[]> = {
-  shared: ["aleatorias", "listo"],
-  single_man: ["capas", "aleatorias"],
-  single_woman: ["capas", "aleatorias"],
-  couple_men: ["capas", "aleatorias"],
-  couple_women: ["capas", "aleatorias"],
+  shared: ["random", "aleatorias", "listo"],
+  single_man: ["cover", "random", "capas", "aleatorias"],
+  single_woman: ["cover", "random", "capas", "aleatorias"],
+  couple_men: ["cover", "random", "capas", "aleatorias"],
+  couple_women: ["cover", "random", "capas", "aleatorias"],
+  listo: ["listo"],
 };
 
 /**

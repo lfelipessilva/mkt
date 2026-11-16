@@ -7,6 +7,7 @@ import type {
   Bait,
   BaitInputItem,
   ContentScope,
+  MediaScope,
   MediaAsset,
   MediaCategory,
   GenerateCarouselsInput,
@@ -208,7 +209,7 @@ export async function deleteBait(id: string): Promise<{ success: boolean }> {
 }
 
 export interface GetMediaOptions {
-  scope?: ContentScope;
+  scope?: MediaScope | ContentScope;
   category?: MediaCategory;
   active?: boolean;
 }
@@ -227,7 +228,7 @@ export async function getMedia(
 
 export async function uploadMedia(
   file: File | Blob,
-  scope: ContentScope,
+  scope: MediaScope | ContentScope,
   category: MediaCategory
 ): Promise<MediaAsset> {
   const formData = new FormData();

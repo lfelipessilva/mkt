@@ -11,10 +11,11 @@ CREATE TYPE content_scope AS ENUM (
   'single_man',
   'single_woman',
   'couple_men',
-  'couple_women'
+  'couple_women',
+  'listo'
 );
 
-CREATE TYPE media_category AS ENUM ('capas', 'aleatorias', 'listo');
+CREATE TYPE media_category AS ENUM ('cover', 'random', 'listo', 'capas', 'aleatorias');
 
 CREATE TYPE run_status AS ENUM (
   'generating',

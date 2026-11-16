@@ -51,14 +51,22 @@ Painel Web: `http://localhost:3000/`
 | `USAGE_DAYS` | Janela de dias para deduplicação/rotação de imagens | `7` |
 | `DISPATCH_WEBHOOK_URL` | Webhook HTTP opcional para evento de envio/despacho | *(opcional)* |
 | `FRONTEND_DIST_DIR` | Caminho personalizado para os estáticos do frontend SPA | `frontend/dist` |
+| `SILO_SERVER_URL` | URL da API do MinIO / Silo S3 | `https://personal-minio.adaygq.easypanel.host` |
+| `SILO_BROWSER_REDIRECT_URL` | URL do console web do MinIO / Silo | `https://console-minio.adaygq.easypanel.host` |
+| `SILO_ACCESS_KEY` | Access key do Silo (MinIO) | *(obrigatório para storage remoto)* |
+| `SILO_SECRET_KEY` | Secret key do Silo (MinIO) | *(obrigatório para storage remoto)* |
+| `SILO_MEDIA_BUCKET` | Bucket para mídias base | `media` |
+| `SILO_CAROUSELS_BUCKET` | Bucket para carrosséis gerados | `carousels` |
 
-## Estrutura de Mídia
+## Estrutura de Mídia e Silo (MinIO)
 
-As mídias são organizadas por escopo e categoria:
-- `media/<role>/capas/` (`single_woman`, `single_man`, `couple_women`, `couple_men`)
-- `media/<role>/aleatorias/`
-- `media/shared/aleatorias/`
-- `media/shared/listo/`
+As mídias são organizadas por escopo e categoria (tanto localmente quanto no bucket `media` do Silo):
+- `media/<role>/cover/` (`single_woman`, `single_man`, `couple_women`, `couple_men`)
+- `media/<role>/random/`
+- `media/shared/random/`
+- `media/listo/` (escopo separado direto sob `media/listo/`)
+
+Os carrosséis gerados (slides renderizados e `meta.json`) são armazenados no bucket `carousels` do Silo e em `./output`.
 
 ## Telegram Bot
 

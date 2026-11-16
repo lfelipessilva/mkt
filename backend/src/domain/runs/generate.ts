@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
 import { AppError } from "../../shared/errors.js";
+import { isSiloEnabled, uploadCarouselToSilo } from "../../shared/storage/silo.js";
 import { getAccount } from "../accounts/store.js";
 import { getMediaRoot } from "../media/paths.js";
 import { recordMediaUsage, upsertMediaAsset } from "../media/store.js";
@@ -93,11 +94,22 @@ async function resolveSlideMediaId(
     const parts = rel.split("/");
     if (parts.length >= 3) {
       const scope = parts[0] as any;
-      const category = parts[1] as any;
+      const category = (parts[1] === "capas" ? "cover" : parts[1] === "aleatorias" ? "random" : parts[1]) as any;
       const asset = await upsertMediaAsset(
         {
           scope,
           category,
+          storage_path: storageWithMedia,
+          filename: slide.filename,
+        },
+        pool
+      );
+      return asset.id;
+    } else if (parts.length === 2 && parts[0] === "listo") {
+      const asset = await upsertMediaAsset(
+        {
+          scope: "listo",
+          category: "listo",
           storage_path: storageWithMedia,
           filename: slide.filename,
         },
@@ -163,17 +175,43 @@ export async function generateOneCarousel(
     });
   }
 
-  fs.writeFileSync(
-    path.join(outDir, "meta.json"),
-    JSON.stringify(
-      {
-        selection: { ...selection, usageUpdate: undefined },
-        copy,
-      },
-      null,
-      2
-    )
+  const metaContent = JSON.stringify(
+    {
+      selection: { ...selection, usageUpdate: undefined },
+      copy,
+    },
+    null,
+    2
   );
+  fs.writeFileSync(path.join(outDir, "meta.json"), metaContent);
+
+  // Upload generated carousel slides and meta.json to Silo if enabled
+  if (isSiloEnabled()) {
+    try {
+      const relOutDir = path.relative(outputRoot, outDir);
+      await uploadCarouselToSilo(
+        path.posix.join(relOutDir, "meta.json"),
+        metaContent,
+        "application/json"
+      );
+
+      if (!options.skipRender) {
+        for (const slide of selection.slides) {
+          const slideFile = path.join(outDir, `slide_${slide.numero}.jpg`);
+          if (fs.existsSync(slideFile)) {
+            const buf = fs.readFileSync(slideFile);
+            await uploadCarouselToSilo(
+              path.posix.join(relOutDir, `slide_${slide.numero}.jpg`),
+              buf,
+              "image/jpeg"
+            );
+          }
+        }
+      }
+    } catch (siloErr) {
+      console.warn("[silo:upload] Failed to upload carousel to silo:", siloErr);
+    }
+  }
 
   // Create CarouselRun row in database
   const run = await createCarouselRun(
