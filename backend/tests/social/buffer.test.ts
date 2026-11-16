@@ -37,20 +37,17 @@ describe("BufferPublisherAdapter", () => {
                       {
                         id: "chan_instagram",
                         service: "instagram",
-                        name: "InstaProfile",
-                        serviceUsername: "instaprofile",
+                        name: "instaprofile",
                       },
                       {
                         id: "chan_tiktok_1",
                         service: "tiktok",
-                        name: "TikTokProfile1",
-                        serviceUsername: "tiktok_user_1",
+                        name: "tiktok_user_1",
                       },
                       {
                         id: "chan_tiktok_2",
                         service: "tiktok",
                         name: "TikTokProfile2",
-                        serviceUsername: null,
                       },
                     ],
                   },
@@ -99,10 +96,10 @@ describe("BufferPublisherAdapter", () => {
                 organizations: [
                   {
                     channels: [
-                      { id: "tt1", service: "tiktok", name: "tt1", serviceUsername: "tt1" },
-                      { id: "tt2", service: "tiktok", name: "tt2", serviceUsername: "tt2" },
-                      { id: "tt3", service: "tiktok", name: "tt3", serviceUsername: "tt3" },
-                      { id: "tt4", service: "tiktok", name: "tt4", serviceUsername: "tt4" },
+                      { id: "tt1", service: "tiktok", name: "tt1" },
+                      { id: "tt2", service: "tiktok", name: "tt2" },
+                      { id: "tt3", service: "tiktok", name: "tt3" },
+                      { id: "tt4", service: "tiktok", name: "tt4" },
                     ],
                   },
                 ],
