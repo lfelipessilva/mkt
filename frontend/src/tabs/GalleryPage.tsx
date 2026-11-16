@@ -1,10 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useAccount } from "../context";
-import type { CarouselRun, CarouselSlide } from "../types";
+import type { Account, CarouselRun, CarouselSlide } from "../types";
 import { getCarouselRuns } from "../api";
 import { RunCard } from "../components/RunCard";
 import { ManualTikTokModal } from "../components/ManualTikTokModal";
 import { RefreshCw, Search, X } from "lucide-react";
+
+export function resolveGalleryTargetAccountIds(
+  selectedAccountId: string,
+  accounts: Account[]
+): string[] {
+  if (selectedAccountId && selectedAccountId !== "all") {
+    return [selectedAccountId];
+  }
+  return accounts.filter((a) => a.enabled).map((a) => a.id);
+}
 
 export function orderSlides(slides: CarouselSlide[]): CarouselSlide[] {
   return [...slides].sort((a, b) => a.position - b.position);
