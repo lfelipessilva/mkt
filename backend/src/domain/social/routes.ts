@@ -110,7 +110,8 @@ export async function syncSocialAccounts(
   // Auto-import channels not matched with any existing account
   for (const ch of channels) {
     if (!matchedChannelIds.has(ch.externalAccountId)) {
-      const cleanId = (ch.username || ch.name)
+      const channelName = (ch as { name?: string }).name || ch.username;
+      const cleanId = (ch.username || channelName)
         .replace(/^@/, "")
         .replace(/[^a-zA-Z0-9_.-]/g, "_")
         .toLowerCase()
@@ -119,9 +120,9 @@ export async function syncSocialAccounts(
       await upsertAccount(
         {
           id: cleanId,
-          display_name: ch.name || cleanId,
+          display_name: channelName || cleanId,
           role: "single_woman",
-          persona: `Conta importada via Buffer (${ch.username || ch.name})`,
+          persona: `Conta importada via Buffer (${ch.username || channelName})`,
           enabled: true,
           social_provider: ch.provider,
           external_account_id: ch.externalAccountId,
@@ -134,7 +135,7 @@ export async function syncSocialAccounts(
 
       matchedAccounts.push({
         id: cleanId,
-        persona: `Conta importada via Buffer (${ch.username || ch.name})`,
+        persona: `Conta importada via Buffer (${ch.username || channelName})`,
         external_account_id: ch.externalAccountId,
         social_provider: ch.provider,
         username: ch.username,
