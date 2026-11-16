@@ -69,7 +69,9 @@ export async function apiFetch<T>(
   const headers = new Headers(options.headers || {});
 
   if (!headers.has("Content-Type") && !(options.body instanceof FormData)) {
-    headers.set("Content-Type", "application/json");
+    if (options.body !== undefined && options.body !== null) {
+      headers.set("Content-Type", "application/json");
+    }
   }
 
   if (token && !headers.has("Authorization")) {
