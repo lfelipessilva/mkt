@@ -5,7 +5,6 @@ import { useAuth } from "./LoginGate";
 import {
   TrendingUp,
   Image as GalleryIcon,
-  Sparkles,
   Users,
   FileText,
   FolderArchive,
@@ -35,7 +34,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { id: "desempenho", label: "Desempenho", icon: TrendingUp },
       { id: "galeria", label: "Galeria", icon: GalleryIcon },
-      { id: "gerar", label: "Gerar", icon: Sparkles },
     ],
   },
   {

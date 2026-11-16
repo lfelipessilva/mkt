@@ -346,7 +346,6 @@ export interface AppSettings {
 export type NavTab =
   | "desempenho"
   | "galeria"
-  | "gerar"
   | "contas"
   | "textos"
   | "midias"
