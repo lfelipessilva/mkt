@@ -31,6 +31,12 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
+    fontconfig \
+    fonts-inter \
+    fonts-liberation \
+    fonts-dejavu-core \
+    fonts-noto-core \
+    && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production

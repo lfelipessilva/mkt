@@ -101,7 +101,7 @@ export function textSvg(text: string, style: SlideStyle = "pill"): Buffer {
   </defs>
   <style>
     .t-pill {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", "Inter", Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", "Inter", "Liberation Sans", "DejaVu Sans", "Noto Sans", Arial, sans-serif;
       font-size: ${fontSize}px;
       font-weight: 700;
       letter-spacing: -0.5px;
@@ -135,7 +135,7 @@ export function textSvg(text: string, style: SlideStyle = "pill"): Buffer {
   </defs>
   <style>
     .t-outline {
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", "Inter", Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", "Inter", "Liberation Sans", "DejaVu Sans", "Noto Sans", Arial, sans-serif;
       font-size: ${fontSize}px;
       font-weight: 700;
       letter-spacing: -0.4px;

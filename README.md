@@ -11,6 +11,9 @@ git clone <repo> && cd shipworm
 cp .env.example .env
 # Preencha as variáveis de ambiente necessárias no .env (detalhadas abaixo)
 
+# Dependências do sistema (fontes necessárias para renderização de texto pelo Sharp)
+sudo apt-get update && sudo apt-get install -y fontconfig fonts-inter fonts-liberation fonts-dejavu-core fonts-noto-core
+
 npm install
 npm run build
 npm run db:migrate
