@@ -200,7 +200,7 @@ export async function pollPendingPostsJob(
           throw new Error(`Carousel run not found: ${row.run_id}`);
         }
 
-        const imageUrls = resolveCarouselSlidePublicUrls(fullRun);
+        const imageUrls = await resolveCarouselSlidePublicUrls(fullRun);
 
         const publishRes = await provider.publishPost({
           internalPostId: row.run_id,

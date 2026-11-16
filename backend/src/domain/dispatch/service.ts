@@ -228,7 +228,7 @@ export async function dispatchCarouselRun(
       );
     }
 
-    const imageUrls = resolveCarouselSlidePublicUrls(run);
+    const imageUrls = await resolveCarouselSlidePublicUrls(run);
 
     requestPayload = {
       run_id: run.id,
@@ -393,6 +393,7 @@ export async function dispatchCarouselRun(
     };
   } catch (error: any) {
     // On failure: update dispatch_event to 'failed'
+    console.error("[dispatchCarouselRun] failed:", error?.stack || error);
     const errorPayload = {
       error: error instanceof Error ? error.message : String(error),
     };
