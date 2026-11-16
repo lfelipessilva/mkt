@@ -64,14 +64,6 @@ export function Sidebar({
 
   return (
     <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-badge">Listo</div>
-        <div className="brand-info">
-          <h1>Carousel Ops</h1>
-          <span className="brand-version">Clean Studio v2</span>
-        </div>
-      </div>
-
       <div className="context-switcher">
         <div className="flex items-center gap-1.5 mb-1.5">
           <Layers className="w-3.5 h-3.5 text-slate-500" />

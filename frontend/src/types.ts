@@ -14,8 +14,8 @@ export function isValidRole(role: string): role is AccountRole {
 export const ROLE_LABELS: Record<AccountRole, string> = {
   single_man: "Homem Solteiro",
   single_woman: "Mulher Solteira",
-  couple_men: "Casal Homens",
-  couple_women: "Casal Mulheres",
+  couple_men: "Casal Homen",
+  couple_women: "Casal Mulher",
 };
 
 export interface Account {
