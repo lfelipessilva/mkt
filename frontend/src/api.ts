@@ -20,6 +20,13 @@ import type {
   UpsertTikTokPostInput,
   TikTokSyncRun,
   AppSettings,
+  AutomationSchedule,
+} from "./types";
+
+export {
+  formatScheduleStatus,
+  formatScheduleChannel,
+  formatPublicationStatus,
 } from "./types";
 
 export type { GenerateCarouselsInput, GenerationJobProgress };
@@ -469,4 +476,12 @@ export async function testDispatch(): Promise<{ ok: boolean; message: string; ru
     return { ok: true, message: "Disparo de teste simulado com sucesso" };
   });
 }
+
+export async function getAutomationSchedule(
+  date?: string
+): Promise<AutomationSchedule> {
+  const query = date ? `?date=${encodeURIComponent(date)}` : "";
+  return apiFetch<AutomationSchedule>(`/automation/schedule${query}`);
+}
+
 

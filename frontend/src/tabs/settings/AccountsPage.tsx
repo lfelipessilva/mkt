@@ -19,6 +19,7 @@ interface AccountFormState {
   role: AccountRole;
   persona: string;
   enabled: boolean;
+  auto_post_enabled: boolean;
   tiktok_open_id: string;
   external_account_id: string;
   social_provider: string;
@@ -30,6 +31,7 @@ const emptyFormState: AccountFormState = {
   role: "single_woman",
   persona: "",
   enabled: true,
+  auto_post_enabled: true,
   tiktok_open_id: "",
   external_account_id: "",
   social_provider: "buffer",
@@ -63,6 +65,7 @@ export function AccountsPage(): React.JSX.Element {
       role: acc.role,
       persona: acc.persona || "",
       enabled: acc.enabled,
+      auto_post_enabled: acc.auto_post_enabled !== false,
       tiktok_open_id: acc.tiktok_open_id || "",
       external_account_id: acc.external_account_id || "",
       social_provider: acc.social_provider || "buffer",
@@ -113,6 +116,7 @@ export function AccountsPage(): React.JSX.Element {
         role: createForm.role,
         persona: createForm.persona.trim(),
         enabled: createForm.enabled,
+        auto_post_enabled: createForm.auto_post_enabled,
         display_name: createForm.display_name.trim() || null,
         tiktok_open_id: createForm.tiktok_open_id.trim() || null,
         external_account_id: createForm.external_account_id.trim() || null,
@@ -144,6 +148,7 @@ export function AccountsPage(): React.JSX.Element {
         role: editForm.role,
         persona: editForm.persona.trim(),
         enabled: editForm.enabled,
+        auto_post_enabled: editForm.auto_post_enabled,
         display_name: editForm.display_name.trim() || null,
         tiktok_open_id: editForm.tiktok_open_id.trim() || null,
         external_account_id: editForm.external_account_id.trim() || null,
@@ -158,6 +163,22 @@ export function AccountsPage(): React.JSX.Element {
       setFormError(
         err instanceof Error ? err.message : "Erro ao atualizar conta"
       );
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleToggleAutoPost = async (acc: Account) => {
+    setActionLoading(true);
+    try {
+      const nextVal = acc.auto_post_enabled === false ? true : false;
+      await updateAccount(acc.id, { auto_post_enabled: nextVal });
+      await reloadAccounts();
+      setStatusMessage(
+        `Auto-post da conta @${acc.id} ${nextVal ? "ativado" : "desativado"}`
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Erro ao alterar status de auto-post");
     } finally {
       setActionLoading(false);
     }
@@ -265,6 +286,7 @@ export function AccountsPage(): React.JSX.Element {
                 <th>Buffer / Canal</th>
                 <th>TikTok Open ID</th>
                 <th>Status</th>
+                <th>Auto-Post</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -310,6 +332,18 @@ export function AccountsPage(): React.JSX.Element {
                       title="Clique para alternar ativo/inativo"
                     >
                       {acc.enabled ? "Ativo" : "Inativo"}
+                    </button>
+                  </td>
+                  <td>
+                    <button
+                      type="button"
+                      className={`status-toggle ${acc.auto_post_enabled !== false ? "active" : "inactive"}`}
+                      onClick={() => void handleToggleAutoPost(acc)}
+                      disabled={actionLoading}
+                      title="Clique para alternar auto-post ativo/inativo"
+                      data-testid={`toggle-auto-post-${acc.id}`}
+                    >
+                      {acc.auto_post_enabled !== false ? "Ativo" : "Inativo"}
                     </button>
                   </td>
                   <td className="actions-cell">
@@ -477,6 +511,23 @@ export function AccountsPage(): React.JSX.Element {
                 </label>
               </div>
 
+              <div className="form-checkbox">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={createForm.auto_post_enabled}
+                    onChange={(e) =>
+                      setCreateForm({
+                        ...createForm,
+                        auto_post_enabled: e.target.checked,
+                      })
+                    }
+                    data-testid="create-acc-auto-post"
+                  />
+                  Habilitar auto-post na rotina de agendamento diária
+                </label>
+              </div>
+
               <div className="modal-actions">
                 <button
                   type="button"
@@ -597,6 +648,23 @@ export function AccountsPage(): React.JSX.Element {
                     }
                   />
                   Habilitar esta conta para gerações automáticas
+                </label>
+              </div>
+
+              <div className="form-checkbox">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={editForm.auto_post_enabled}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        auto_post_enabled: e.target.checked,
+                      })
+                    }
+                    data-testid="edit-acc-auto-post"
+                  />
+                  Habilitar auto-post na rotina de agendamento diária
                 </label>
               </div>
 

@@ -378,8 +378,103 @@ export interface TikTokSyncRun {
   error_message?: string | null;
 }
 
+export interface PostWindow {
+  id: string;
+  start: string;
+  end: string;
+}
+
+export type AutoPostSlotStatus =
+  | "pending"
+  | "running"
+  | "awaiting_approval"
+  | "done"
+  | "failed"
+  | "skipped";
+
+export type AutoPostSlotChannel = "buffer" | "telegram" | "social";
+
+export interface AutoPostSlot {
+  id: string;
+  window_id: string;
+  account_id: string;
+  account_display_name: string;
+  account_enabled: boolean;
+  channel: AutoPostSlotChannel | string;
+  scheduled_at: string;
+  window_end: string;
+  status: AutoPostSlotStatus | string;
+  attempts: number;
+  run_id: string | null;
+  run_status: string | null;
+  post_status: string | null;
+  last_error: string | null;
+}
+
+export interface AutomationSchedule {
+  date: string;
+  timezone: string;
+  enabled: boolean;
+  slots: AutoPostSlot[];
+}
+
+export type AutomationScheduleResponse = AutomationSchedule;
+
+export function formatScheduleStatus(status: string): string {
+  switch (status) {
+    case "pending":
+      return "Agendado";
+    case "running":
+      return "Gerando/Publicando";
+    case "awaiting_approval":
+      return "Aguardando aprovação";
+    case "done":
+      return "Enviado";
+    case "failed":
+      return "Falhou";
+    case "skipped":
+      return "Pulado";
+    default:
+      return status;
+  }
+}
+
+export function formatScheduleChannel(channel: string): string {
+  switch (channel) {
+    case "buffer":
+      return "Buffer";
+    case "telegram":
+      return "Telegram";
+    case "social":
+      return "Social";
+    default:
+      return channel;
+  }
+}
+
+export function formatPublicationStatus(
+  status: string | null | undefined
+): string {
+  if (!status) return "-";
+  switch (status) {
+    case "queued":
+      return "Na fila";
+    case "processing":
+      return "Processando";
+    case "published":
+      return "Publicado";
+    case "failed":
+      return "Falhou";
+    default:
+      return status;
+  }
+}
+
 export interface AppSettings {
   auto_dispatch_enabled?: boolean;
+  auto_post_windows?: PostWindow[] | string;
+  auto_post_count_per_day?: number;
+  auto_post_timezone?: string;
   [key: string]: any;
 }
 
