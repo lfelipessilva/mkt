@@ -5,10 +5,23 @@ import type {
   TikTokPerformanceSortField,
   CarouselRun,
   TikTokPost,
+  Account,
 } from "../types";
 import { getTikTokPerformance, syncTikTok } from "../api";
 import { ManualTikTokModal } from "../components/ManualTikTokModal";
-import { RefreshCw, Zap, Eye, Heart, MessageSquare, BarChart3, Edit3 } from "lucide-react";
+import { PerformanceChart } from "../components/PerformanceChart";
+import { RunCard } from "../components/RunCard";
+import {
+  RefreshCw,
+  Zap,
+  Eye,
+  Heart,
+  MessageSquare,
+  BarChart3,
+  Edit3,
+  LayoutGrid,
+  List,
+} from "lucide-react";
 
 export function filterPerformanceByAccount(
   items: TikTokPerformanceItem[],
@@ -99,11 +112,14 @@ export function computePerformanceStats(items: TikTokPerformanceItem[]): Perform
 }
 
 export function PerformancePage(): React.JSX.Element {
-  const { selectedAccountId, selectedAccount } = useAccount();
+  const { selectedAccountId, selectedAccount, accounts } = useAccount();
 
   const [items, setItems] = useState<TikTokPerformanceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // View mode: Cards vs Table
+  const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
   // Sorting
   const [sortField, setSortField] = useState<TikTokPerformanceSortField>("views");
@@ -180,6 +196,14 @@ export function PerformancePage(): React.JSX.Element {
     showToast("Métricas atualizadas com sucesso!", "success");
     loadPerformance();
   };
+
+  const accountsById = useMemo(() => {
+    const map = new Map<string, Account>();
+    for (const acc of accounts) {
+      map.set(acc.id, acc);
+    }
+    return map;
+  }, [accounts]);
 
   const filteredItems = useMemo(() => {
     const contextFiltered = filterPerformanceByAccount(items, selectedAccountId);
@@ -274,6 +298,58 @@ export function PerformancePage(): React.JSX.Element {
         </div>
       </div>
 
+      {/* Engagement Chart Component */}
+      {filteredItems.length > 0 && <PerformanceChart items={filteredItems} />}
+
+      {/* Controls Bar: Sort & View Toggle */}
+      {filteredItems.length > 0 && (
+        <div className="performance-controls-bar flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-medium text-slate-500">Ordenar por:</span>
+            <select
+              className="bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+              value={sortField}
+              onChange={(e) => handleSortChange(e.target.value as TikTokPerformanceSortField)}
+            >
+              <option value="views">Visualizações {sortField === "views" ? (sortOrder === "asc" ? "(menor)" : "(maior)") : ""}</option>
+              <option value="likes">Curtidas {sortField === "likes" ? (sortOrder === "asc" ? "(menor)" : "(maior)") : ""}</option>
+              <option value="comments">Comentários</option>
+              <option value="shares">Compartilhamentos</option>
+              <option value="published_at">Data de Publicação</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-start sm:self-auto">
+            <button
+              type="button"
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                viewMode === "cards"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              onClick={() => setViewMode("cards")}
+              title="Exibir como cards de carrossel ordenados"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>Cards Ordenados</span>
+            </button>
+            <button
+              type="button"
+              className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                viewMode === "table"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+              onClick={() => setViewMode("table")}
+              title="Exibir como tabela detalhada"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>Tabela</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error state */}
       {error && (
         <div className="error-card" role="alert">
@@ -305,8 +381,47 @@ export function PerformancePage(): React.JSX.Element {
         </div>
       )}
 
-      {/* Data Table */}
-      {filteredItems.length > 0 && (
+      {/* View Mode 1: Cards View (Ordered) */}
+      {filteredItems.length > 0 && viewMode === "cards" && (
+        <div className="runs-grid">
+          {filteredItems.map((item) => {
+            const synthesizedRun: CarouselRun = item.run
+              ? item.run
+              : {
+                  id: item.run_id,
+                  account_id: item.account_id,
+                  account_role: item.account_role as any,
+                  archetype_title: item.archetype_title,
+                  tema: item.tema,
+                  bait_body: item.bait_body,
+                  legenda: item.legenda,
+                  status: (item.status as any) || "published",
+                  output_dir: item.output_dir,
+                  slides: [],
+                };
+
+            return (
+              <RunCard
+                key={item.id || item.tiktok_post_id}
+                run={synthesizedRun}
+                account={accountsById.get(item.account_id)}
+                metrics={{
+                  views: item.views,
+                  likes: item.likes,
+                  comments: item.comments,
+                  shares: item.shares,
+                  video_url: item.video_url,
+                }}
+                onOpenManualPublish={() => handleOpenEditModal(item)}
+                onToast={showToast}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {/* View Mode 2: Detailed Data Table */}
+      {filteredItems.length > 0 && viewMode === "table" && (
         <div className="table-wrapper">
           <table className="performance-table" aria-label="Tabela de Desempenho do TikTok">
             <thead>
