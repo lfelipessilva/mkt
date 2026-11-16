@@ -30,7 +30,7 @@ function parseAccountArg(text?: string): string | undefined {
 }
 
 export function createBot(options: BotConfig = {}): Bot | null {
-  const token = options.token || process.env.TELEGRAM_BOT_TOKEN;
+  const token = options.token !== undefined ? options.token : process.env.TELEGRAM_BOT_TOKEN;
   if (!token) return null;
 
   const allowedUserIds = options.allowedUserIds ?? getAllowedUserIds();

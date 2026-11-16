@@ -499,9 +499,9 @@ Legacy `src/`, `config/*.json` removed or shimmed only until Task 14 passes; del
 - Delete: `src/index.js`, `src/config.js`, `config/*.json` usage from runtime path
 - Modify: `README.md`, `ecosystem.config.cjs` → point to `backend/dist/index.js`
 
-- [ ] **Step 1:** `npm test` + `npm run build` green.
-- [ ] **Step 2:** Document VPS env vars in README.
-- [ ] **Step 3:** Commit `chore: remove legacy json config runtime`.
+- [x] **Step 1:** `npm test` + `npm run build` green.
+- [x] **Step 2:** Document VPS env vars in README.
+- [x] **Step 3:** Commit `chore: remove legacy json config runtime`.
 
 ---
 

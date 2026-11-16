@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: "listo-carousel",
-      script: "src/index.js",
+      script: "backend/dist/index.js",
       cwd: __dirname,
       instances: 1,
       autorestart: true,

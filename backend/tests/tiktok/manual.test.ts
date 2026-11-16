@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import pg from "pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { runMigrations } from "../../src/shared/db/migrate.js";
+import { closePool } from "../../src/shared/db/client.js";
 import { buildApp } from "../../src/app.js";
 import type { FastifyInstance } from "fastify";
 import { upsertAccount } from "../../src/domain/accounts/store.js";
@@ -40,8 +41,13 @@ describe("Task 16: TikTok manual publish & Desempenho query", { timeout: 60000 }
   });
 
   after(async () => {
-    await app.close();
-    await pool.end();
+    if (app) {
+      await app.close();
+    }
+    await closePool();
+    if (pool) {
+      await pool.end();
+    }
     if (container) {
       await container.stop();
     }
