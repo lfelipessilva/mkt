@@ -14,7 +14,6 @@ import type { AccountRole } from "../accounts/schemas.js";
 import {
   MEDIA_SCOPES,
   validCategoriesForScope,
-  getMediaRoot,
   safeResolveMediaPath,
   parseSiloMediaKey,
   type MediaCategory,
@@ -183,6 +182,37 @@ export async function listMediaAssets(
 }
 
 /**
+ * Lists active media assets for given scopes and category, mapped to { filename, path }.
+ * Slide path matches storage_path.
+ */
+export async function listActiveMediaImages(
+  scopes: (ContentScope | string)[],
+  category: MediaCategory | string,
+  poolInstance?: Pool
+): Promise<Array<{ filename: string; path: string }>> {
+  const p = poolInstance || getPool();
+  const canonical =
+    category === "capas" ? "cover" : category === "aleatorias" ? "random" : category;
+  const result = await p.query<{ filename: string; storage_path: string }>(
+    `SELECT filename, storage_path
+     FROM media_assets
+     WHERE active = true
+       AND scope = ANY($1::text[])
+       AND (
+         category = $2
+         OR ($2 = 'cover' AND category = 'capas')
+         OR ($2 = 'random' AND category = 'aleatorias')
+       )
+     ORDER BY filename ASC`,
+    [scopes, canonical]
+  );
+  return result.rows.map((row) => ({
+    filename: row.filename,
+    path: row.storage_path,
+  }));
+}
+
+/**
  * Gets a single media asset by its storage path.
  */
 export async function getMediaAssetByStoragePath(
@@ -262,7 +292,7 @@ export async function deleteMediaAsset(
 
   // Remove physical file from disk if it exists
   try {
-    const diskPath = safeResolveMediaPath(asset.storage_path, mediaRoot);
+    const diskPath = safeResolveMediaPath(asset.storage_path);
     if (fs.existsSync(diskPath)) {
       fs.unlinkSync(diskPath);
     }

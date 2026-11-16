@@ -1,4 +1,4 @@
-import { readdirSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import type { Pool } from "pg";
 import { getPool } from "../shared/db/client.js";
@@ -9,11 +9,11 @@ import {
 } from "../domain/accounts/schemas.js";
 import { getAccount } from "../domain/accounts/store.js";
 import { loadEffectiveForAccount } from "../domain/content/effective.js";
-import { getMediaRoot } from "../domain/media/paths.js";
 import {
   getUsageDays,
   recordMediaUsage,
   recentlyUsedFilenames,
+  listActiveMediaImages,
 } from "../domain/media/store.js";
 import type { Archetype } from "../domain/archetypes/schemas.js";
 import type { Bait } from "../domain/baits/schemas.js";
@@ -74,56 +74,21 @@ export interface SelectCarouselInput {
   role: AccountRole;
   archetypes: Array<string | Pick<Archetype, "title">>;
   baits?: Array<string | Pick<Bait, "body">>;
+  pool?: Pool;
   mediaRoot?: string;
   persona?: string;
   accountId?: string;
   usage?: UsageData | null;
   usedFilenames?: Set<string>;
   usageDays?: number;
+  randomCount?: number;
   aleatoriasCount?: number;
   now?: number;
-}
-
-export function resolveMediaForRole(mediaRoot: string = getMediaRoot(), role: AccountRole): MediaDirs {
-  if (!AccountRoleSchema.safeParse(role).success) {
-    throw new Error(`role inválido: ${role}`);
-  }
-  const root = getMediaRoot(mediaRoot);
-  const coverDir = existsSync(join(root, role, "cover"))
-    ? join(root, role, "cover")
-    : join(root, role, "capas");
-  const randomRoleDir = existsSync(join(root, role, "random"))
-    ? join(root, role, "random")
-    : join(root, role, "aleatorias");
-  const randomSharedDir = existsSync(join(root, "shared", "random"))
-    ? join(root, "shared", "random")
-    : join(root, "shared", "aleatorias");
-  const listoDir = existsSync(join(root, "listo"))
-    ? join(root, "listo")
-    : join(root, "shared", "listo");
-
-  return {
-    capas: coverDir,
-    aleatoriasRole: randomRoleDir,
-    aleatoriasShared: randomSharedDir,
-    listo: listoDir,
+  pools?: {
+    cover?: MediaImage[];
+    random?: MediaImage[];
+    listo?: MediaImage[];
   };
-}
-
-export function allMediaImageDirs(mediaRoot?: string): string[] {
-  const root = getMediaRoot(mediaRoot);
-  const dirs: string[] = [];
-  for (const role of AccountRoleSchema.options) {
-    const rDir = existsSync(join(root, role, "random"))
-      ? join(root, role, "random")
-      : join(root, role, "aleatorias");
-    dirs.push(rDir);
-  }
-  const sharedDir = existsSync(join(root, "shared", "random"))
-    ? join(root, "shared", "random")
-    : join(root, "shared", "aleatorias");
-  dirs.push(sharedDir);
-  return dirs;
 }
 
 export function unionImages(...pools: MediaImage[][]): MediaImage[] {
@@ -137,13 +102,6 @@ export function unionImages(...pools: MediaImage[][]): MediaImage[] {
     }
   }
   return out;
-}
-
-export function listImages(dir: string): MediaImage[] {
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((f) => IMAGE_RE.test(f))
-    .map((f) => ({ filename: f, path: join(dir, f) }));
 }
 
 export function loadUsage(usagePath: string): UsageData {
@@ -212,8 +170,8 @@ function pickBait(baits: string[], usedBaits: Set<string>): string {
   return pickRandom(free.length ? free : baits);
 }
 
-export function selectCarousel({
-  mediaRoot,
+export async function selectCarousel({
+  pool,
   role,
   archetypes,
   baits = [],
@@ -222,9 +180,11 @@ export function selectCarousel({
   usage,
   usedFilenames,
   usageDays,
+  randomCount,
   aleatoriasCount,
   now = Date.now(),
-}: SelectCarouselInput): CarouselSelection {
+  pools,
+}: SelectCarouselInput): Promise<CarouselSelection> {
   if (!AccountRoleSchema.safeParse(role).success) {
     throw new Error(`role inválido: ${role}`);
   }
@@ -249,65 +209,71 @@ export function selectCarousel({
     : legacyUsed;
   const usedBaits = recentlyUsedBaits(pruned);
 
-  const dirs = resolveMediaForRole(mediaRoot, role);
-  const capas = listImages(dirs.capas);
-  const aleatorias = unionImages(
-    listImages(dirs.aleatoriasRole),
-    listImages(dirs.aleatoriasShared)
-  );
-  const listos = listImages(dirs.listo);
+  const p = pool || getPool();
 
-  if (!capas.length || !listos.length || aleatorias.length < 3) {
+  const coverPool =
+    pools?.cover ?? (await listActiveMediaImages([role], "cover", p));
+  const randomPool =
+    pools?.random ??
+    unionImages(
+      await listActiveMediaImages([role], "random", p),
+      await listActiveMediaImages(["shared"], "random", p)
+    );
+  const listoPool =
+    pools?.listo ??
+    (await listActiveMediaImages(["listo", "shared"], "listo", p));
+
+  if (!coverPool.length || !listoPool.length || randomPool.length < 3) {
     throw new Error(
-      `mídia insuficiente (${role}): capas=${capas.length} aleatorias=${aleatorias.length} listo=${listos.length}`
+      `mídia insuficiente (${role}): cover=${coverPool.length} random=${randomPool.length} listo=${listoPool.length}`
     );
   }
 
-  const nAleatorias = aleatoriasCount ?? (Math.random() < 0.5 ? 3 : 4);
-  const count = Math.min(nAleatorias, aleatorias.length);
+  const targetCount = randomCount ?? aleatoriasCount ?? (Math.random() < 0.5 ? 3 : 4);
+  const count = Math.min(targetCount, randomPool.length);
 
-  const capa = pickRandom(available(capas, used));
+  const cover = pickRandom(available(coverPool, used));
   const listo = pickRandom(
     available(
-      listos.filter((i) => i.filename !== capa.filename),
+      listoPool.filter((i) => i.filename !== cover.filename),
       used
     )
   );
 
-  const pickedAleatorias: MediaImage[] = [];
+  const pickedRandom: MediaImage[] = [];
   const usedCategories = new Set<string>();
-  const aleatoriaPool = available(
-    aleatorias.filter((i) => i.filename !== capa.filename && i.filename !== listo.filename),
+  const availableRandomPool = available(
+    randomPool.filter((i) => i.filename !== cover.filename && i.filename !== listo.filename),
     used,
     count
   );
-  const shuffledAleatorias = shuffle(aleatoriaPool);
+  const shuffledRandom = shuffle(availableRandomPool);
 
-  for (const img of shuffledAleatorias) {
-    if (pickedAleatorias.length >= count) break;
+  for (const img of shuffledRandom) {
+    if (pickedRandom.length >= count) break;
     const cat = categoryPrefix(img.filename);
     if (usedCategories.has(cat)) continue;
     usedCategories.add(cat);
-    pickedAleatorias.push(img);
+    pickedRandom.push(img);
   }
 
-  if (pickedAleatorias.length < count) {
-    for (const img of shuffledAleatorias) {
-      if (pickedAleatorias.length >= count) break;
-      if (pickedAleatorias.includes(img)) continue;
-      pickedAleatorias.push(img);
+  if (pickedRandom.length < count) {
+    for (const img of shuffledRandom) {
+      if (pickedRandom.length >= count) break;
+      if (pickedRandom.includes(img)) continue;
+      pickedRandom.push(img);
     }
   }
 
-  if (pickedAleatorias.length < count) {
-    throw new Error(`não deu pra sortear ${count} imagens aleatórias`);
+  if (pickedRandom.length < count) {
+    throw new Error(`não deu pra sortear ${count} imagens random`);
   }
 
-  const mid = shuffle([...pickedAleatorias]);
+  const mid = shuffle([...pickedRandom]);
   const listoAt = mid.length - (mid.length > 1 && Math.random() < 0.5 ? 1 : 0);
   mid.splice(listoAt, 0, listo);
 
-  const slides: SlideSelection[] = [capa, ...mid].map((img, i) => ({
+  const slides: SlideSelection[] = [cover, ...mid].map((img, i) => ({
     numero: i + 1,
     filename: img.filename,
     path: img.path,
@@ -353,6 +319,7 @@ export async function selectCarouselForAccount(
     usage?: UsageData;
     usedFilenames?: Set<string>;
     usageDays?: number;
+    randomCount?: number;
     aleatoriasCount?: number;
     now?: number;
   } = {}
@@ -379,6 +346,7 @@ export async function selectCarouselForAccount(
   }
 
   return selectCarousel({
+    pool: p,
     role: account.role,
     archetypes: effective.archetypes,
     baits: effective.baits,
@@ -388,7 +356,8 @@ export async function selectCarouselForAccount(
     usage: options.usage,
     usedFilenames,
     usageDays,
-    aleatoriasCount: options.aleatoriasCount,
+    randomCount: options.randomCount ?? options.aleatoriasCount,
+    aleatoriasCount: options.aleatoriasCount ?? options.randomCount,
     now: options.now,
   });
 }
