@@ -77,6 +77,19 @@ describe("Task 12: Agenda panel, settings & account toggle (TDD)", () => {
       assert.equal(requestedUrl, "/api/v1/automation/schedule");
       assert.equal(scheduleWithoutDate.enabled, true);
     });
+
+    it("propagates error when API fails so caller can display agenda error state", async () => {
+      globalThis.fetch = (async () => {
+        return new Response(JSON.stringify({ message: "Falha interna ao carregar agenda" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }) as typeof fetch;
+
+      await assert.rejects(async () => {
+        await getAutomationSchedule();
+      }, /Falha interna ao carregar agenda/);
+    });
   });
 
   describe("Pure helpers: formatScheduleStatus (spec §5.9.2, §5.11 test 7, 12)", () => {
@@ -111,6 +124,16 @@ describe("Task 12: Agenda panel, settings & account toggle (TDD)", () => {
       assert.equal(formatPublicationStatus(null), "-");
       assert.equal(formatPublicationStatus(undefined), "-");
       assert.equal(formatPublicationStatus(""), "-");
+    });
+
+    it("evaluates publication column using post_status without fallback to raw run_status", () => {
+      // In Task 12 table, slot has run_status: "generated" and post_status: null
+      // The publication column should show "-" rather than leaking raw run_status
+      const slot: Partial<AutoPostSlot> = {
+        run_status: "generated",
+        post_status: null,
+      };
+      assert.equal(formatPublicationStatus(slot.post_status), "-");
     });
   });
 

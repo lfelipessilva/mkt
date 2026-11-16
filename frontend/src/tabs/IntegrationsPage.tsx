@@ -41,6 +41,7 @@ export function IntegrationsPage(): React.JSX.Element {
   const [scheduleDate, setScheduleDate] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [scheduleLoading, setScheduleLoading] = useState<boolean>(false);
+  const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [testingDispatch, setTestingDispatch] = useState<boolean>(false);
   const [syncingTikTok, setSyncingTikTok] = useState<boolean>(false);
@@ -55,24 +56,26 @@ export function IntegrationsPage(): React.JSX.Element {
 
   const loadSchedule = useCallback(async (date?: string) => {
     setScheduleLoading(true);
+    setScheduleError(null);
     try {
       const res = await getAutomationSchedule(date || undefined);
       setSchedule(res);
-      if (!scheduleDate && res.date) {
-        setScheduleDate(res.date);
-      }
+      setScheduleDate((prev) => (prev ? prev : res.date || ""));
     } catch (err) {
       console.warn("Failed to load schedule:", err);
+      setScheduleError(
+        err instanceof Error ? err.message : "Erro ao carregar a agenda de postagens"
+      );
     } finally {
       setScheduleLoading(false);
     }
-  }, [scheduleDate]);
+  }, []);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setErrorMessage(null);
     try {
-      const [fetchedSettings, fetchedLatestSync, fetchedSchedule] = await Promise.all([
+      const [fetchedSettings, fetchedLatestSync] = await Promise.all([
         getSettings().catch((err) => {
           console.warn("Failed to load settings:", err);
           return {} as AppSettings;
@@ -81,21 +84,10 @@ export function IntegrationsPage(): React.JSX.Element {
           console.warn("Failed to load latest sync:", err);
           return null;
         }),
-        getAutomationSchedule(scheduleDate || undefined).catch((err) => {
-          console.warn("Failed to load schedule:", err);
-          return null;
-        }),
       ]);
 
       setSettings(fetchedSettings);
       setLatestSync(fetchedLatestSync);
-
-      if (fetchedSchedule) {
-        setSchedule(fetchedSchedule);
-        if (!scheduleDate && fetchedSchedule.date) {
-          setScheduleDate(fetchedSchedule.date);
-        }
-      }
 
       if (fetchedSettings.auto_post_timezone) {
         setTzInput(String(fetchedSettings.auto_post_timezone));
@@ -123,11 +115,12 @@ export function IntegrationsPage(): React.JSX.Element {
     } finally {
       setLoading(false);
     }
-  }, [scheduleDate]);
+  }, []);
 
   useEffect(() => {
     void loadData();
-  }, [loadData]);
+    void loadSchedule();
+  }, [loadData, loadSchedule]);
 
   // Recarrega a cada 60s enquanto a página estiver montada
   useEffect(() => {
@@ -316,11 +309,14 @@ export function IntegrationsPage(): React.JSX.Element {
         <button
           type="button"
           className="btn btn-outline flex items-center gap-1.5"
-          onClick={() => void loadData()}
-          disabled={loading || Boolean(savingKey) || testingDispatch || syncingTikTok}
+          onClick={() => {
+            void loadData();
+            void loadSchedule(scheduleDate || undefined);
+          }}
+          disabled={loading || scheduleLoading || Boolean(savingKey) || testingDispatch || syncingTikTok}
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
-          <span>{loading ? "Atualizando..." : "Recarregar"}</span>
+          <RefreshCw className={`w-3.5 h-3.5 ${loading || scheduleLoading ? "animate-spin text-blue-600" : ""}`} />
+          <span>{loading || scheduleLoading ? "Atualizando..." : "Recarregar"}</span>
         </button>
       </div>
 
@@ -668,6 +664,24 @@ export function IntegrationsPage(): React.JSX.Element {
           </div>
         </div>
 
+        {scheduleError && (
+          <div
+            className="banner banner-error"
+            role="alert"
+            data-testid="agenda-error-banner"
+            style={{ marginTop: "16px" }}
+          >
+            <span>⚠ {scheduleError}</span>
+            <button
+              type="button"
+              className="btn-icon"
+              onClick={() => setScheduleError(null)}
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* Tabela de slots da agenda */}
         <div className="accounts-table-wrapper" style={{ marginTop: "16px", overflowX: "auto" }}>
           <table className="data-table" data-testid="agenda-table">
@@ -682,7 +696,13 @@ export function IntegrationsPage(): React.JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {!schedule || schedule.slots.length === 0 ? (
+              {scheduleError ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-6 text-red-600 font-medium" data-testid="agenda-error-row">
+                    ⚠ {scheduleError}
+                  </td>
+                </tr>
+              ) : !schedule || schedule.slots.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="text-center py-6 text-muted italic" data-testid="agenda-empty-row">
                     Nenhum slot agendado para esta data.
@@ -732,7 +752,7 @@ export function IntegrationsPage(): React.JSX.Element {
                       </td>
                       <td>
                         <span className="text-sm font-medium">
-                          {formatPublicationStatus(slot.post_status || slot.run_status)}
+                          {formatPublicationStatus(slot.post_status)}
                         </span>
                       </td>
                       <td>
