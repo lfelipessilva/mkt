@@ -75,7 +75,7 @@ function formatMessage(
     case "awaiting_approval":
       return `🕐 Aguardando aprovação — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "buffer_accepted":
-      return `📤 Enviado ao Buffer — @${account} — aguardando confirmação do TikTok`;
+      return `📤 No Buffer em ~30min — @${account} — abre o Buffer, adiciona a música e publica`;
     case "publish_ok":
       return `✅ Publicado no TikTok — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "publish_failed":

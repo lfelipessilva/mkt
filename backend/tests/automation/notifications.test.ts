@@ -87,7 +87,7 @@ describe("automation notifications", () => {
       {
         event: "buffer_accepted",
         payload: { account: "gabriel" },
-        expect: /📤 Enviado ao Buffer — @gabriel — aguardando confirmação do TikTok/,
+        expect: /📤 No Buffer em ~30min — @gabriel — abre o Buffer, adiciona a música e publica/,
       },
       {
         event: "publish_ok",
