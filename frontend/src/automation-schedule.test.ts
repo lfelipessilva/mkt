@@ -90,6 +90,32 @@ describe("Task 12: Agenda panel, settings & account toggle (TDD)", () => {
         await getAutomationSchedule();
       }, /Falha interna ao carregar agenda/);
     });
+
+    it("passes AbortSignal to fetch to support in-flight request cancellation", async () => {
+      const controller = new AbortController();
+      let signalReceived: AbortSignal | undefined;
+
+      globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+        signalReceived = init?.signal as AbortSignal;
+        return new Response(
+          JSON.stringify({
+            date: "2026-11-16",
+            timezone: "America/Sao_Paulo",
+            enabled: true,
+            slots: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }) as typeof fetch;
+
+      await getAutomationSchedule("2026-11-16", controller.signal);
+      assert.equal(signalReceived, controller.signal);
+
+      // Also supports options object shape
+      const controller2 = new AbortController();
+      await getAutomationSchedule("2026-11-16", { signal: controller2.signal });
+      assert.equal(signalReceived, controller2.signal);
+    });
   });
 
   describe("Pure helpers: formatScheduleStatus (spec §5.9.2, §5.11 test 7, 12)", () => {

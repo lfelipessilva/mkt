@@ -478,10 +478,17 @@ export async function testDispatch(): Promise<{ ok: boolean; message: string; ru
 }
 
 export async function getAutomationSchedule(
-  date?: string
+  date?: string,
+  optionsOrSignal?: { signal?: AbortSignal } | AbortSignal
 ): Promise<AutomationSchedule> {
   const query = date ? `?date=${encodeURIComponent(date)}` : "";
-  return apiFetch<AutomationSchedule>(`/automation/schedule${query}`);
+  const signal =
+    optionsOrSignal instanceof AbortSignal
+      ? optionsOrSignal
+      : optionsOrSignal?.signal;
+  return apiFetch<AutomationSchedule>(`/automation/schedule${query}`, {
+    signal,
+  });
 }
 
 

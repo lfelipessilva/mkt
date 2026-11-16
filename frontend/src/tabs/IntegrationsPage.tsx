@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   getSettings,
   updateSetting,
@@ -54,21 +54,56 @@ export function IntegrationsPage(): React.JSX.Element {
   const [countInput, setCountInput] = useState<number>(3);
   const [windowsInput, setWindowsInput] = useState<PostWindow[]>(DEFAULT_WINDOWS);
 
+  const scheduleAbortRef = useRef<AbortController | null>(null);
+  const scheduleRequestIdRef = useRef<number>(0);
+
   const loadSchedule = useCallback(async (date?: string) => {
+    if (scheduleAbortRef.current) {
+      scheduleAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    scheduleAbortRef.current = controller;
+    const requestId = ++scheduleRequestIdRef.current;
+
     setScheduleLoading(true);
     setScheduleError(null);
     try {
-      const res = await getAutomationSchedule(date || undefined);
+      const res = await getAutomationSchedule(date || undefined, controller.signal);
+      if (requestId !== scheduleRequestIdRef.current) {
+        return;
+      }
       setSchedule(res);
       setScheduleDate((prev) => (prev ? prev : res.date || ""));
     } catch (err) {
+      if (
+        controller.signal.aborted ||
+        (err instanceof Error && err.name === "AbortError")
+      ) {
+        return;
+      }
+      if (requestId !== scheduleRequestIdRef.current) {
+        return;
+      }
       console.warn("Failed to load schedule:", err);
+      setSchedule(null);
       setScheduleError(
-        err instanceof Error ? err.message : "Erro ao carregar a agenda de postagens"
+        err instanceof Error
+          ? err.message
+          : "Erro ao carregar a agenda de postagens"
       );
     } finally {
-      setScheduleLoading(false);
+      if (requestId === scheduleRequestIdRef.current) {
+        setScheduleLoading(false);
+      }
     }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scheduleAbortRef.current) {
+        scheduleAbortRef.current.abort();
+      }
+    };
   }, []);
 
   const loadData = useCallback(async () => {
@@ -672,13 +707,6 @@ export function IntegrationsPage(): React.JSX.Element {
             style={{ marginTop: "16px" }}
           >
             <span>⚠ {scheduleError}</span>
-            <button
-              type="button"
-              className="btn-icon"
-              onClick={() => setScheduleError(null)}
-            >
-              ×
-            </button>
           </div>
         )}
 
