@@ -319,6 +319,7 @@ export async function dispatchCarouselRun(
         customSocialPublisherProvider ||
         getSocialPublisherProvider(options.channel === "buffer" ? "buffer" : undefined);
 
+      const isBuffer = options.channel === "buffer";
       const publishRes = await provider.publishPost({
         internalPostId: run.id,
         externalAccountId: requestPayload.external_account_id,
@@ -327,7 +328,13 @@ export async function dispatchCarouselRun(
           type: "carousel",
           imageUrls: requestPayload.image_urls,
         },
-        publishMode: "immediate",
+        publishMode: isBuffer ? "scheduled" : "immediate",
+        ...(isBuffer
+          ? {
+              scheduledAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+              schedulingType: "notification" as const,
+            }
+          : {}),
       });
 
       responsePayload = publishRes;
