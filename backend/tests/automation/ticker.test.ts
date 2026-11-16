@@ -311,7 +311,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
         enabled: true,
         auto_post_enabled: true,
         external_account_id: "ext-123",
-        social_provider: "buffer",
+        social_provider: "zernio",
       },
       pool
     );
@@ -338,7 +338,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
           slot_date: "2026-11-16",
           window_id: "morning",
           account_id: "acc-buf",
-          channel: "buffer",
+          channel: "zernio",
           scheduled_at: now,
           window_end: windowEnd,
         },
@@ -395,7 +395,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
     const tgSlot = slots.find((s) => s.account_id === "acc-tg");
 
     assert.equal(bufSlot?.status, "awaiting_approval");
-    assert.equal(bufSlot?.channel, "buffer");
+    assert.equal(bufSlot?.channel, "zernio");
     assert.equal(tgSlot?.status, "done");
     assert.equal(tgSlot?.channel, "telegram");
   });
@@ -637,7 +637,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
         enabled: true,
         auto_post_enabled: true,
         external_account_id: "ext-17",
-        social_provider: "buffer",
+        social_provider: "zernio",
       },
       pool
     );
@@ -661,7 +661,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
           slot_date: "2026-11-16",
           window_id: "morning",
           account_id: "acc-buf-17",
-          channel: "buffer",
+          channel: "zernio",
           scheduled_at: now,
           window_end: windowEnd,
         },
@@ -771,7 +771,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
         enabled: true,
         auto_post_enabled: true,
         external_account_id: "ext-buf-20",
-        social_provider: "buffer",
+        social_provider: "zernio",
       },
       pool
     );
@@ -785,7 +785,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
           slot_date: "2026-11-16",
           window_id: "morning",
           account_id: "acc-buf-20",
-          channel: "buffer",
+          channel: "zernio",
           scheduled_at: now,
           window_end: windowEnd,
         },
@@ -821,7 +821,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
 
     const [slot] = await listSlotsByDate("2026-11-16", pool);
     assert.equal(slot.status, "awaiting_approval");
-    assert.equal(slot.channel, "buffer");
+    assert.equal(slot.channel, "zernio");
     assert.ok(slot.run_id);
 
     const run = await getCarouselRun(slot.run_id, pool);
@@ -930,7 +930,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
         enabled: true,
         auto_post_enabled: true,
         external_account_id: "ext-exp",
-        social_provider: "buffer",
+        social_provider: "zernio",
       },
       pool
     );
@@ -944,7 +944,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
           slot_date: "2026-11-16",
           window_id: "morning",
           account_id: "acc-exp",
-          channel: "buffer",
+          channel: "zernio",
           scheduled_at: new Date("2026-11-16T10:00:00.000Z"),
           window_end: windowEnd,
         },
@@ -1138,7 +1138,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
         enabled: true,
         auto_post_enabled: true,
         external_account_id: "ext-busy-exp",
-        social_provider: "buffer",
+        social_provider: "zernio",
       },
       pool
     );
@@ -1152,7 +1152,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
           slot_date: "2026-11-16",
           window_id: "morning",
           account_id: "acc-busy-exp",
-          channel: "buffer",
+          channel: "zernio",
           scheduled_at: new Date("2026-11-16T10:00:00.000Z"),
           window_end: windowEnd,
         },

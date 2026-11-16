@@ -52,7 +52,7 @@ describe("Task 3: Planner & Slots (spec §5.11 items 1–6, 25–26)", { timeout
       enabled: true,
       auto_post_enabled: true,
       external_account_id: "ext-buffer-1",
-      social_provider: "buffer",
+      social_provider: "zernio",
     }, pool);
 
     // Account 2: external_account_id present, provider postforme -> channel social
@@ -101,7 +101,7 @@ describe("Task 3: Planner & Slots (spec §5.11 items 1–6, 25–26)", { timeout
 
     // Verify channels
     const slotByAccount = new Map(slots.map(s => [s.account_id, s]));
-    assert.equal(slotByAccount.get("acc-1")?.channel, "buffer");
+    assert.equal(slotByAccount.get("acc-1")?.channel, "zernio");
     assert.equal(slotByAccount.get("acc-2")?.channel, "social");
     assert.equal(slotByAccount.get("acc-3")?.channel, "telegram");
 

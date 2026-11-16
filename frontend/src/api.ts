@@ -178,6 +178,10 @@ export async function syncSocialAccounts(): Promise<SyncAccountsResult> {
   });
 }
 
+export async function getTikTokConnectUrl(): Promise<{ authUrl: string }> {
+  return apiFetch<{ authUrl: string }>("/social/connect/tiktok");
+}
+
 export async function getArchetypes(
   scope?: ContentScope
 ): Promise<Archetype[]> {
@@ -366,7 +370,7 @@ export async function getCarouselRun(id: string): Promise<CarouselRun> {
 
 export async function dispatchCarouselRun(
   runId: string,
-  channel: "telegram" | "api" | "buffer" | "social" = "telegram"
+  channel: "telegram" | "api" | "zernio" | "social" = "telegram"
 ): Promise<DispatchResult> {
   return apiFetch<DispatchResult>(
     `/carousels/runs/${encodeURIComponent(runId)}/send?channel=${encodeURIComponent(channel)}`,

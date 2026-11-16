@@ -127,7 +127,7 @@ describe("Task 9: Read model buffer_dispatched_at (spec §5.8)", { timeout: 6000
 
     await pool.query(
       `INSERT INTO dispatch_events (run_id, channel, status, triggered_by, sent_at)
-       VALUES ($1, 'buffer', 'failed', 'test', NOW())`,
+       VALUES ($1, 'zernio', 'failed', 'test', NOW())`,
       [created.id]
     );
 
@@ -172,7 +172,7 @@ describe("Task 9: Read model buffer_dispatched_at (spec §5.8)", { timeout: 6000
 
     await pool.query(
       `INSERT INTO dispatch_events (run_id, channel, status, triggered_by, sent_at)
-       VALUES ($1, 'buffer', 'sent', 'test', $2)`,
+       VALUES ($1, 'zernio', 'sent', 'test', $2)`,
       [created.id, latestSent]
     );
 
@@ -212,7 +212,7 @@ describe("Task 9: Read model buffer_dispatched_at (spec §5.8)", { timeout: 6000
       `INSERT INTO auto_post_slots (
         slot_date, window_id, account_id, channel, scheduled_at, window_end, status
        ) VALUES (
-        '2026-11-16', 'morning', 'acc_test', 'buffer', NOW(), NOW() + interval '1 hour', 'pending'
+        '2026-11-16', 'morning', 'acc_test', 'zernio', NOW(), NOW() + interval '1 hour', 'pending'
        ) RETURNING id`
     );
     const slotId = slotResult.rows[0].id;

@@ -48,6 +48,8 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     tmpOutputDir = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-buffer-output-"));
     process.env.OUTPUT_DIR = tmpOutputDir;
     process.env.SILO_SERVER_URL = "https://personal-minio.adaygq.easypanel.host";
+    process.env.SILO_ACCESS_KEY = "test";
+    process.env.SILO_SECRET_KEY = "test";
     process.env.SILO_CAROUSELS_BUCKET = "carousels";
 
     app = await buildApp();
@@ -130,7 +132,7 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     let providerStatus: "queued" | "published" = "queued";
 
     const mockProvider: SocialPublisherProvider = {
-      providerName: "buffer" as const,
+      providerName: "zernio" as const,
 
       async listConnectedAccounts(): Promise<SocialAccount[]> {
         return [
@@ -177,22 +179,21 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     // 3. Dispatch to Buffer via Dispatch Service
     const dispatchResult = await dispatchCarouselRun({
       runId,
-      channel: "buffer",
+      channel: "zernio",
       pool,
       socialPublisherProvider: mockProvider,
     });
 
     assert.ok(dispatchResult.event);
-    assert.equal(dispatchResult.event.channel, "buffer");
+    assert.equal(dispatchResult.event.channel, "zernio");
     assert.equal(dispatchResult.event.status, "sent");
     assert.equal(dispatchResult.run.status, "dispatched");
 
     // Verify Buffer dispatch payload & slide URLs
     assert.ok(dispatchedPayload);
     assert.equal(dispatchedPayload.externalAccountId, "buf_e2e_channel_99");
-    assert.equal(dispatchedPayload.publishMode, "scheduled");
-    assert.equal(dispatchedPayload.schedulingType, "notification");
-    assert.ok(dispatchedPayload.scheduledAt);
+    assert.equal(dispatchedPayload.publishMode, "immediate");
+    assert.equal(dispatchedPayload.scheduledAt, undefined);
     assert.equal(dispatchedPayload.media.type, "carousel");
     assert.deepEqual((dispatchedPayload.media as any).imageUrls, [
       "https://personal-minio.adaygq.easypanel.host/carousels/acc_e2e_tiktok/post_e2e_1/slide_1.jpg",
@@ -208,7 +209,7 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     assert.equal(initialPostRes.rows[0].publish_status, "queued");
     assert.equal(initialPostRes.rows[0].external_post_id, externalPostId);
     assert.equal(initialPostRes.rows[0].tracking_mode, "api");
-    assert.equal(initialPostRes.rows[0].provider, "buffer");
+    assert.equal(initialPostRes.rows[0].provider, "zernio");
 
     // 4. Polling Worker: initial poll while still queued
     const firstPollResult = await pollPendingPostsJob(pool, mockProvider);

@@ -11,7 +11,7 @@ import type {
 } from "../../src/domain/social/types.js";
 
 class MockSocialProvider implements SocialPublisherProvider {
-  readonly providerName = "buffer" as const;
+  readonly providerName = "zernio" as const;
   constructor(public mockAccounts: SocialAccount[]) {}
 
   async listConnectedAccounts(): Promise<SocialAccount[]> {
@@ -142,13 +142,13 @@ describe("Task 2: syncSocialAccounts Auto-Import", () => {
         externalAccountId: "buf_chan_gabriel",
         name: "Gabriel Tech",
         username: "gabriel_tech",
-        provider: "buffer",
+        provider: "zernio",
       },
       {
         externalAccountId: "buf_chan_tiktok_novo",
         name: "Novo Canal TikTok",
         username: "@novo_canal_tiktok",
-        provider: "buffer",
+        provider: "zernio",
       },
     ]);
 
@@ -163,13 +163,13 @@ describe("Task 2: syncSocialAccounts Auto-Import", () => {
     const gabriel = accountsDb.find((a) => a.id === "gabriel_tech");
     assert.ok(gabriel);
     assert.equal(gabriel.external_account_id, "buf_chan_gabriel");
-    assert.equal(gabriel.social_provider, "buffer");
+    assert.equal(gabriel.social_provider, "zernio");
     assert.equal(gabriel.persona, "Gabriel entusiasta tech e dev");
 
     // Assert auto-created account
     const novoCanal = accountsDb.find((a) => a.id === "novo_canal_tiktok");
     assert.ok(novoCanal);
-    assert.equal(novoCanal.social_provider, "buffer");
+    assert.equal(novoCanal.social_provider, "zernio");
     assert.equal(novoCanal.external_account_id, "buf_chan_tiktok_novo");
     assert.equal(novoCanal.enabled, true);
   });

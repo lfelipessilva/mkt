@@ -1,14 +1,14 @@
 import { AppError } from "../../shared/errors.js";
 import { SocialPublisherProvider } from "./types.js";
-import { BufferPublisherAdapter } from "./providers/buffer.js";
+import { ZernioPublisherAdapter } from "./providers/zernio.js";
 import { PostForMePublisherAdapter } from "./providers/postforme.js";
 
 export function getSocialPublisherProvider(name?: string): SocialPublisherProvider {
-  const providerName = name || process.env.SOCIAL_PROVIDER || "buffer";
+  const providerName = name || "zernio";
 
   switch (providerName) {
-    case "buffer":
-      return new BufferPublisherAdapter();
+    case "zernio":
+      return new ZernioPublisherAdapter();
     case "postforme":
       return new PostForMePublisherAdapter();
     default:

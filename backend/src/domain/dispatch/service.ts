@@ -215,7 +215,7 @@ export async function dispatchCarouselRun(
       slide_paths: slidePaths,
       legenda: run.legenda,
     };
-  } else if (options.channel === "buffer" || options.channel === "social") {
+  } else if (options.channel === "zernio" || options.channel === "social") {
     const account = await getAccount(run.account_id, p);
     if (!account) {
       throw new AppError(`Account '${run.account_id}' not found`, 404, "not_found");
@@ -313,13 +313,12 @@ export async function dispatchCarouselRun(
         status: res.status,
         body: parsedBody,
       };
-    } else if (options.channel === "buffer" || options.channel === "social") {
+    } else if (options.channel === "zernio" || options.channel === "social") {
       const provider =
         options.socialPublisherProvider ||
         customSocialPublisherProvider ||
-        getSocialPublisherProvider(options.channel === "buffer" ? "buffer" : undefined);
+        getSocialPublisherProvider();
 
-      const isBuffer = options.channel === "buffer";
       const publishRes = await provider.publishPost({
         internalPostId: run.id,
         externalAccountId: requestPayload.external_account_id,
@@ -328,18 +327,12 @@ export async function dispatchCarouselRun(
           type: "carousel",
           imageUrls: requestPayload.image_urls,
         },
-        publishMode: isBuffer ? "scheduled" : "immediate",
-        ...(isBuffer
-          ? {
-              scheduledAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-              schedulingType: "notification" as const,
-            }
-          : {}),
+        publishMode: "immediate",
       });
 
       responsePayload = publishRes;
 
-      const providerName = options.channel === "buffer" ? "buffer" : (process.env.SOCIAL_PROVIDER || "buffer");
+      const providerName = "zernio";
 
       await p.query(
         `INSERT INTO tiktok_posts (

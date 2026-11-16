@@ -1,9 +1,9 @@
-export type SocialProviderType = "buffer" | "postforme";
+export type SocialProviderType = "zernio" | "postforme";
 
 export interface SocialAccount {
   internalAccountId: string; // ID da conta no app (ex: 'gabriel', 'lucas')
   provider: SocialProviderType;
-  externalAccountId: string; // channelId no Buffer; social_account_id no Post for Me
+  externalAccountId: string;
   username: string; // @perfil no TikTok
   service: "tiktok";
   isActive: boolean;

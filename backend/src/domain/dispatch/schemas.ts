@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { CarouselRun } from "../runs/schemas.js";
 
-export const DispatchChannelSchema = z.enum(["api", "telegram", "buffer", "social"]);
+export const DispatchChannelSchema = z.enum(["api", "telegram", "zernio", "social"]);
 export type DispatchChannel = z.infer<typeof DispatchChannelSchema>;
 
 export const DispatchStatusSchema = z.enum(["pending", "sent", "failed"]);

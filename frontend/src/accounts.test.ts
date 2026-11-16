@@ -293,7 +293,7 @@ describe("Accounts configuration & CRUD", () => {
         social_provider: "buffer",
       });
       assert.equal(linked.isLinked, true);
-      assert.equal(linked.label, "Buffer (buf_chan_123)");
+      assert.equal(linked.label, "Zernio (buf_chan_123)");
       assert.equal(linked.externalAccountId, "buf_chan_123");
       assert.equal(linked.provider, "buffer");
     });

@@ -19,7 +19,7 @@ import type {
 const { Pool } = pg;
 
 class MockSocialProvider implements SocialPublisherProvider {
-  readonly providerName = "buffer" as const;
+  readonly providerName = "zernio" as const;
   mockAccounts: SocialAccount[] = [];
 
   async listConnectedAccounts(): Promise<SocialAccount[]> {
@@ -98,7 +98,7 @@ describe("Task 7: Social Accounts Sync Endpoint & Post for Me Phase 2 Stubs", { 
     mockProvider.mockAccounts = [
       {
         internalAccountId: "buf_chan_1",
-        provider: "buffer",
+        provider: "zernio",
         externalAccountId: "buf_chan_1",
         username: "@gabriel_tech",
         service: "tiktok",
@@ -106,7 +106,7 @@ describe("Task 7: Social Accounts Sync Endpoint & Post for Me Phase 2 Stubs", { 
       },
       {
         internalAccountId: "buf_chan_2",
-        provider: "buffer",
+        provider: "zernio",
         externalAccountId: "buf_chan_2",
         username: "rebeca_fitness",
         service: "tiktok",
@@ -114,7 +114,7 @@ describe("Task 7: Social Accounts Sync Endpoint & Post for Me Phase 2 Stubs", { 
       },
       {
         internalAccountId: "buf_chan_unmatched",
-        provider: "buffer",
+        provider: "zernio",
         externalAccountId: "buf_chan_unmatched",
         username: "unrelated_channel",
         service: "tiktok",
@@ -137,11 +137,11 @@ describe("Task 7: Social Accounts Sync Endpoint & Post for Me Phase 2 Stubs", { 
     // Verify DB was updated
     const gabrielDb = await pool.query("SELECT * FROM accounts WHERE id = 'gabriel_tech'");
     assert.equal(gabrielDb.rows[0].external_account_id, "buf_chan_1");
-    assert.equal(gabrielDb.rows[0].social_provider, "buffer");
+    assert.equal(gabrielDb.rows[0].social_provider, "zernio");
 
     const rebecaDb = await pool.query("SELECT * FROM accounts WHERE id = 'rebeca_fitness'");
     assert.equal(rebecaDb.rows[0].external_account_id, "buf_chan_2");
-    assert.equal(rebecaDb.rows[0].social_provider, "buffer");
+    assert.equal(rebecaDb.rows[0].social_provider, "zernio");
 
     const lucasDb = await pool.query("SELECT * FROM accounts WHERE id = 'lucas_games'");
     assert.equal(lucasDb.rows[0].external_account_id, null);

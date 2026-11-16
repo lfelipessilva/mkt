@@ -53,6 +53,8 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
     tmpOutputDir = fs.mkdtempSync(path.join(os.tmpdir(), "task7-output-"));
     process.env.OUTPUT_DIR = tmpOutputDir;
     process.env.SILO_SERVER_URL = "https://silo.example.com";
+    process.env.SILO_ACCESS_KEY = "test";
+    process.env.SILO_SECRET_KEY = "test";
     process.env.SILO_CAROUSELS_BUCKET = "carousels";
 
     app = buildApp();
@@ -108,7 +110,7 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
         enabled: true,
         auto_post_enabled: true,
         external_account_id: `ext-${accountId}`,
-        social_provider: "buffer",
+        social_provider: "zernio",
       },
       pool
     );
@@ -150,7 +152,7 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
           slot_date: now.toISOString().substring(0, 10),
           window_id: "morning",
           account_id: accountId,
-          channel: "buffer",
+          channel: "zernio",
           scheduled_at: now,
           window_end: windowEnd,
           status: options.slotStatus || "awaiting_approval",
@@ -223,13 +225,13 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
     const dispatchFn: DispatchCarouselFn = async (opts) => {
       dispatchCalled++;
       assert.equal(opts.runId, run.id);
-      assert.equal(opts.channel, "buffer");
+      assert.equal(opts.channel, "zernio");
       assert.equal(opts.triggeredBy, "approval");
       return {
         event: {
           id: "evt-approve-buf",
           run_id: opts.runId,
-          channel: "buffer",
+          channel: "zernio",
           status: "sent",
           triggered_by: "approval",
           request_payload: {},
@@ -463,7 +465,7 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
     assert.ok(editCall, "editMessageText must be called");
     assert.equal(editCall.payload.chat_id, 999);
     assert.equal(editCall.payload.message_id, 555);
-    assert.match(editCall.payload.text, /Enviado ao Buffer/);
+    assert.match(editCall.payload.text, /Enviado ao TikTok/);
 
     // 2. Second callback query on same run (already approved)
     apiCalls.length = 0;
@@ -533,7 +535,7 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
         event: {
           id: "evt-concurrent",
           run_id: opts.runId,
-          channel: "buffer",
+          channel: "zernio",
           status: "sent",
           triggered_by: "approval",
           request_payload: {},
@@ -611,7 +613,7 @@ describe("Task 7: Approval API + Telegram callback (spec §5.11 items 22–24)",
 
     const editCall = apiCalls.find((c) => c.method === "editMessageText");
     assert.ok(editCall);
-    assert.match(editCall.payload.text, /❌ Falha ao enviar ao Buffer/);
+    assert.match(editCall.payload.text, /❌ Falha ao enviar ao TikTok/);
   });
 
   it("Item 24: bot callback query with unrelated data answers callback query to clear spinner", async () => {

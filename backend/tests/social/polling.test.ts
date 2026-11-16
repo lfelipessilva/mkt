@@ -15,6 +15,8 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
 
   before(async () => {
     process.env.SILO_SERVER_URL = "https://silo.example.com";
+    process.env.SILO_ACCESS_KEY = "test";
+    process.env.SILO_SECRET_KEY = "test";
     process.env.SILO_CAROUSELS_BUCKET = "carousels";
     let connectionString = process.env.DATABASE_URL;
 
@@ -58,7 +60,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
       `INSERT INTO auto_post_slots (
         slot_date, window_id, account_id, channel, scheduled_at, window_end, status
       ) VALUES (
-        CURRENT_DATE, 'morning', $1, 'buffer', NOW(), NOW() + INTERVAL '2 hours', $2
+        CURRENT_DATE, 'morning', $1, 'zernio', NOW(), NOW() + INTERVAL '2 hours', $2
       ) RETURNING id`,
       [options.accountId || "acc_polling_test", options.status || "done"]
     );
@@ -88,7 +90,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
     const postRes = await pool.query(
       `INSERT INTO tiktok_posts (
         run_id, tracking_mode, provider, external_post_id, publish_status, scheduled_at, notified_at, created_at, updated_at
-      ) VALUES ($1, 'api', 'buffer', $2, $3, $4, $5, COALESCE($6, NOW()), NOW())
+      ) VALUES ($1, 'api', 'zernio', $2, $3, $4, $5, COALESCE($6, NOW()), NOW())
       RETURNING id, run_id, publish_status, external_post_id, published_at, notified_at`,
       [
         runId,
@@ -111,7 +113,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
 
     const mockSentAt = new Date().toISOString();
     const mockProvider: SocialPublisherProvider = {
-      providerName: "buffer",
+      providerName: "zernio",
       async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
       async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
         throw new Error("not called in this test");
@@ -154,7 +156,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
     });
 
     const mockProvider: SocialPublisherProvider = {
-      providerName: "buffer",
+      providerName: "zernio",
       async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
       async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
         throw new Error("not called");
@@ -206,7 +208,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
 
     let publishCalledWith: PublishPostRequest | null = null;
     const mockProvider: SocialPublisherProvider = {
-      providerName: "buffer",
+      providerName: "zernio",
       async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
       async publishPost(req: PublishPostRequest): Promise<PublishPostResponse> {
         publishCalledWith = req;
@@ -247,7 +249,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
 
       const mockSentAt = new Date().toISOString();
       const mockProvider: SocialPublisherProvider = {
-        providerName: "buffer",
+        providerName: "zernio",
         async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
         async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
           throw new Error("not called");
@@ -295,7 +297,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
       });
 
       const mockProvider: SocialPublisherProvider = {
-        providerName: "buffer",
+        providerName: "zernio",
         async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
         async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
           throw new Error("not called");
@@ -343,7 +345,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
       });
 
       const mockProvider: SocialPublisherProvider = {
-        providerName: "buffer",
+        providerName: "zernio",
         async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
         async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
           throw new Error("not called");
@@ -389,7 +391,7 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
       });
 
       const mockProvider: SocialPublisherProvider = {
-        providerName: "buffer",
+        providerName: "zernio",
         async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
         async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
           throw new Error("not called");

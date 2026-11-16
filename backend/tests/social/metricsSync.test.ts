@@ -69,7 +69,7 @@ describe("Task 6: Daily Metrics Sync Worker (syncTikTokMetricsDailyJob)", { time
       `INSERT INTO tiktok_posts (
         run_id, tracking_mode, provider, external_post_id, publish_status,
         published_at, views, likes, comments, shares, created_at, updated_at
-      ) VALUES ($1, 'api', 'buffer', $2, 'published', $3, $4, $5, 0, 0, NOW(), NOW())
+      ) VALUES ($1, 'api', 'zernio', $2, 'published', $3, $4, $5, 0, 0, NOW(), NOW())
       RETURNING id, run_id, external_post_id`,
       [
         runId,
@@ -93,7 +93,7 @@ describe("Task 6: Daily Metrics Sync Worker (syncTikTokMetricsDailyJob)", { time
     });
 
     const mockProvider: SocialPublisherProvider = {
-      providerName: "buffer",
+      providerName: "zernio",
       async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
       async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
         throw new Error("not called");
@@ -153,7 +153,7 @@ describe("Task 6: Daily Metrics Sync Worker (syncTikTokMetricsDailyJob)", { time
 
     let getMetricsCalled = false;
     const mockProvider: SocialPublisherProvider = {
-      providerName: "buffer",
+      providerName: "zernio",
       async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
       async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
         throw new Error("not called");

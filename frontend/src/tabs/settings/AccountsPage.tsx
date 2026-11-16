@@ -34,7 +34,7 @@ const emptyFormState: AccountFormState = {
   auto_post_enabled: true,
   tiktok_open_id: "",
   external_account_id: "",
-  social_provider: "buffer",
+  social_provider: "zernio",
 };
 
 export function AccountsPage(): React.JSX.Element {
@@ -68,7 +68,7 @@ export function AccountsPage(): React.JSX.Element {
       auto_post_enabled: acc.auto_post_enabled !== false,
       tiktok_open_id: acc.tiktok_open_id || "",
       external_account_id: acc.external_account_id || "",
-      social_provider: acc.social_provider || "buffer",
+      social_provider: acc.social_provider || "zernio",
     });
     setFormError(null);
   };
@@ -80,13 +80,13 @@ export function AccountsPage(): React.JSX.Element {
       const res = await syncSocialAccounts();
       await reloadAccounts();
       setStatusMessage(
-        `Sincronização Buffer concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).`
+        `Sincronização Zernio concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).`
       );
     } catch (err) {
       alert(
         err instanceof Error
           ? err.message
-          : "Erro ao sincronizar contas do Buffer"
+          : "Erro ao sincronizar contas do Zernio"
       );
     } finally {
       setSyncingBuffer(false);
@@ -232,7 +232,7 @@ export function AccountsPage(): React.JSX.Element {
             data-testid="btn-sync-buffer"
           >
             <RefreshCw className={`w-4 h-4 ${syncingBuffer ? "animate-spin text-blue-600" : ""}`} />
-            <span>{syncingBuffer ? "Puxando do Buffer..." : "Puxar Contas do Buffer"}</span>
+            <span>{syncingBuffer ? "Puxando do Zernio..." : "Puxar contas do Zernio"}</span>
           </button>
           <button
             type="button"
@@ -283,7 +283,7 @@ export function AccountsPage(): React.JSX.Element {
                 <th>Nome de Exibição</th>
                 <th>Role (Papel)</th>
                 <th>Persona</th>
-                <th>Buffer / Canal</th>
+                <th>Zernio / Canal</th>
                 <th>TikTok Open ID</th>
                 <th>Status</th>
                 <th>Auto-Post</th>
@@ -311,8 +311,8 @@ export function AccountsPage(): React.JSX.Element {
                   </td>
                   <td>
                     {bufferStatus.isLinked ? (
-                      <span className="role-badge role-shared" title={`Buffer ID: ${bufferStatus.externalAccountId}`}>
-                        Buffer ({bufferStatus.externalAccountId})
+                      <span className="role-badge role-shared" title={`Zernio ID: ${bufferStatus.externalAccountId}`}>
+                        Zernio ({bufferStatus.externalAccountId})
                       </span>
                     ) : (
                       <span className="text-muted text-sm">Não vinculado</span>
@@ -485,7 +485,7 @@ export function AccountsPage(): React.JSX.Element {
               </div>
 
               <div className="form-group">
-                <label htmlFor="create-acc-buffer">ID do Canal Buffer (external_account_id)</label>
+                <label htmlFor="create-acc-buffer">ID da conta Zernio (external_account_id)</label>
                 <input
                   id="create-acc-buffer"
                   type="text"
@@ -495,7 +495,7 @@ export function AccountsPage(): React.JSX.Element {
                     setCreateForm({ ...createForm, external_account_id: e.target.value })
                   }
                 />
-                <span className="form-hint">Provider: {createForm.social_provider || "buffer"}</span>
+                <span className="form-hint">Provider: {createForm.social_provider || "zernio"}</span>
               </div>
 
               <div className="form-checkbox">
@@ -625,17 +625,17 @@ export function AccountsPage(): React.JSX.Element {
               </div>
 
               <div className="form-group">
-                <label htmlFor="edit-acc-buffer">ID do Canal Buffer (external_account_id)</label>
+                <label htmlFor="edit-acc-buffer">ID da conta Zernio (external_account_id)</label>
                 <input
                   id="edit-acc-buffer"
                   type="text"
-                  placeholder="ID do canal no Buffer (ex: 64b1f...)"
+                  placeholder="ID da conta no Zernio"
                   value={editForm.external_account_id}
                   onChange={(e) =>
                     setEditForm({ ...editForm, external_account_id: e.target.value })
                   }
                 />
-                <span className="form-hint">Provider: {editForm.social_provider || "buffer"}</span>
+                <span className="form-hint">Provider: {editForm.social_provider || "zernio"}</span>
               </div>
 
               <div className="form-checkbox">

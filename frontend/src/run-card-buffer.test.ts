@@ -27,7 +27,7 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
     persona: "persona 1",
     role: "single_woman",
     enabled: true,
-    social_provider: "buffer",
+    social_provider: "zernio",
     external_account_id: "buf_channel_123",
   };
 
@@ -62,7 +62,7 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
       assert.deepEqual(state, {
         visible: true,
         disabled: false,
-        label: "Publicar no Buffer",
+        label: "Publicar no TikTok",
       });
     });
 
@@ -124,7 +124,7 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
       assert.deepEqual(state, {
         visible: true,
         disabled: true,
-        label: "Enviado ao Buffer",
+        label: "Enviado ao TikTok",
       });
     });
 
@@ -138,7 +138,7 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
       assert.deepEqual(state, {
         visible: true,
         disabled: false,
-        label: "Reenviar ao Buffer",
+        label: "Reenviar ao TikTok",
       });
     });
 
@@ -198,9 +198,9 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
         );
       }) as any;
 
-      const result = await dispatchCarouselRun("run-test-1", "buffer");
+      const result = await dispatchCarouselRun("run-test-1", "zernio");
       assert.ok(requestedUrl.includes("/api/v1/carousels/runs/run-test-1/send"));
-      assert.ok(requestedUrl.includes("channel=buffer"));
+      assert.ok(requestedUrl.includes("channel=zernio"));
       assert.equal(requestedMethod, "POST");
       assert.equal(authHeader, "Bearer test-token-task-11");
       assert.equal(result.ok, true);

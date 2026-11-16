@@ -312,12 +312,11 @@ export async function executeSlot(
     return;
   }
 
-  if (channel === "buffer") {
-    // Buffer channel: do not dispatch now; set awaiting_approval
+  if (channel === "zernio") {
     await updateSlot(
       slot.id,
       {
-        channel: "buffer",
+        channel: "zernio",
         status: "awaiting_approval",
       },
       pool

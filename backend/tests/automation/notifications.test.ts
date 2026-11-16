@@ -41,7 +41,7 @@ describe("automation notifications", () => {
     assert.equal(withoutUrl.inline_keyboard[0][0].text, "Confirmar envio");
     assert.equal(
       withoutUrl.inline_keyboard[0][0].callback_data,
-      `approve_buffer:${runId}`
+      `approve_zernio:${runId}`
     );
 
     const withUrl = buildApprovalKeyboard(runId, "https://app.example.com");
@@ -51,7 +51,7 @@ describe("automation notifications", () => {
       withUrl.inline_keyboard[0][0].url,
       `https://app.example.com/?tab=galeria&run=${runId}`
     );
-    assert.equal(withUrl.inline_keyboard[0][1].callback_data, `approve_buffer:${runId}`);
+    assert.equal(withUrl.inline_keyboard[0][1].callback_data, `approve_zernio:${runId}`);
   });
 
   it("notifyAutomation sends Portuguese templates to notify chat", async () => {
@@ -87,7 +87,7 @@ describe("automation notifications", () => {
       {
         event: "buffer_accepted",
         payload: { account: "gabriel" },
-        expect: /📤 No Buffer em ~30min — @gabriel — abre o Buffer, adiciona a música e publica/,
+        expect: /📤 Enviado ao TikTok — @gabriel — com áudio/,
       },
       {
         event: "publish_ok",

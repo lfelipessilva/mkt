@@ -34,9 +34,9 @@ interface AccountRow {
 
 /**
  * Resolves the planned channel for an account:
- * - 'buffer' if external_account_id is present and provider is 'buffer' or null/empty
+ * - 'zernio' if external_account_id is present and provider is 'zernio'
  * - 'social' if external_account_id is present and provider is 'postforme'
- * - 'telegram' otherwise (no external_account_id)
+ * - 'telegram' otherwise
  */
 export function resolvePlannedChannel(account: {
   external_account_id?: string | null;
@@ -45,12 +45,8 @@ export function resolvePlannedChannel(account: {
   const extId = account.external_account_id?.trim();
   if (extId) {
     const provider = account.social_provider?.trim().toLowerCase();
-    if (!provider || provider === "buffer") {
-      return "buffer";
-    }
-    if (provider === "postforme") {
-      return "social";
-    }
+    if (provider === "zernio") return "zernio";
+    if (provider === "postforme") return "social";
   }
   return "telegram";
 }
