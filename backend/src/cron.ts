@@ -143,7 +143,6 @@ export function startCron(options: CronConfig = {}): ScheduledTask & { tasks?: R
     originalStop();
     pollingTask.stop();
     metricsTask.stop();
-    return resultTask;
   };
 
   return resultTask;
