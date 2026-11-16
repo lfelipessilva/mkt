@@ -108,4 +108,19 @@ describe("ZernioPublisherAdapter", () => {
     assert.equal(settings.musicSoundInfo.musicSoundId, "clip-1");
     assert.equal(body?.publishNow, true);
   });
+
+  it("rejects video posts", async () => {
+    const adapter = new ZernioPublisherAdapter(client({}));
+    await assert.rejects(
+      () =>
+        adapter.publishPost({
+          internalPostId: "run",
+          externalAccountId: "acc",
+          caption: "video",
+          media: { type: "video", videoUrl: "https://cdn.example/v.mp4" },
+          publishMode: "immediate",
+        }),
+      (err: unknown) => err instanceof AppError && err.code === "validation_error"
+    );
+  });
 });

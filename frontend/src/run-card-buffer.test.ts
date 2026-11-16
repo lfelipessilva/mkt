@@ -62,7 +62,7 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
       assert.deepEqual(state, {
         visible: true,
         disabled: false,
-        label: "Publicar no TikTok",
+        label: "Publicar no Zernio",
       });
     });
 
@@ -124,7 +124,7 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
       assert.deepEqual(state, {
         visible: true,
         disabled: true,
-        label: "Enviado ao TikTok",
+        label: "Enviado ao Zernio",
       });
     });
 
@@ -138,7 +138,7 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
       assert.deepEqual(state, {
         visible: true,
         disabled: false,
-        label: "Reenviar ao TikTok",
+        label: "Reenviar ao Zernio",
       });
     });
 

@@ -164,11 +164,11 @@ export class ZernioPublisherAdapter implements SocialPublisherProvider {
   }
 
   async publishPost(request: PublishPostRequest): Promise<PublishPostResponse> {
+    if (request.media.type !== "carousel") {
+      throw new AppError("Só publicamos carrossel de imagens", 400, "validation_error");
+    }
     const soundId = await this.requireMusic(request.externalAccountId);
-    const mediaItems =
-      request.media.type === "carousel"
-        ? request.media.imageUrls.map((url) => ({ type: "image", url }))
-        : [{ type: "video", url: request.media.videoUrl }];
+    const mediaItems = request.media.imageUrls.map((url) => ({ type: "image", url }));
 
     const tiktokSettings: Record<string, unknown> = {
       privacy_level: "PUBLIC_TO_EVERYONE",
@@ -177,16 +177,10 @@ export class ZernioPublisherAdapter implements SocialPublisherProvider {
       allow_stitch: true,
       content_preview_confirmed: true,
       express_consent_given: true,
-      media_type: request.media.type === "carousel" ? "photo" : "video",
+      media_type: "photo",
       photo_cover_index: 0,
-      musicSoundInfo:
-        request.media.type === "carousel"
-          ? { musicSoundId: soundId }
-          : { musicSoundId: soundId, musicSoundVolume: 50 },
+      musicSoundInfo: { musicSoundId: soundId },
     };
-    if (request.media.type === "video") {
-      tiktokSettings.videoOriginalSoundVolume = 50;
-    }
 
     const body: Record<string, unknown> = {
       content: request.caption || "",

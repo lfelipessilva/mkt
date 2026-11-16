@@ -98,12 +98,12 @@ export function resolveBufferPublishState(
 
   // 1. Se run.buffer_dispatched_at existe e run.status !== 'failed' → visible: true, disabled: true, label 'Enviado ao Buffer'
   if (run.buffer_dispatched_at && run.status !== "failed") {
-    return { visible: true, disabled: true, label: "Enviado ao TikTok" };
+    return { visible: true, disabled: true, label: "Enviado ao Zernio" };
   }
 
   // 2. Se run.buffer_dispatched_at existe e run.status === 'failed' → visible: true, disabled: false, label 'Reenviar ao Buffer'
   if (run.buffer_dispatched_at && run.status === "failed") {
-    return { visible: true, disabled: false, label: "Reenviar ao TikTok" };
+    return { visible: true, disabled: false, label: "Reenviar ao Zernio" };
   }
 
   // 3. Se run está aguardando aprovação da rotina (status = 'awaiting_approval' ou slot vinculado em awaiting_approval)
@@ -122,7 +122,7 @@ export function resolveBufferPublishState(
   }
 
   // 5. Se não existe buffer_dispatched_at, a conta está vinculada e o run não está published → visible: true, disabled: false, label 'Publicar no Buffer'
-  return { visible: true, disabled: false, label: "Publicar no TikTok" };
+  return { visible: true, disabled: false, label: "Publicar no Zernio" };
 }
 
 export function RunCard({
@@ -139,7 +139,7 @@ export function RunCard({
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [isPublishingBuffer, setIsPublishingBuffer] = useState(false);
-  const [bufferSuccess, setBufferSuccess] = useState(false);
+  const [bufferSuccess, setBufferSuccess] = useState<string | null>(null);
   const [bufferError, setBufferError] = useState<string | null>(null);
   const [expandedCaption, setExpandedCaption] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
@@ -192,7 +192,7 @@ export function RunCard({
     if (isPublishingBuffer || bufferState.disabled) return;
     setIsPublishingBuffer(true);
     setBufferError(null);
-    setBufferSuccess(false);
+    setBufferSuccess(null);
 
     try {
       let updatedRun: CarouselRun;
@@ -211,13 +211,13 @@ export function RunCard({
           buffer_dispatched_at: new Date().toISOString(),
         };
       }
-      setBufferSuccess(true);
+      setBufferSuccess("Carrossel enviado ao Zernio");
       if (onDispatched) onDispatched(updatedRun);
       if (onRunUpdated) onRunUpdated(updatedRun);
-      if (onToast) onToast("Carrossel enviado ao TikTok", "success");
-      setTimeout(() => setBufferSuccess(false), 4000);
+      if (onToast) onToast("Carrossel enviado ao Zernio", "success");
+      setTimeout(() => setBufferSuccess(null), 4000);
     } catch (err: any) {
-      const msg = err.message || "Erro ao publicar no TikTok";
+      const msg = err.message || "Erro ao publicar no Zernio";
       setBufferError(msg);
       if (onToast) onToast(msg, "error");
     } finally {
@@ -395,7 +395,7 @@ export function RunCard({
         {bufferSuccess && (
           <div className="run-card-alert success flex items-center gap-2">
             <Check className="w-4 h-4 text-emerald-600" />
-            <span>Carrossel enviado ao Buffer</span>
+            <span>{bufferSuccess}</span>
           </div>
         )}
 
