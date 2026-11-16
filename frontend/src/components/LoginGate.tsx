@@ -1,5 +1,6 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { getToken, setToken, clearToken, verifyToken } from "../api";
+import { ShieldCheck, KeyRound, AlertCircle } from "lucide-react";
 
 interface AuthContextType {
   token: string | null;
@@ -71,14 +72,20 @@ export function LoginGate({ children }: LoginGateProps): React.JSX.Element {
       <div className="login-screen">
         <div className="login-card">
           <div className="login-header">
-            <div className="logo-badge">Listo Ops</div>
-            <h2>Marketing Carousel Ops v2</h2>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold uppercase tracking-wider mb-3">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Listo Ops Studio</span>
+            </div>
+            <h2>Marketing Carousel Ops</h2>
             <p>Insira seu Bearer Token para acessar o painel de operações.</p>
           </div>
 
           <form onSubmit={handleLogin} className="login-form">
             <div className="form-group">
-              <label htmlFor="token-input">API Bearer Token</label>
+              <label htmlFor="token-input" className="flex items-center gap-1.5">
+                <KeyRound className="w-3.5 h-3.5 text-slate-500" />
+                <span>API Bearer Token</span>
+              </label>
               <input
                 id="token-input"
                 type="password"
@@ -90,7 +97,12 @@ export function LoginGate({ children }: LoginGateProps): React.JSX.Element {
               />
             </div>
 
-            {error && <div className="error-banner">{error}</div>}
+            {error && (
+              <div className="error-banner flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
             <button
               type="submit"

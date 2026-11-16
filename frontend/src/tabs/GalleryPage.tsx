@@ -4,6 +4,7 @@ import type { CarouselRun, CarouselSlide } from "../types";
 import { getCarouselRuns } from "../api";
 import { RunCard } from "../components/RunCard";
 import { ManualTikTokModal } from "../components/ManualTikTokModal";
+import { RefreshCw, Search, X } from "lucide-react";
 
 export function orderSlides(slides: CarouselSlide[]): CarouselSlide[] {
   return [...slides].sort((a, b) => a.position - b.position);
@@ -135,11 +136,12 @@ export function GalleryPage(): React.JSX.Element {
         <div className="header-actions">
           <button
             type="button"
-            className="btn btn-secondary btn-refresh"
+            className="btn btn-secondary btn-refresh flex items-center gap-1.5"
             onClick={loadRuns}
             disabled={loading}
           >
-            {loading ? "Carregando..." : "↻ Atualizar"}
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
+            <span>{loading ? "Carregando..." : "Atualizar"}</span>
           </button>
         </div>
       </div>
@@ -167,10 +169,11 @@ export function GalleryPage(): React.JSX.Element {
           ))}
         </div>
 
-        <div className="search-input-wrapper">
+        <div className="search-input-wrapper relative flex items-center">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
           <input
             type="text"
-            className="search-input"
+            className="search-input !pl-9"
             placeholder="Buscar por tema, arquétipo ou conta..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -181,7 +184,7 @@ export function GalleryPage(): React.JSX.Element {
               className="clear-search-btn"
               onClick={() => setSearchQuery("")}
             >
-              ×
+              <X className="w-3.5 h-3.5" />
             </button>
           )}
         </div>

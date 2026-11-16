@@ -2,6 +2,17 @@ import React from "react";
 import type { NavTab } from "../types";
 import { useAccount } from "../context";
 import { useAuth } from "./LoginGate";
+import {
+  TrendingUp,
+  Image as GalleryIcon,
+  Sparkles,
+  Users,
+  FileText,
+  FolderArchive,
+  Cpu,
+  LogOut,
+  Layers,
+} from "lucide-react";
 
 interface SidebarProps {
   currentTab: NavTab;
@@ -14,6 +25,7 @@ interface NavGroup {
     id: NavTab;
     label: string;
     sublabel?: string;
+    icon: React.ComponentType<{ className?: string }>;
   }[];
 }
 
@@ -21,21 +33,22 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: "Carrosséis",
     items: [
-      { id: "desempenho", label: "Desempenho" },
-      { id: "galeria", label: "Galeria" },
-      { id: "gerar", label: "Gerar" },
+      { id: "desempenho", label: "Desempenho", icon: TrendingUp },
+      { id: "galeria", label: "Galeria", icon: GalleryIcon },
+      { id: "gerar", label: "Gerar", icon: Sparkles },
     ],
   },
   {
     title: "Configuração",
     items: [
-      { id: "contas", label: "Contas" },
-      { id: "textos", label: "Textos", sublabel: "shared | role" },
-      { id: "midias", label: "Mídias", sublabel: "shared | role" },
+      { id: "contas", label: "Contas", icon: Users },
+      { id: "textos", label: "Textos", sublabel: "shared | role", icon: FileText },
+      { id: "midias", label: "Mídias", sublabel: "shared | role", icon: FolderArchive },
       {
         id: "integracoes",
         label: "Integrações",
         sublabel: "auto-dispatch, TikTok, TG",
+        icon: Cpu,
       },
     ],
   },
@@ -55,14 +68,17 @@ export function Sidebar({
         <div className="brand-badge">Listo</div>
         <div className="brand-info">
           <h1>Carousel Ops</h1>
-          <span className="brand-version">v2</span>
+          <span className="brand-version">Clean Studio v2</span>
         </div>
       </div>
 
       <div className="context-switcher">
-        <label htmlFor="account-context-select" className="context-label">
-          Contexto da Conta
-        </label>
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Layers className="w-3.5 h-3.5 text-slate-500" />
+          <label htmlFor="account-context-select" className="context-label !mb-0">
+            Contexto da Conta
+          </label>
+        </div>
         <div className="select-wrapper">
           <select
             id="account-context-select"
@@ -93,6 +109,7 @@ export function Sidebar({
             <ul className="nav-list">
               {group.items.map((item) => {
                 const isActive = currentTab === item.id;
+                const Icon = item.icon;
                 return (
                   <li key={item.id} className="nav-item">
                     <button
@@ -100,7 +117,10 @@ export function Sidebar({
                       className={`nav-button ${isActive ? "active" : ""}`}
                       onClick={() => onSelectTab(item.id)}
                     >
-                      <span className="nav-label">{item.label}</span>
+                      <div className="flex items-center gap-2.5">
+                        <Icon className={`w-4 h-4 ${isActive ? "text-blue-600" : "text-slate-500"}`} />
+                        <span className="nav-label">{item.label}</span>
+                      </div>
                       {item.sublabel && (
                         <span className="nav-sublabel">{item.sublabel}</span>
                       )}
@@ -116,10 +136,11 @@ export function Sidebar({
       <div className="sidebar-footer">
         <button
           type="button"
-          className="btn btn-outline btn-sm btn-logout"
+          className="btn btn-outline btn-sm btn-logout w-full flex items-center justify-center gap-2"
           onClick={logout}
         >
-          Sair
+          <LogOut className="w-3.5 h-3.5" />
+          <span>Sair</span>
         </button>
       </div>
     </aside>

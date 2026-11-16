@@ -11,6 +11,7 @@ import {
 } from "../../types";
 import { getMedia, uploadMedia, deleteMedia } from "../../api";
 import { AuthImage } from "../../components/AuthImage";
+import { UploadCloud, Trash2 } from "lucide-react";
 
 const CATEGORY_LABELS: Record<MediaCategory, string> = {
   cover: "Cover (Slide 1)",
@@ -237,7 +238,7 @@ export function MediaPage(): React.JSX.Element {
         <form onSubmit={handleUpload} className="upload-media-form">
           <div className="upload-input-group">
             <label htmlFor="media-file-input" className="file-input-label">
-              <span className="upload-icon">📁</span>
+              <UploadCloud className="w-4 h-4 text-blue-600" />
               <span>
                 {selectedFile
                   ? selectedFile.name
@@ -309,12 +310,13 @@ export function MediaPage(): React.JSX.Element {
                     </span>
                     <button
                       type="button"
-                      className="btn-delete-media"
+                      className="btn-delete-media flex items-center gap-1 hover:text-red-700"
                       title="Excluir mídia"
                       disabled={deletingPath === asset.storage_path}
                       onClick={() => void handleDelete(asset)}
                     >
-                      {deletingPath === asset.storage_path ? "..." : "Excluir"}
+                      <Trash2 className="w-3 h-3" />
+                      <span>{deletingPath === asset.storage_path ? "..." : "Excluir"}</span>
                     </button>
                   </div>
                 </div>

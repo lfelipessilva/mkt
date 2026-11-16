@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { CarouselRun, TikTokPerformanceItem, TikTokPost, UpsertTikTokPostInput } from "../types";
 import { upsertTikTokPost } from "../api";
+import { X } from "lucide-react";
 
 export function validateManualTikTokInput(input: {
   views?: number;
@@ -150,11 +151,11 @@ export function ManualTikTokModal({
           </div>
           <button
             type="button"
-            className="modal-close-btn"
+            className="modal-close-btn p-1.5 hover:bg-slate-100 rounded-md transition-colors"
             onClick={onClose}
             aria-label="Fechar"
           >
-            ×
+            <X className="w-4 h-4 text-slate-500" />
           </button>
         </div>
 
