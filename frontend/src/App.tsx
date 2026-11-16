@@ -6,7 +6,6 @@ import { Sidebar } from "./components/Sidebar";
 import { AccountsPage } from "./tabs/settings/AccountsPage";
 import { TextsPage } from "./tabs/settings/TextsPage";
 import { MediaPage } from "./tabs/settings/MediaPage";
-import { GeneratePage } from "./tabs/GeneratePage";
 import { GalleryPage } from "./tabs/GalleryPage";
 import { PerformancePage } from "./tabs/PerformancePage";
 import { IntegrationsPage } from "./tabs/IntegrationsPage";
@@ -14,7 +13,6 @@ import { IntegrationsPage } from "./tabs/IntegrationsPage";
 const TAB_TITLES: Record<NavTab, string> = {
   desempenho: "Desempenho de Carrosséis",
   galeria: "Galeria de Carrosséis",
-  gerar: "Gerar Carrosséis",
   contas: "Configuração de Contas",
   textos: "Biblioteca de Textos",
   midias: "Biblioteca de Mídias",
@@ -51,8 +49,6 @@ function ShellContent(): React.JSX.Element {
             <PerformancePage />
           ) : currentTab === "galeria" ? (
             <GalleryPage />
-          ) : currentTab === "gerar" ? (
-            <GeneratePage />
           ) : currentTab === "contas" ? (
             <AccountsPage />
           ) : currentTab === "textos" ? (
