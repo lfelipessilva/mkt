@@ -383,6 +383,8 @@ export async function downloadCarouselFromSilo(key: string): Promise<Buffer> {
   return downloadFromSilo(bucket, normalizeCarouselKey(key));
 }
 
+export const downloadCarouselSlideFromSilo = downloadCarouselFromSilo;
+
 export async function getCarouselStreamFromSilo(
   key: string
 ): Promise<{ stream: Readable; contentType?: string; contentLength?: number }> {

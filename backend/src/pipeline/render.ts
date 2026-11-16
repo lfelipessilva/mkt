@@ -8,7 +8,7 @@ const H = 1920;
 export type SlideStyle = "pill" | "outline";
 
 export interface RenderSlideOptions {
-  imagePath: string;
+  imagePath: string | Buffer;
   text: string;
   outPath: string;
   style?: SlideStyle;
@@ -17,6 +17,7 @@ export interface RenderSlideOptions {
 export interface RenderSlideInput {
   numero: number | string;
   path: string;
+  buffer?: Buffer;
 }
 
 export interface RenderCarouselOptions {
@@ -192,7 +193,12 @@ export async function renderCarousel({
       textsByNumero.get(String(slide.numero)) ??
       "";
     const outPath = join(outDir, `slide_${slide.numero}.jpg`);
-    await renderSlide({ imagePath: slide.path, text, outPath, style: carouselStyle });
+    await renderSlide({
+      imagePath: slide.buffer ?? slide.path,
+      text,
+      outPath,
+      style: carouselStyle,
+    });
     paths.push(outPath);
   }
   return paths;

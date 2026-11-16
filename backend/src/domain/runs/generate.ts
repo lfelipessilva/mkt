@@ -1,18 +1,27 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
 import { AppError } from "../../shared/errors.js";
-import { isSiloEnabled, uploadCarouselToSilo } from "../../shared/storage/silo.js";
+import {
+  isSiloEnabled,
+  uploadCarouselToSilo,
+  downloadMediaFromSilo,
+} from "../../shared/storage/silo.js";
 import { getAccount } from "../accounts/store.js";
-import { getMediaRoot } from "../media/paths.js";
+import {
+  toPortableOutputPath,
+  getOutputDir,
+  safeResolveMediaPath,
+} from "../media/paths.js";
 import { recordMediaUsage, upsertMediaAsset } from "../media/store.js";
 import { selectCarouselForAccount } from "../../pipeline/select.js";
 import {
   generateCarouselCopy,
   type GeneratedCarouselCopy,
 } from "../../pipeline/gemini.js";
-import { renderCarousel } from "../../pipeline/render.js";
+import { renderCarousel, type RenderSlideInput } from "../../pipeline/render.js";
 import type { CarouselRun, CarouselSlide, GenerationJobProgress } from "./schemas.js";
 import {
   createCarouselRun,
@@ -22,6 +31,10 @@ import {
   getGenerationJobProgress,
 } from "./store.js";
 
+export { getOutputDir };
+
+export type MediaBytesLoader = (storagePath: string) => Promise<Buffer>;
+
 export interface GenerateOneCarouselOptions {
   accountId: string;
   jobId?: string | null;
@@ -30,6 +43,7 @@ export interface GenerateOneCarouselOptions {
   pool?: Pool;
   mediaRoot?: string;
   outputDir?: string;
+  mediaBytesLoader?: MediaBytesLoader;
   geminiApiKey?: string;
   geminiModel?: string;
   now?: number;
@@ -49,27 +63,14 @@ export function nextPostIndex(accountDayDir: string): number {
   return (nums.length ? Math.max(...nums) : 0) + 1;
 }
 
-export function getOutputDir(customRoot?: string): string {
-  if (customRoot) return path.resolve(customRoot);
-  if (process.env.OUTPUT_DIR) return path.resolve(process.env.OUTPUT_DIR);
-  const cwdOutput = path.resolve(process.cwd(), "output");
-  if (fs.existsSync(cwdOutput)) return cwdOutput;
-  const parentOutput = path.resolve(process.cwd(), "../output");
-  if (fs.existsSync(path.resolve(process.cwd(), "../package.json"))) {
-    return parentOutput;
-  }
-  return cwdOutput;
-}
-
 async function resolveSlideMediaId(
   slide: { filename: string; path: string },
-  mediaRoot: string,
+  _mediaRoot: string | undefined,
   pool: Pool
 ): Promise<string | null> {
-  const root = getMediaRoot(mediaRoot);
-  const rel = path.relative(root, slide.path).replace(/\\/g, "/");
-  const storageWithMedia = path.posix.join("media", rel);
-  const storagePlain = rel;
+  const normPath = slide.path.replace(/\\/g, "/");
+  const storageWithMedia = normPath.startsWith("media/") ? normPath : path.posix.join("media", normPath);
+  const storagePlain = normPath.startsWith("media/") ? normPath.slice(6) : normPath;
 
   // 1. Look up by storage_path
   const byPath = await pool.query<{ id: string }>(
@@ -91,6 +92,7 @@ async function resolveSlideMediaId(
 
   // 3. Fallback: try to upsert if file path structure matches
   try {
+    const rel = normPath.startsWith("media/") ? normPath.slice(6) : normPath;
     const parts = rel.split("/");
     if (parts.length >= 3) {
       const scope = parts[0] as any;
@@ -128,6 +130,10 @@ export async function generateOneCarousel(
   options: GenerateOneCarouselOptions
 ): Promise<CarouselRun> {
   const p = options.pool || getPool();
+
+  if (process.env.NODE_ENV === "production" && !isSiloEnabled()) {
+    throw new AppError("Silo storage is required in production", 503, "silo_disabled");
+  }
 
   const account = await getAccount(options.accountId, p);
   if (!account) {
@@ -168,8 +174,51 @@ export async function generateOneCarousel(
   fs.mkdirSync(outDir, { recursive: true });
 
   if (!options.skipRender) {
+    const renderSlides: RenderSlideInput[] = [];
+    for (const slide of selection.slides) {
+      let buffer: Buffer | undefined;
+
+      if (options.mediaBytesLoader) {
+        buffer = await options.mediaBytesLoader(slide.path);
+      } else if (fs.existsSync(slide.path)) {
+        // direct path exists on disk
+      } else {
+        let diskResolved: string | null = null;
+        try {
+          const resolved = safeResolveMediaPath(slide.path);
+          if (fs.existsSync(resolved)) {
+            diskResolved = resolved;
+          }
+        } catch {
+          // ignore
+        }
+
+        if (diskResolved) {
+          renderSlides.push({
+            numero: slide.numero,
+            path: diskResolved,
+          });
+          continue;
+        } else if (isSiloEnabled()) {
+          buffer = await downloadMediaFromSilo(slide.path);
+        } else {
+          throw new AppError(
+            `Cannot render slide ${slide.numero}: media '${slide.path}' not found on disk and Silo is not enabled`,
+            500,
+            "media_not_found"
+          );
+        }
+      }
+
+      renderSlides.push({
+        numero: slide.numero,
+        path: slide.path,
+        buffer,
+      });
+    }
+
     await renderCarousel({
-      slides: selection.slides,
+      slides: renderSlides,
       textsByNumero,
       outDir,
     });
@@ -187,31 +236,29 @@ export async function generateOneCarousel(
 
   // Upload generated carousel slides and meta.json to Silo if enabled
   if (isSiloEnabled()) {
-    try {
-      const relOutDir = path.relative(outputRoot, outDir);
-      await uploadCarouselToSilo(
-        path.posix.join(relOutDir, "meta.json"),
-        metaContent,
-        "application/json"
-      );
+    const relOutDir = path.relative(outputRoot, outDir).replace(/\\/g, "/");
+    await uploadCarouselToSilo(
+      path.posix.join(relOutDir, "meta.json"),
+      metaContent,
+      "application/json"
+    );
 
-      if (!options.skipRender) {
-        for (const slide of selection.slides) {
-          const slideFile = path.join(outDir, `slide_${slide.numero}.jpg`);
-          if (fs.existsSync(slideFile)) {
-            const buf = fs.readFileSync(slideFile);
-            await uploadCarouselToSilo(
-              path.posix.join(relOutDir, `slide_${slide.numero}.jpg`),
-              buf,
-              "image/jpeg"
-            );
-          }
+    if (!options.skipRender) {
+      for (const slide of selection.slides) {
+        const slideFile = path.join(outDir, `slide_${slide.numero}.jpg`);
+        if (fs.existsSync(slideFile)) {
+          const buf = fs.readFileSync(slideFile);
+          await uploadCarouselToSilo(
+            path.posix.join(relOutDir, `slide_${slide.numero}.jpg`),
+            buf,
+            "image/jpeg"
+          );
         }
       }
-    } catch (siloErr) {
-      console.warn("[silo:upload] Failed to upload carousel to silo:", siloErr);
     }
   }
+
+  const portableOutDir = toPortableOutputPath(outDir, outputRoot);
 
   // Create CarouselRun row in database
   const run = await createCarouselRun(
@@ -224,7 +271,7 @@ export async function generateOneCarousel(
       tema: copy.tema_escolhido,
       legenda: copy.legenda_tiktok,
       status: "generated",
-      output_dir: outDir,
+      output_dir: portableOutDir,
       generated_at: new Date(options.now ?? Date.now()),
     },
     p
@@ -244,13 +291,13 @@ export async function generateOneCarousel(
     const slide = selection.slides[i];
     const mediaId = await resolveSlideMediaId(
       slide,
-      options.mediaRoot || getMediaRoot(),
+      options.mediaRoot,
       p
     );
     if (mediaId) {
       usedMediaIds.push(mediaId);
     }
-    const slideStoragePath = path.join(outDir, `slide_${slide.numero}.jpg`);
+    const slideStoragePath = path.posix.join(portableOutDir, `slide_${slide.numero}.jpg`);
     slideInputs.push({
       run_id: run.id,
       position: slide.numero,
@@ -283,6 +330,7 @@ export interface GenerateBatchOptions {
   pool?: Pool;
   mediaRoot?: string;
   outputDir?: string;
+  mediaBytesLoader?: MediaBytesLoader;
   geminiApiKey?: string;
   geminiModel?: string;
   now?: number;
@@ -340,6 +388,7 @@ export async function generateBatch(
         pool: p,
         mediaRoot: options.mediaRoot,
         outputDir: options.outputDir,
+        mediaBytesLoader: options.mediaBytesLoader,
         geminiApiKey: options.geminiApiKey,
         geminiModel: options.geminiModel,
         now: options.now,
