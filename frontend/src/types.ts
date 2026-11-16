@@ -24,6 +24,7 @@ export interface Account {
   persona: string;
   role: AccountRole;
   enabled: boolean;
+  auto_post_enabled?: boolean;
   tiktok_open_id?: string | null;
   social_provider?: string | null;
   external_account_id?: string | null;
@@ -37,6 +38,7 @@ export interface CreateAccountInput {
   persona: string;
   role: AccountRole;
   enabled?: boolean;
+  auto_post_enabled?: boolean;
   tiktok_open_id?: string | null;
   social_provider?: string | null;
   external_account_id?: string | null;
@@ -47,6 +49,7 @@ export interface UpdateAccountInput {
   persona?: string;
   role?: AccountRole;
   enabled?: boolean;
+  auto_post_enabled?: boolean;
   tiktok_open_id?: string | null;
   social_provider?: string | null;
   external_account_id?: string | null;
@@ -227,6 +230,7 @@ export interface CarouselSlide {
 export type RunStatus =
   | "generating"
   | "generated"
+  | "awaiting_approval"
   | "dispatching"
   | "dispatched"
   | "published"
@@ -235,6 +239,7 @@ export type RunStatus =
 export interface CarouselRun {
   id: string;
   job_id?: string | null;
+  auto_post_slot_id?: string | null;
   account_id: string;
   account_role?: AccountRole;
   archetype_title: string;
@@ -245,6 +250,7 @@ export interface CarouselRun {
   output_dir?: string | null;
   error_message?: string | null;
   generated_at?: string | null;
+  buffer_dispatched_at?: string | null;
   created_at?: string;
   updated_at?: string;
   slides?: CarouselSlide[];

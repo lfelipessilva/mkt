@@ -4,6 +4,7 @@ import { AccountRoleSchema, type AccountRole } from "../accounts/schemas.js";
 export const RUN_STATUSES = [
   "generating",
   "generated",
+  "awaiting_approval",
   "dispatching",
   "dispatched",
   "published",
@@ -26,6 +27,7 @@ export type CarouselSlide = z.infer<typeof CarouselSlideSchema>;
 export const CarouselRunSchema = z.object({
   id: z.string().uuid(),
   job_id: z.string().uuid().nullable().optional(),
+  auto_post_slot_id: z.string().uuid().nullable().optional(),
   account_id: z.string().min(1),
   account_role: AccountRoleSchema,
   archetype_title: z.string().min(1),
@@ -36,6 +38,7 @@ export const CarouselRunSchema = z.object({
   output_dir: z.string().nullable().optional(),
   error_message: z.string().nullable().optional(),
   generated_at: z.coerce.date().nullable().optional(),
+  buffer_dispatched_at: z.coerce.date().nullable().optional(),
   created_at: z.coerce.date().optional(),
   updated_at: z.coerce.date().optional(),
   slides: z.array(CarouselSlideSchema).optional(),
