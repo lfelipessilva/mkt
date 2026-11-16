@@ -9,6 +9,7 @@ import {
   createAccount,
   updateAccount,
   deleteAccount,
+  syncSocialAccounts,
   setToken,
   clearToken,
 } from "./api";
@@ -180,6 +181,95 @@ describe("Accounts configuration & CRUD", () => {
       assert.equal(requestedMethod, "DELETE");
       assert.equal(requestedHeaders?.get("Authorization"), "Bearer test-token-123");
       assert.equal(result.ok, true);
+    });
+
+    it("syncSocialAccounts calls POST /api/v1/social/accounts/sync and returns sync stats", async () => {
+      let requestedUrl = "";
+      let requestedMethod = "";
+      let requestedHeaders: Headers | undefined;
+
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        requestedUrl = String(input);
+        requestedMethod = init?.method ?? "GET";
+        requestedHeaders = new Headers(init?.headers);
+
+        return new Response(
+          JSON.stringify({
+            synced: 2,
+            matched: 1,
+            created: 1,
+            accounts: [
+              {
+                id: "conta_existente",
+                persona: "Persona 1",
+                external_account_id: "buf_chan_1",
+                social_provider: "buffer",
+                username: "conta1",
+              },
+              {
+                id: "conta_criada",
+                persona: "Conta importada via Buffer (conta2)",
+                external_account_id: "buf_chan_2",
+                social_provider: "buffer",
+                username: "conta2",
+              },
+            ],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      };
+
+      const result = await syncSocialAccounts();
+
+      assert.equal(requestedUrl, "/api/v1/social/accounts/sync");
+      assert.equal(requestedMethod, "POST");
+      assert.equal(requestedHeaders?.get("Authorization"), "Bearer test-token-123");
+      assert.equal(result.synced, 2);
+      assert.equal(result.matched, 1);
+      assert.equal(result.created, 1);
+      assert.equal(result.accounts.length, 2);
+      assert.equal(result.accounts[0].external_account_id, "buf_chan_1");
+    });
+
+    it("updateAccount passes external_account_id and social_provider", async () => {
+      let requestedUrl = "";
+      let requestedMethod = "";
+      let requestedHeaders: Headers | undefined;
+      let requestedBody = "";
+
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        requestedUrl = String(input);
+        requestedMethod = init?.method ?? "GET";
+        requestedHeaders = new Headers(init?.headers);
+        requestedBody = String(init?.body);
+
+        return new Response(
+          JSON.stringify({
+            id: "maria_clara",
+            role: "single_woman",
+            persona: "Updated persona",
+            enabled: true,
+            external_account_id: "buffer-channel-xyz",
+            social_provider: "buffer",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      };
+
+      const result = await updateAccount("maria_clara", {
+        external_account_id: "buffer-channel-xyz",
+        social_provider: "buffer",
+      });
+
+      assert.equal(requestedUrl, "/api/v1/accounts/maria_clara");
+      assert.equal(requestedMethod, "PATCH");
+      assert.equal(requestedHeaders?.get("Authorization"), "Bearer test-token-123");
+      assert.deepEqual(JSON.parse(requestedBody), {
+        external_account_id: "buffer-channel-xyz",
+        social_provider: "buffer",
+      });
+      assert.equal(result.external_account_id, "buffer-channel-xyz");
+      assert.equal(result.social_provider, "buffer");
     });
   });
 });
