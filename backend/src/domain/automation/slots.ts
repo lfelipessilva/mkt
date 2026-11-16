@@ -1,5 +1,8 @@
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
+import { getAllSettings } from "../settings/store.js";
+import { resolveAutomationTimezone } from "./windows.js";
+import { localDateString } from "./time.js";
 
 export type SlotStatus =
   | "pending"
@@ -381,5 +384,121 @@ export async function handleSlotRetry(
       p
     );
   }
+}
+
+export interface AutomationScheduleSlot {
+  id: string;
+  window_id: string;
+  account_id: string;
+  account_display_name: string;
+  account_enabled: boolean;
+  channel: SlotChannel;
+  scheduled_at: string;
+  window_end: string;
+  status: SlotStatus;
+  attempts: number;
+  run_id: string | null;
+  run_status: string | null;
+  post_status: string | null;
+  last_error: string | null;
+}
+
+export interface AutomationScheduleResponse {
+  date: string;
+  timezone: string;
+  enabled: boolean;
+  slots: AutomationScheduleSlot[];
+}
+
+export function isValidDateString(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const parts = s.split("-").map(Number);
+  const year = parts[0];
+  const month = parts[1];
+  const day = parts[2];
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > 31) return false;
+  const d = new Date(Date.UTC(year, month - 1, day));
+  return (
+    d.getUTCFullYear() === year &&
+    d.getUTCMonth() === month - 1 &&
+    d.getUTCDate() === day
+  );
+}
+
+export async function getAutomationSchedule(
+  options: { date?: string; pool?: Pool } = {}
+): Promise<AutomationScheduleResponse> {
+  const p = options.pool || getPool();
+  const allSettings = await getAllSettings(p);
+
+  const tz = resolveAutomationTimezone(allSettings);
+
+  const autoDispatchVal = allSettings.auto_dispatch_enabled;
+  let enabled = false;
+  if (typeof autoDispatchVal === "boolean") {
+    enabled = autoDispatchVal;
+  } else if (typeof autoDispatchVal === "string") {
+    enabled = autoDispatchVal.toLowerCase() === "true";
+  } else if (
+    typeof autoDispatchVal === "object" &&
+    autoDispatchVal !== null &&
+    "enabled" in autoDispatchVal
+  ) {
+    enabled = Boolean(autoDispatchVal.enabled);
+  } else if (autoDispatchVal) {
+    enabled = Boolean(autoDispatchVal);
+  }
+
+  const dateStr = options.date || localDateString(new Date(), tz);
+
+  const res = await p.query(
+    `SELECT
+       s.id,
+       s.window_id,
+       s.account_id,
+       COALESCE(NULLIF(a.display_name, ''), a.id, s.account_id) AS account_display_name,
+       COALESCE(a.enabled, true) AS account_enabled,
+       s.channel,
+       s.scheduled_at,
+       s.window_end,
+       s.status,
+       s.attempts,
+       s.run_id,
+       r.status AS run_status,
+       tp.publish_status AS post_status,
+       s.last_error
+     FROM auto_post_slots s
+     LEFT JOIN accounts a ON a.id = s.account_id
+     LEFT JOIN carousel_runs r ON r.id = s.run_id
+     LEFT JOIN tiktok_posts tp ON tp.run_id = s.run_id
+     WHERE s.slot_date = $1::date
+     ORDER BY s.scheduled_at ASC, s.id ASC`,
+    [dateStr]
+  );
+
+  const slots: AutomationScheduleSlot[] = res.rows.map((row) => ({
+    id: row.id,
+    window_id: row.window_id,
+    account_id: row.account_id,
+    account_display_name: row.account_display_name,
+    account_enabled: Boolean(row.account_enabled),
+    channel: row.channel,
+    scheduled_at: new Date(row.scheduled_at).toISOString(),
+    window_end: new Date(row.window_end).toISOString(),
+    status: row.status,
+    attempts: Number(row.attempts),
+    run_id: row.run_id ?? null,
+    run_status: row.run_status ?? null,
+    post_status: row.post_status ?? null,
+    last_error: row.last_error ?? null,
+  }));
+
+  return {
+    date: dateStr,
+    timezone: tz,
+    enabled,
+    slots,
+  };
 }
 

@@ -13,7 +13,7 @@ import { replaceArchetypesForScope } from "../../src/domain/archetypes/store.js"
 import { replaceBaitsForScope } from "../../src/domain/baits/store.js";
 import { upsertMediaAsset } from "../../src/domain/media/store.js";
 import { generateBatch } from "../../src/domain/runs/generate.js";
-import { isAutoDispatchEnabled, runCronTick } from "../../src/cron.js";
+import { isAutoDispatchEnabled, startCron } from "../../src/cron.js";
 import { withJobLock, getJobStatus } from "../../src/jobLock.js";
 import { createBot } from "../../src/bot.js";
 
@@ -77,8 +77,15 @@ describe("Task 13: Cron, bot, auto-dispatch hooks", { timeout: 60000 }, () => {
   }
 
   before(async () => {
-    container = await new PostgreSqlContainer("postgres:16-alpine").start();
-    const connStr = container.getConnectionUri();
+    let connStr = process.env.DATABASE_URL;
+    if (!connStr) {
+      try {
+        container = await new PostgreSqlContainer("postgres:16-alpine").start();
+        connStr = container.getConnectionUri();
+      } catch {
+        connStr = "postgresql://luisfelipe@localhost:5432/redhorse_test";
+      }
+    }
     process.env.DATABASE_URL = connStr;
 
     pool = new Pool({ connectionString: connStr });
@@ -259,7 +266,7 @@ describe("Task 13: Cron, bot, auto-dispatch hooks", { timeout: 60000 }, () => {
     });
   });
 
-  describe("Step 2: Cron auto_dispatch_enabled hook", () => {
+  describe("Step 2: Automation cron wiring & auto_dispatch_enabled hook", () => {
     it("isAutoDispatchEnabled returns false when row is absent or false", async () => {
       const emptyCheck = await isAutoDispatchEnabled(pool);
       assert.equal(emptyCheck, false);
@@ -275,43 +282,35 @@ describe("Task 13: Cron, bot, auto-dispatch hooks", { timeout: 60000 }, () => {
       assert.equal(await isAutoDispatchEnabled(pool), true);
     });
 
-    it("runCronTick skips generation if auto_dispatch_enabled is false", async () => {
-      await upsertAccount(
-        {
-          id: "acc_active",
-          role: "single_woman",
-          enabled: true,
-        },
-        pool
-      );
+    it("startCron wires automationTask on AUTOMATION_CRON_SCHEDULE, pollingTask, metricsTask and stop", () => {
+      const task = startCron({
+        pool,
+        runBootTick: false,
+        automationSchedule: "* * * * *",
+        pollingSchedule: "*/2 * * * *",
+        metricsSchedule: "0 4 * * *",
+      });
 
-      const result = await runCronTick({ pool, mockCopy, skipRender: true });
-      assert.equal(result.ran, false);
+      assert.ok(task);
+      assert.ok(task.tasks);
+      assert.ok(task.tasks.automationTask);
+      assert.ok(task.tasks.pollingTask);
+      assert.ok(task.tasks.metricsTask);
+      assert.equal(typeof task.tasks.stop, "function");
 
-      const jobs = await pool.query("SELECT * FROM generation_jobs");
-      assert.equal(jobs.rowCount, 0);
+      task.tasks.stop();
     });
 
-    it("runCronTick executes generateBatch when auto_dispatch_enabled is true", async () => {
-      await upsertAccount(
-        {
-          id: "acc_active",
-          role: "single_woman",
-          enabled: true,
-        },
-        pool
+    it("startCron rejects invalid cron expressions", () => {
+      assert.throws(
+        () =>
+          startCron({
+            pool,
+            runBootTick: false,
+            automationSchedule: "invalid-cron",
+          }),
+        /AUTOMATION_CRON_SCHEDULE inválido/
       );
-
-      await pool.query(
-        `INSERT INTO app_settings (key, value) VALUES ('auto_dispatch_enabled', 'true'::jsonb)`
-      );
-
-      const result = await runCronTick({ pool, mockCopy, skipRender: true });
-      assert.equal(result.ran, true);
-      assert.ok(result.summary?.includes("1 carrossel(is) gerado(s)"));
-
-      const jobs = await pool.query("SELECT * FROM generation_jobs");
-      assert.equal(jobs.rowCount, 1);
     });
   });
 

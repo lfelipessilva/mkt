@@ -1,23 +1,24 @@
 import cron, { type ScheduledTask } from "node-cron";
 import type { Pool } from "pg";
 import { getPool } from "./shared/db/client.js";
-import { withJobLock } from "./jobLock.js";
-import { generateBatch } from "./domain/runs/generate.js";
+import { runAutomationTick } from "./domain/automation/ticker.js";
 import { pollPendingPostsJob } from "./domain/social/polling.js";
 import { syncTikTokMetricsDailyJob } from "./domain/social/metricsSync.js";
 import type { SocialPublisherProvider } from "./domain/social/types.js";
 
 export interface CronConfig {
+  automationSchedule?: string;
   schedule?: string;
   pollingSchedule?: string;
   metricsSchedule?: string;
   timezone?: string;
   pool?: Pool;
   socialPublisherProvider?: SocialPublisherProvider;
+  runBootTick?: boolean;
 }
 
 export interface RunningCronTasks {
-  batchTask: ScheduledTask;
+  automationTask: ScheduledTask;
   pollingTask: ScheduledTask;
   metricsTask: ScheduledTask;
   stop: () => void;
@@ -42,44 +43,25 @@ export async function isAutoDispatchEnabled(pool: Pool): Promise<boolean> {
   }
 }
 
-export interface RunCronTickOptions {
-  pool?: Pool;
-  mockCopy?: any;
-  skipRender?: boolean;
-}
-
-export async function runCronTick(options: RunCronTickOptions = {}): Promise<{ ran: boolean; summary?: string }> {
-  const pool = options.pool || getPool();
-  const autoDispatch = await isAutoDispatchEnabled(pool);
-  if (!autoDispatch) {
-    console.log("[cron] auto_dispatch_enabled is false/unset; skipping scheduled runBatch");
-    return { ran: false };
-  }
-
-  const result = await withJobLock(async () => {
-    const batchRes = await generateBatch({
-      pool,
-      mockCopy: options.mockCopy,
-      skipRender: options.skipRender,
-    });
-    return {
-      summary: `${batchRes.runs.length} carrossel(is) gerado(s)`,
-      batchRes,
-    };
-  });
-
-  return { ran: true, summary: result.summary };
-}
-
 export function startCron(options: CronConfig = {}): ScheduledTask & { tasks?: RunningCronTasks } {
-  const schedule = options.schedule || process.env.CRON_SCHEDULE || "0 7,11,17 * * *";
-  const pollingSchedule = options.pollingSchedule || process.env.POLLING_CRON_SCHEDULE || "*/2 * * * *";
-  const metricsSchedule = options.metricsSchedule || process.env.METRICS_CRON_SCHEDULE || "0 4 * * *";
+  const automationSchedule =
+    options.automationSchedule ||
+    options.schedule ||
+    process.env.AUTOMATION_CRON_SCHEDULE ||
+    "* * * * *";
+  const pollingSchedule =
+    options.pollingSchedule ||
+    process.env.POLLING_CRON_SCHEDULE ||
+    "*/2 * * * *";
+  const metricsSchedule =
+    options.metricsSchedule ||
+    process.env.METRICS_CRON_SCHEDULE ||
+    "0 4 * * *";
   const timezone = options.timezone || process.env.TZ || "America/Sao_Paulo";
   const pool = options.pool || getPool();
 
-  if (!cron.validate(schedule)) {
-    throw new Error(`CRON_SCHEDULE inválido: ${schedule}`);
+  if (!cron.validate(automationSchedule)) {
+    throw new Error(`AUTOMATION_CRON_SCHEDULE inválido: ${automationSchedule}`);
   }
   if (!cron.validate(pollingSchedule)) {
     throw new Error(`POLLING_CRON_SCHEDULE inválido: ${pollingSchedule}`);
@@ -88,13 +70,13 @@ export function startCron(options: CronConfig = {}): ScheduledTask & { tasks?: R
     throw new Error(`METRICS_CRON_SCHEDULE inválido: ${metricsSchedule}`);
   }
 
-  const batchTask = cron.schedule(
-    schedule,
+  const automationTask = cron.schedule(
+    automationSchedule,
     async () => {
       try {
-        await runCronTick({ pool });
+        await runAutomationTick({ pool });
       } catch (e: any) {
-        console.error("[cron:batch]", e.message);
+        console.error("[cron:automation]", e.message);
       }
     },
     { timezone }
@@ -125,25 +107,31 @@ export function startCron(options: CronConfig = {}): ScheduledTask & { tasks?: R
   );
 
   const runningTasks: RunningCronTasks = {
-    batchTask,
+    automationTask,
     pollingTask,
     metricsTask,
     stop: () => {
-      batchTask.stop();
+      automationTask.stop();
       pollingTask.stop();
       metricsTask.stop();
     },
   };
 
-  // Keep returning batchTask as ScheduledTask for backward compatibility, augmented with tasks
-  const resultTask = batchTask as ScheduledTask & { tasks?: RunningCronTasks };
+  const resultTask = automationTask as ScheduledTask & { tasks?: RunningCronTasks };
   resultTask.tasks = runningTasks;
-  const originalStop = batchTask.stop.bind(batchTask);
+  const originalStop = automationTask.stop.bind(automationTask);
   resultTask.stop = () => {
     originalStop();
     pollingTask.stop();
     metricsTask.stop();
   };
+
+  // Boot calls recover + one tick
+  if (options.runBootTick !== false) {
+    runAutomationTick({ pool, recoverStaleRunning: true }).catch((err) => {
+      console.error("[cron:boot]", err?.message || err);
+    });
+  }
 
   return resultTask;
 }

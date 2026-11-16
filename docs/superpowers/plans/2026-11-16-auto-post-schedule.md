@@ -221,7 +221,7 @@
 - Invalid date → 400 `validation_error`
 - Endpoint read-only (does not call planner create)
 
-- [ ] **Step 1–4: TDD schedule route + settings 400 + cron shape. Commit** `feat(automation): schedule API, settings validation, minute cron`
+- [x] **Step 1–4: TDD schedule route + settings 400 + cron shape. Commit** `feat(automation): schedule API, settings validation, minute cron`
 
 ---
 
