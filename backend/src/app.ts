@@ -13,6 +13,7 @@ import { runsRoutes } from "./domain/runs/routes.js";
 import { dispatchRoutes } from "./domain/dispatch/routes.js";
 import { tiktokRoutes } from "./domain/tiktok/routes.js";
 import { settingsRoutes } from "./domain/settings/routes.js";
+import { socialRoutes, socialWebhookRoutes } from "./domain/social/routes.js";
 
 function resolveFrontendDist(): string | null {
   const candidateDirs = [
@@ -99,9 +100,13 @@ export function buildApp(): FastifyInstance {
       v1.register(dispatchRoutes, { prefix: "/carousels" });
       v1.register(tiktokRoutes, { prefix: "/tiktok" });
       v1.register(settingsRoutes, { prefix: "/settings" });
+      v1.register(socialRoutes, { prefix: "/social" });
     },
     { prefix: "/api/v1" }
   );
+
+  // Webhooks (public / non-bearer authenticated)
+  app.register(socialWebhookRoutes, { prefix: "/api/v1/webhooks" });
 
   // SPA fallback for non-API client routes
   app.setNotFoundHandler(async (request, reply) => {
