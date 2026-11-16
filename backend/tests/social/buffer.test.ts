@@ -248,6 +248,60 @@ describe("BufferPublisherAdapter", () => {
       });
     });
 
+    it("maps schedulingType notification + scheduled mode to customScheduled with dueAt", async () => {
+      let capturedBody: any = null;
+
+      globalThis.fetch = async (_url: any, options: any) => {
+        capturedBody = JSON.parse(options.body);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              createPost: {
+                post: {
+                  id: "post_notify_1",
+                  status: "queued",
+                  dueAt: "2026-11-20T12:30:00.000Z",
+                },
+              },
+            },
+          }),
+        } as any;
+      };
+
+      const adapter = new BufferPublisherAdapter();
+      const res = await adapter.publishPost({
+        internalPostId: "int_post_notify",
+        externalAccountId: "chan_tiktok_1",
+        caption: "Notification post with music",
+        media: {
+          type: "carousel",
+          imageUrls: [
+            "https://personal-minio.adaygq.easypanel.host/carousels/slide_1.jpg",
+            "https://personal-minio.adaygq.easypanel.host/carousels/slide_2.jpg",
+          ],
+        },
+        publishMode: "scheduled",
+        scheduledAt: "2026-11-20T12:30:00.000Z",
+        schedulingType: "notification",
+      });
+
+      assert.equal(res.externalPostId, "post_notify_1");
+      assert.equal(res.status, "queued");
+      assert.deepEqual(capturedBody.variables.input, {
+        channelId: "chan_tiktok_1",
+        text: "Notification post with music",
+        schedulingType: "notification",
+        mode: "customScheduled",
+        dueAt: "2026-11-20T12:30:00.000Z",
+        assets: [
+          { image: { url: "https://personal-minio.adaygq.easypanel.host/carousels/slide_1.jpg" } },
+          { image: { url: "https://personal-minio.adaygq.easypanel.host/carousels/slide_2.jpg" } },
+        ],
+      });
+    });
+
     it("handles GraphQL MutationError in createPost and returns failed status with message", async () => {
       globalThis.fetch = async () => {
         return {

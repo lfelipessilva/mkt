@@ -31,6 +31,7 @@ export interface PublishPostRequest {
   media: SocialMediaContent;
   publishMode: "immediate" | "scheduled";
   scheduledAt?: string; // ISO-8601 (obrigatório se scheduled)
+  schedulingType?: "automatic" | "notification";
 }
 
 export type PublishStatus = "queued" | "processing" | "published" | "failed";

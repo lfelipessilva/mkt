@@ -189,7 +189,7 @@ export class BufferPublisherAdapter implements SocialPublisherProvider {
     const input: Record<string, unknown> = {
       channelId: request.externalAccountId,
       text: request.caption,
-      schedulingType: "automatic",
+      schedulingType: request.schedulingType ?? "automatic",
     };
 
     if (request.publishMode === "immediate") {
