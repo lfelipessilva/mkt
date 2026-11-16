@@ -28,6 +28,7 @@ function mapCarouselRunRow(row: any): CarouselRun {
   return {
     id: row.id,
     job_id: row.job_id ?? null,
+    auto_post_slot_id: row.auto_post_slot_id ?? null,
     account_id: row.account_id,
     account_role: row.account_role,
     archetype_title: row.archetype_title,
@@ -38,6 +39,7 @@ function mapCarouselRunRow(row: any): CarouselRun {
     output_dir: row.output_dir ?? null,
     error_message: row.error_message ?? null,
     generated_at: row.generated_at ? new Date(row.generated_at) : null,
+    buffer_dispatched_at: row.buffer_dispatched_at ? new Date(row.buffer_dispatched_at) : null,
     created_at: new Date(row.created_at),
     updated_at: new Date(row.updated_at),
   };
@@ -108,8 +110,17 @@ export async function getCarouselRun(
 ): Promise<CarouselRun | null> {
   const p = poolInstance || getPool();
   const result = await p.query(
-    `SELECT id, job_id, account_id, account_role, archetype_title, bait_body, tema,
-            legenda, status, output_dir, error_message, generated_at, created_at, updated_at
+    `SELECT id, job_id, auto_post_slot_id, account_id, account_role, archetype_title, bait_body, tema,
+            legenda, status, output_dir, error_message, generated_at, created_at, updated_at,
+            (
+              SELECT de.sent_at
+              FROM dispatch_events de
+              WHERE de.run_id = carousel_runs.id
+                AND de.channel IN ('buffer', 'social')
+                AND de.status = 'sent'
+              ORDER BY de.sent_at DESC NULLS LAST
+              LIMIT 1
+            ) AS buffer_dispatched_at
      FROM carousel_runs
      WHERE id = $1`,
     [id]
@@ -222,8 +233,17 @@ export async function listCarouselRuns(
   const offsetClause = filters.offset ? `OFFSET ${Number(filters.offset)}` : "";
 
   const query = `
-    SELECT id, job_id, account_id, account_role, archetype_title, bait_body, tema,
-           legenda, status, output_dir, error_message, generated_at, created_at, updated_at
+    SELECT id, job_id, auto_post_slot_id, account_id, account_role, archetype_title, bait_body, tema,
+           legenda, status, output_dir, error_message, generated_at, created_at, updated_at,
+           (
+             SELECT de.sent_at
+             FROM dispatch_events de
+             WHERE de.run_id = carousel_runs.id
+               AND de.channel IN ('buffer', 'social')
+               AND de.status = 'sent'
+             ORDER BY de.sent_at DESC NULLS LAST
+             LIMIT 1
+           ) AS buffer_dispatched_at
     FROM carousel_runs
     ${whereClause}
     ORDER BY created_at DESC

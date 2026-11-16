@@ -236,7 +236,7 @@
 **Interfaces:**
 - Produces: `buffer_dispatched_at: Date | null` from latest `dispatch_events` where `channel IN ('buffer','social')` AND `status='sent'`
 
-- [ ] **Step 1–4: TDD. Commit** `feat(runs): expose buffer_dispatched_at on carousel runs`
+- [x] **Step 1–4: TDD. Commit** `feat(runs): expose buffer_dispatched_at on carousel runs`
 
 ---
 
