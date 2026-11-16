@@ -25,17 +25,19 @@ O objetivo é que o TikTok poste sozinho, em horários humanos e espalhados, sem
 ### Goals
 
 1. Botão "Publicar no Buffer" no card da galeria, visível apenas para conta vinculada, chamando `POST /api/v1/carousels/runs/:id/send?channel=buffer`.
-2. Plano diário persistido com 1 slot por conta por janela (3 por dia por conta).
+2. Plano diário persistido com 1 slot por conta por janela (3 por dia por conta por padrão).
 3. Horários sorteados dentro de cada janela, com distribuição que evita concentração (fatias iguais).
-4. Execução serializada: no máximo 1 slot rodando por vez; gerar → publicar → liberar o próximo.
+4. Execução serializada: no máximo 1 slot rodando por vez; gerar → (aprovação, se Buffer) → publicar → liberar o próximo.
 5. Resolver o canal na hora da execução: `external_account_id` presente → Buffer; ausente → Telegram.
-6. Sobreviver a restart/deploy sem duplicar post, sem repostar slot de outro dia e sem perder o plano do dia.
-7. Painel somente-leitura em Integrações com a agenda do dia e o status de cada slot.
-8. Manter os botões e endpoints manuais existentes (gerar, enviar Telegram, publicar manual no TikTok).
+6. Revisão antes de enviar: conta vinculada ao Buffer gera o carrossel e aguarda aprovação humana; a publicação só acontece após confirmação (botão no Telegram ou no site). Conta sem vínculo envia o álbum pelo Telegram automaticamente.
+7. Rotina configurável: liga/desliga geral, participação por conta, janelas de horário editáveis e quantidade de posts por dia por conta.
+8. Notificações no Telegram: geração (sucesso/falha com conta + arquétipo), aceite do Buffer e resultado final da publicação (sucesso/falha) via polling.
+9. Sobreviver a restart/deploy sem duplicar post, sem repostar slot de outro dia e sem perder o plano do dia.
+10. Painel em Integrações com a agenda do dia e o status de cada slot.
+11. Manter os botões e endpoints manuais existentes (gerar, enviar Telegram, publicar manual no TikTok).
 
 ### Non-Goals
 
-- Editar a agenda pela UI (janelas, horários ou quantidade de posts).
 - Backfill de janelas perdidas por downtime.
 - Agendamento `dueAt` no Buffer; a rotina dispara no horário e publica com `shareNow`.
 - Suporte a Post for Me nesta fase (o desenho deixa o ponto de extensão, mas o adapter continua stub).
@@ -110,8 +112,11 @@ export const DEFAULT_WINDOWS: PostWindow[] = [
 ];
 ```
 
-- Override opcional por `AUTO_POST_WINDOWS` (JSON com o mesmo formato), útil para operação/teste.
-- Fuso: `AUTOMATION_TZ || process.env.TZ || "America/Sao_Paulo"`.
+- Fonte de configuração (prioridade): `app_settings.auto_post_windows` (JSON com o mesmo formato) > env `AUTO_POST_WINDOWS` > `DEFAULT_WINDOWS`.
+- Quantidade de posts por dia por conta: `app_settings.auto_post_count_per_day` (inteiro, default 3, clamp 1–6). Quando menor que o número de janelas, usa as N primeiras janelas; quando maior, não duplica janela.
+- Participação por conta: coluna `accounts.auto_post_enabled` (default `true`). Só contas `enabled = true AND auto_post_enabled = true` entram no plano.
+- Fuso: `app_settings.auto_post_timezone` > env `AUTOMATION_TZ` > `process.env.TZ` > `America/Sao_Paulo`.
+- Aplicação de mudanças de janelas/horários: vale a partir do próximo dia. O planner usa a configuração vigente no momento em que cria os slots de um dia; slots já criados para o dia atual não são reescritos. Isso evita mover um slot já agendado.
 - Helpers em `backend/src/domain/automation/time.ts`:
   - `localDateString(date, timeZone): string` → `YYYY-MM-DD`.
   - `zonedTimeToUtc(localDate, "HH:mm", timeZone): Date` (converte com o offset do fuso; itera uma vez para cobrir DST).
@@ -143,16 +148,23 @@ CREATE TABLE auto_post_slots (
   scheduled_at  TIMESTAMPTZ NOT NULL,
   window_end    TIMESTAMPTZ NOT NULL,
   status        TEXT NOT NULL DEFAULT 'pending'
-                CHECK (status IN ('pending', 'running', 'done', 'failed', 'skipped')),
+                CHECK (status IN ('pending', 'running', 'awaiting_approval', 'done', 'failed', 'skipped')),
   attempts      INT NOT NULL DEFAULT 0,
   run_id        UUID REFERENCES carousel_runs(id) ON DELETE SET NULL,
   last_error    TEXT,
   started_at    TIMESTAMPTZ,
+  approved_at   TIMESTAMPTZ,
   finished_at   TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (slot_date, window_id, account_id)
 );
+
+-- Conta participa da rotina?
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS auto_post_enabled BOOLEAN NOT NULL DEFAULT true;
+
+-- Vínculo run <-> slot (para aprovação e deep link)
+ALTER TABLE carousel_runs ADD COLUMN IF NOT EXISTS auto_post_slot_id UUID REFERENCES auto_post_slots(id) ON DELETE SET NULL;
 
 CREATE INDEX idx_auto_post_slots_due
   ON auto_post_slots (status, scheduled_at);
@@ -217,7 +229,7 @@ Arquivo novo: `backend/src/domain/automation/ticker.ts`.
 
 **Execução de um slot** (`executeSlot`):
 
-1. Carrega a conta. Se não existir ou `enabled = false` → `skipped` (`last_error = 'conta desativada'`).
+1. Carrega a conta. Se não existir ou `enabled = false` ou `auto_post_enabled = false` → `skipped` (`last_error = 'conta desativada'`).
 2. Resolve o canal:
    - `external_account_id` preenchido e provider `buffer`/nulo/vazio → `buffer`.
    - `external_account_id` preenchido e provider `postforme` → `social` (reservado; nesta fase o executor marca `skipped` com `last_error = 'provider não suportado nesta fase'` e **não** envia pelo Telegram).
@@ -228,10 +240,12 @@ Arquivo novo: `backend/src/domain/automation/ticker.ts`.
    - Se já existe `dispatch_events` com status `sent` **para o canal resolvido** → marca slot `done` (proteção contra duplicar após crash).
    - Se o run está `published` (publicação manual ou por outro canal) e não há evento `sent` no canal resolvido → `skipped` (`last_error = 'carrossel já publicado'`), para não duplicar.
    - Se o run tem slides e não está `published` → reutiliza (não gera de novo), mesmo que já tenha sido despachado em outro canal (ex.: Telegram para revisão).
-4. Se não há run reutilizável: `generateOneCarousel({ accountId, pool })`. Atualiza `slot.run_id`.
-5. `dispatchCarouselRun({ runId, channel, triggeredBy: 'auto_schedule', pool })`.
-6. Sucesso (dispatch aceito pelo canal) → `status = 'done'`, `finished_at = now()`, `last_error = null`. `done` significa **entregue ao canal**, não “publicado no TikTok”; o desfecho real é lido de `carousel_runs`/`tiktok_posts` na agenda.
-7. Erro → retry:
+4. Se não há run reutilizável: `generateOneCarousel({ accountId, pool })`. Atualiza `slot.run_id` e `carousel_runs.auto_post_slot_id`.
+5. **Notificação de geração:** envia mensagem no chat de notificação (sucesso com conta + arquétipo; falha com motivo). Só para a rotina automática.
+6. Ramo por canal:
+   - **Telegram (conta sem vínculo):** `dispatchCarouselRun({ runId, channel: 'telegram', triggeredBy: 'auto_schedule' })`. Sucesso → slot `done`, `finished_at = now()`. Notifica o resultado final (enviado com sucesso / falha).
+   - **Buffer (conta vinculada):** **não publica agora.** Slot vai para `awaiting_approval`, run fica `generated` (status de run novo `awaiting_approval` opcional, mas o slot é a fonte de verdade). Envia mensagem no Telegram com deep link para o carrossel na plataforma + botão inline "Confirmar envio" (`callback_data = approve_buffer:<runId>`). Notifica "gerado, aguardando aprovação".
+7. Erro em geração/dispatch → retry (mesmas regras). Se a geração falhou, não há run; notifica falha de geração.
    - `MAX_ATTEMPTS = 2`.
    - `RETRY_DELAY = 5min`.
    - Se `attempts < 2` e `now + 5min < window_end`: `status = 'pending'`, `scheduled_at = now + 5min`, `last_error = mensagem`.
@@ -242,6 +256,30 @@ Arquivo novo: `backend/src/domain/automation/ticker.ts`.
 
 Funções de geração e dispatch são injetáveis nas options (`generateFn`, `dispatchFn`) para testes; em produção usam as implementações reais.
 
+### 5.4.1 Aprovação e publicação (contas Buffer)
+
+Quando um slot Buffer entra em `awaiting_approval`, a publicação só ocorre após confirmação humana.
+
+**Endpoint de aprovação:** `POST /api/v1/automation/runs/:runId/approve` (idempotente).
+
+- Carrega o slot vinculado ao run (via `carousel_runs.auto_post_slot_id`) e o run.
+- Se o slot não está em `awaiting_approval`:
+  - Se já está `done` → retorna `{ ok: true, already: true, run }` (idempotente).
+  - Se está `failed`/`skipped`/`expired` → 409 `slot_not_awaiting_approval`.
+- Se `window_end < now` → slot vira `skipped` (`last_error = 'aprovação expirada'`), retorna 410 `approval_expired`.
+- Senão: slot → `running`, `approved_at = now()`. Chama `dispatchCarouselRun({ runId, channel: 'buffer', triggeredBy: 'approval' })`.
+  - Sucesso → slot `done`, `finished_at = now()`. Notifica "aceito pelo Buffer".
+  - Falha → retry (mesmas regras do executor); notifica falha.
+- Concorrência: claim com `UPDATE ... WHERE status='awaiting_approval'` (linha afetada = 0 → já processado por outro chamador → retorna o estado atual).
+
+**Telegram — botão inline:** callback `approve_buffer:<runId>` (cabe nos 64 bytes). Handler no `bot.ts` chama a mesma função de aprovação e responde ao callback (`ctx.answerCallbackQuery`) com sucesso/erro. A mensagem original é editada para refletir o resultado.
+
+**Deep link no Telegram:** mensagem de "aguardando aprovação" inclui botão URL (quando `APP_BASE_URL` está definido): `🔗 Abrir carrossel` → `${APP_BASE_URL}/?tab=galeria&run=${runId}`. Se `APP_BASE_URL` não estiver definido, omite o botão URL (mantém o botão inline de confirmação).
+
+**Site — deep link:** `App.tsx` passa a ler `window.location.search` na montagem: `?tab=galeria&run=<id>` define a aba inicial como `galeria` e um estado `focusedRunId`. `GalleryPage` recebe `focusedRunId` e, após carregar os runs, faz scroll até o card correspondente e aplica destaque visual. O card exibe "Aguardando aprovação" + botão "Confirmar envio" (chama o endpoint de aprovação). Se o run não estiver mais aguardando, o botão fica desabilitado com o motivo.
+
+**Expiração:** no ticker, slots `awaiting_approval` com `window_end < now` viram `skipped` (`last_error = 'aprovação expirada'`). O run permanece `generated` na galeria para publicação manual.
+
 ### 5.5 Resolução de canal e comportamento de publicação
 
 - **Buffer:** `dispatchCarouselRun` já monta `image_urls` via Silo, chama `publishPost` com `publishMode: 'immediate'` (`shareNow`) e grava/atualiza `tiktok_posts` (`provider = 'buffer'`). O polling existente leva `queued`/`processing` → `published`/`failed`.
@@ -250,12 +288,37 @@ Funções de geração e dispatch são injetáveis nas options (`generateFn`, `d
 - **Vínculo alterado no meio do dia:** o executor sempre re-resolve; um slot planejado como Telegram vira Buffer se a conta for vinculada antes de executar, e vice-versa.
 - **Provider futuro:** `social_provider = 'postforme'` com `external_account_id` deve usar `channel=social` e o factory existente. Fica como ponto de extensão; nesta fase o adapter é stub.
 
-### 5.6 Toggle e configuração
+### 5.6 Toggle, configuração e notificações
+
+**Configuração (UI):**
 
 - Reutiliza a chave existente **`auto_dispatch_enabled`** como liga/desliga da rotina. Não há segunda chave.
 - Na UI de Integrações, o card existente muda de texto: “Despacho Automático (Cron)” → “Rotina automática de posts”, explicando 3 posts/conta/dia, janelas, Buffer/Telegram e execução uma por vez.
+- Card de configuração adicional (ou seção no mesmo card) permite:
+  - Editar as janelas (lista de `{ id, start, end }` em `HH:mm`), adicionar/remover.
+  - Editar posts por dia (1–6).
+  - Escolher o fuso.
+  - Salvar via `PUT /api/v1/settings/auto_post_windows`, `auto_post_count_per_day`, `auto_post_timezone`.
+  - Mudanças valem a partir do próximo dia (planner usa a configuração vigente ao criar os slots).
+- Em Contas, cada conta ganha o toggle `auto_post_enabled` (participa da rotina). Salvável via `PATCH /api/v1/accounts/:id`.
 - Desligar a rotina não apaga o histórico nem queima slots futuros: eles ficam `pending` e voltam a executar quando a rotina for religada. Só slots de janela encerrada viram `skipped`.
 - `CRON_SCHEDULE` deixa de ser usado para geração. `AUTOMATION_CRON_SCHEDULE` (default `* * * * *`) controla o ticker. `CRON_SCHEDULE` fica documentado como obsoleto.
+
+**Notificações no Telegram:**
+
+- Chat de notificação: `TELEGRAM_NOTIFY_CHAT_ID` (se definido) senão `TELEGRAM_CHAT_ID`.
+- Só a rotina automática notifica; o botão manual fica silencioso.
+- Mensagens (português):
+  - Geração ok: `✅ Carrossel gerado — @<conta> — arquétipo: <título>`.
+  - Geração falhou: `❌ Falha ao gerar — @<conta> — <motivo>`.
+  - Buffer aguardando aprovação: `🕐 Aguardando aprovação — @<conta> — arquétipo: <título>` + botão URL (deep link) + botão inline "Confirmar envio".
+  - Buffer aceito: `📤 Enviado ao Buffer — @<conta> — aguardando confirmação do TikTok`.
+  - Publicação ok (via polling): `✅ Publicado no TikTok — @<conta> — arquétipo: <título>`.
+  - Publicação falhou (via polling): `❌ Falha na publicação — @<conta> — <motivo>`.
+  - Telegram enviado: `✅ Enviado ao Telegram — @<conta> — arquétipo: <título>`.
+- Para não virar spam, envia a de "gerado" e a de resultado final; a de "aceito pelo Buffer" é opcional mas recomendada (mostra que o clique funcionou).
+- Notificações de resultado final via polling: o polling job, ao transicionar `queued/processing` → `published`/`failed`, dispara a notificação se o run tiver `auto_post_slot_id` (ou seja, veio da rotina). Posts manuais não notificam.
+- Dedupe: cada transição notifica no máximo uma vez (guardar flag `notified_at` em `tiktok_posts` ou checar `auto_post_slots.finished_at`).
 
 ### 5.7 Mudanças no cron
 
@@ -286,8 +349,9 @@ Em `backend/src/domain/runs/store.ts`, tanto `getCarouselRun` quanto `listCarous
 ) AS buffer_dispatched_at
 ```
 
-- `CarouselRunSchema` ganha `buffer_dispatched_at: z.coerce.date().nullable().optional()`.
-- `frontend/src/types.ts` ganha `buffer_dispatched_at?: string | null`.
+- `CarouselRunSchema` ganha `buffer_dispatched_at: z.coerce.date().nullable().optional()` e `auto_post_slot_id: z.string().uuid().nullable().optional()`.
+- `RUN_STATUSES` ganha `awaiting_approval` (run gerado pela rotina e aguardando confirmação humana antes do envio ao Buffer).
+- `frontend/src/types.ts` ganha `buffer_dispatched_at?: string | null`, `auto_post_slot_id?: string | null` e `RunStatus` ganha `"awaiting_approval"`.
 - Isso permite o card saber se o run já foi enviado ao Buffer, independentemente de ter passado pelo Telegram antes.
 
 **API nova:** `GET /api/v1/automation/schedule?date=YYYY-MM-DD` (default: hoje no fuso).
@@ -347,6 +411,7 @@ Regras:
 - Se `run.buffer_dispatched_at` existe e `run.status !== 'failed'` → `visible: true`, `disabled: true`, label `"Enviado ao Buffer"`.
 - Se `run.buffer_dispatched_at` existe e `run.status === 'failed'` → `visible: true`, `disabled: false`, label `"Reenviar ao Buffer"`.
 - Se não existe `buffer_dispatched_at` e `run.status === 'published'` → `visible: true`, `disabled: true`, label `"Já publicado"` (evita duplicar uma publicação manual).
+- Se o run está aguardando aprovação da rotina (`status = 'awaiting_approval'` ou slot vinculado em `awaiting_approval`) → `visible: true`, `disabled: false`, label `"Confirmar envio"`. O clique chama `POST /api/v1/automation/runs/:runId/approve`.
 - Se não existe `buffer_dispatched_at`, a conta está vinculada e o run não está `published` → `visible: true`, `disabled: false`, label `"Publicar no Buffer"`. Isso inclui runs já despachados só para o Telegram, que servem de revisão antes da publicação.
 - Caso contrário → `visible: false`.
 
@@ -370,7 +435,12 @@ Comportamento:
   - `formatScheduleStatus(status: string): string`
   - `formatScheduleChannel(channel: string): string`
 
-#### 5.9.3 Texto do toggle
+#### 5.9.3 Deep link e foco no card
+
+- `App.tsx` passa a ler `window.location.search` na montagem: `?tab=galeria&run=<id>` define a aba inicial como `galeria` e um estado `focusedRunId`. Também reage a mudanças de URL (popstate) para o caso de o Telegram abrir em nova aba.
+- `GalleryPage` recebe `focusedRunId?: string`. Após carregar os runs, se o run existir, faz scroll até o card e aplica destaque visual (classe `run-card--focused`). Se o run não existir na página atual (filtro), mostra banner "Carrossel não encontrado nesta visualização".
+
+#### 5.9.4 Texto do toggle
 
 Atualizar o card para deixar explícito:
 
@@ -409,6 +479,16 @@ Atualizar o card para deixar explícito:
 17. `ticker`: run despachado só para Telegram → slot Buffer reenvia ao Buffer; run já `published` (manual/outro canal) sem evento `sent` no canal → slot `skipped`.
 18. `automation/routes`: agenda retorna `account_enabled`, `run_status` e `post_status`, com join em `carousel_runs` e `tiktok_posts`.
 19. `ticker`: conta `postforme` com `external_account_id` → slot `social` e executor marca `skipped` com erro claro, sem enviar Telegram.
+20. `ticker`: conta Buffer → slot vai para `awaiting_approval`, run fica `generated`, notificação de "aguardando aprovação" enviada com deep link.
+21. `ticker`: conta Telegram → gera e envia álbum, slot `done`, notificação de sucesso enviada.
+22. `approval`: `POST /api/v1/automation/runs/:runId/approve` em slot `awaiting_approval` despacha ao Buffer e marca `done`; segunda chamada retorna `already: true`.
+23. `approval`: aprovação após `window_end` → 410 e slot `skipped` (`aprovação expirada`).
+24. `approval`: callback `approve_buffer:<runId>` no bot chama a mesma função e edita a mensagem.
+25. `planner`: conta com `auto_post_enabled = false` não recebe slot.
+26. `planner`: `auto_post_count_per_day = 2` → só 2 janelas por conta.
+27. `settings`: `auto_post_windows` inválido (start >= end) → 400.
+28. `polling`: transição para `published`/`failed` de run com `auto_post_slot_id` dispara notificação; run manual não notifica.
+29. `notifications`: chat de notificação usa `TELEGRAM_NOTIFY_CHAT_ID` quando definido, senão `TELEGRAM_CHAT_ID`.
 
 **Frontend (node:test puro, sem DOM):**
 
@@ -421,6 +501,9 @@ Atualizar o card para deixar explícito:
 7. `formatScheduleStatus` e `formatScheduleChannel` mapeiam todos os valores.
 8. `resolveBufferPublishState`: `run.status='published'` sem `buffer_dispatched_at` → visível, desabilitado, “Já publicado”.
 9. `formatPublicationStatus` (novo helper) mapeia `queued`, `processing`, `published`, `failed` e `null`.
+10. `resolveBufferPublishState`: run `status='awaiting_approval'` → visível, habilitado, "Confirmar envio".
+11. `parseDeepLinkParams` (novo helper em `App.tsx` ou util) extrai `{ tab, runId }` de `?tab=galeria&run=<id>`.
+12. `formatScheduleStatus` mapeia `awaiting_approval` → "Aguardando aprovação".
 
 ### 5.12 Compatibilidade e rollout
 
@@ -437,6 +520,9 @@ Atualizar o card para deixar explícito:
 1. **Escopo das contas:** todas as contas ativas entram na rotina. Vinculadas ao Buffer publicam no Buffer; sem vínculo publicam no Telegram.
 2. **Abordagem:** plano diário persistido + ticker de minuto (A).
 3. **Contas sem vínculo:** não ficam de fora nem apenas na galeria; vão para o Telegram.
+4. **Rotina configurável:** liga/desliga geral, participação por conta, janelas e posts/dia editáveis pela UI; mudanças valem a partir do próximo dia.
+5. **Revisão antes de enviar:** conta Buffer gera e aguarda aprovação humana (botão no Telegram com deep link + botão inline, ou botão no site); conta Telegram envia automaticamente.
+6. **Notificações no Telegram:** geração (sucesso/falha), aceite do Buffer e resultado final via polling; chat padrão `TELEGRAM_CHAT_ID`, opcional `TELEGRAM_NOTIFY_CHAT_ID`. Só a rotina notifica.
 
 ## 7. O que fica para o Builder
 
@@ -447,6 +533,10 @@ Atualizar o card para deixar explícito:
 - Organização dos testes e uso de fakes injetáveis para geração/dispatch.
 - Se o painel da agenda deve ter polling de 60s ou apenas recarregar manualmente; o design recomenda 60s.
 - Textos finais da UI em português, mantendo o tom do restante do painel.
+- `APP_BASE_URL` env para o deep link do Telegram; se ausente, omite o botão URL.
+- Validação de janelas: `start < end`, sem sobreposição? O design recomenda apenas `start < end` por janela; sobreposição entre janelas é responsabilidade do operador.
+- Expiração de aprovação: `window_end` é o limite; após isso slot `skipped`.
+- Idempotência do endpoint de aprovação e do callback do bot.
 
 ---
 
