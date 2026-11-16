@@ -93,17 +93,17 @@ export function resolveBufferPublishState(
     account &&
     account.external_account_id &&
     account.external_account_id.trim() !== "" &&
-    (!account.social_provider || account.social_provider.trim() === "" || account.social_provider.trim().toLowerCase() === "buffer")
+    account.social_provider?.trim().toLowerCase() === "zernio"
   );
 
   // 1. Se run.buffer_dispatched_at existe e run.status !== 'failed' → visible: true, disabled: true, label 'Enviado ao Buffer'
   if (run.buffer_dispatched_at && run.status !== "failed") {
-    return { visible: true, disabled: true, label: "Enviado ao Buffer" };
+    return { visible: true, disabled: true, label: "Enviado ao TikTok" };
   }
 
   // 2. Se run.buffer_dispatched_at existe e run.status === 'failed' → visible: true, disabled: false, label 'Reenviar ao Buffer'
   if (run.buffer_dispatched_at && run.status === "failed") {
-    return { visible: true, disabled: false, label: "Reenviar ao Buffer" };
+    return { visible: true, disabled: false, label: "Reenviar ao TikTok" };
   }
 
   // 3. Se run está aguardando aprovação da rotina (status = 'awaiting_approval' ou slot vinculado em awaiting_approval)
@@ -122,7 +122,7 @@ export function resolveBufferPublishState(
   }
 
   // 5. Se não existe buffer_dispatched_at, a conta está vinculada e o run não está published → visible: true, disabled: false, label 'Publicar no Buffer'
-  return { visible: true, disabled: false, label: "Publicar no Buffer" };
+  return { visible: true, disabled: false, label: "Publicar no TikTok" };
 }
 
 export function RunCard({
@@ -160,7 +160,7 @@ export function RunCard({
     account &&
     account.external_account_id &&
     account.external_account_id.trim() !== "" &&
-    (!account.social_provider || account.social_provider.trim() === "" || account.social_provider.trim().toLowerCase() === "buffer")
+    account.social_provider?.trim().toLowerCase() === "zernio"
   );
 
   const bufferState = resolveBufferPublishState(account, run);
@@ -204,7 +204,7 @@ export function RunCard({
           buffer_dispatched_at: new Date().toISOString(),
         };
       } else {
-        const result = await dispatchCarouselRun(run.id, "buffer");
+        const result = await dispatchCarouselRun(run.id, "zernio");
         updatedRun = result.run || {
           ...run,
           status: "dispatched",
@@ -214,10 +214,10 @@ export function RunCard({
       setBufferSuccess(true);
       if (onDispatched) onDispatched(updatedRun);
       if (onRunUpdated) onRunUpdated(updatedRun);
-      if (onToast) onToast("Carrossel enviado ao Buffer", "success");
+      if (onToast) onToast("Carrossel enviado ao TikTok", "success");
       setTimeout(() => setBufferSuccess(false), 4000);
     } catch (err: any) {
-      const msg = err.message || "Erro ao publicar no Buffer";
+      const msg = err.message || "Erro ao publicar no TikTok";
       setBufferError(msg);
       if (onToast) onToast(msg, "error");
     } finally {
@@ -245,8 +245,8 @@ export function RunCard({
 
           <div className="run-card-badges flex items-center gap-1.5">
             {isLinked && (
-              <span className="buffer-badge" title={`Conta vinculada ao Buffer (${account?.external_account_id})`}>
-                Buffer
+              <span className="buffer-badge" title={`Conta vinculada ao Zernio (${account?.external_account_id})`}>
+                Zernio
               </span>
             )}
             <span className={`status-pill status-${run.status}`}>

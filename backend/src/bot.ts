@@ -116,12 +116,17 @@ export function createBot(options: BotConfig = {}): Bot | null {
 
   bot.on("callback_query:data", async (ctx) => {
     const data = ctx.callbackQuery?.data;
-    if (!data || !data.startsWith("approve_buffer:")) {
+    const approvePrefix = data?.startsWith("approve_zernio:")
+      ? "approve_zernio:"
+      : data?.startsWith("approve_buffer:")
+        ? "approve_buffer:"
+        : null;
+    if (!data || !approvePrefix) {
       await ctx.answerCallbackQuery().catch(() => {});
       return;
     }
 
-    const runId = data.slice("approve_buffer:".length).trim();
+    const runId = data.slice(approvePrefix.length).trim();
     if (!runId) {
       await ctx.answerCallbackQuery({ text: "ID do carrossel inválido" });
       await ctx.editMessageText("❌ ID do carrossel inválido").catch(() => {});
@@ -138,20 +143,20 @@ export function createBot(options: BotConfig = {}): Bot | null {
 
       if (result.already) {
         await ctx.answerCallbackQuery({
-          text: "Carrossel já enviado ao Buffer.",
+          text: "Carrossel já enviado ao TikTok.",
         });
         const account = result.run?.account_id ? `@${result.run.account_id}` : "carrossel";
         await ctx
-          .editMessageText(`📤 Enviado ao Buffer — ${account} (já processado)`)
+          .editMessageText(`📤 Enviado ao TikTok — ${account} (já processado)`)
           .catch(() => {});
       } else {
         await ctx.answerCallbackQuery({
-          text: "Enviado ao Buffer com sucesso!",
+          text: "Enviado ao TikTok com sucesso!",
         });
         const account = result.run?.account_id ? `@${result.run.account_id}` : "carrossel";
         await ctx
           .editMessageText(
-            `📤 Enviado ao Buffer — ${account} — aguardando confirmação do TikTok`
+            `📤 Enviado ao TikTok — ${account} — com áudio`
           )
           .catch(() => {});
       }
@@ -179,7 +184,7 @@ export function createBot(options: BotConfig = {}): Bot | null {
           text: `Erro: ${msg}`,
         });
         await ctx
-          .editMessageText(`❌ Falha ao enviar ao Buffer: ${msg}`)
+          .editMessageText(`❌ Falha ao enviar ao TikTok: ${msg}`)
           .catch(() => {});
       }
     }

@@ -6,6 +6,7 @@ import {
   syncTikTok,
   getLatestTikTokSync,
   syncSocialAccounts,
+  getTikTokConnectUrl,
   getAutomationSchedule,
   type TikTokSyncResult,
 } from "../api";
@@ -46,6 +47,7 @@ export function IntegrationsPage(): React.JSX.Element {
   const [testingDispatch, setTestingDispatch] = useState<boolean>(false);
   const [syncingTikTok, setSyncingTikTok] = useState<boolean>(false);
   const [syncingBuffer, setSyncingBuffer] = useState<boolean>(false);
+  const [connectingTikTok, setConnectingTikTok] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -301,6 +303,19 @@ export function IntegrationsPage(): React.JSX.Element {
     }
   };
 
+  const handleConnectTikTok = async () => {
+    setConnectingTikTok(true);
+    setErrorMessage(null);
+    try {
+      const { authUrl } = await getTikTokConnectUrl();
+      window.open(authUrl, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : "Erro ao conectar TikTok");
+    } finally {
+      setConnectingTikTok(false);
+    }
+  };
+
   const handleSyncBuffer = async () => {
     setSyncingBuffer(true);
     setErrorMessage(null);
@@ -308,11 +323,11 @@ export function IntegrationsPage(): React.JSX.Element {
     try {
       const res = await syncSocialAccounts();
       setStatusMessage(
-        `Sincronização Buffer concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).`
+        `Sincronização Zernio concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).`
       );
     } catch (err) {
       setErrorMessage(
-        err instanceof Error ? err.message : "Erro ao sincronizar Buffer"
+        err instanceof Error ? err.message : "Erro ao sincronizar Zernio"
       );
     } finally {
       setSyncingBuffer(false);
@@ -477,24 +492,24 @@ export function IntegrationsPage(): React.JSX.Element {
           </div>
         </div>
 
-        {/* Card 3: Buffer Social Publishing */}
         <div className="integration-card" data-testid="card-buffer-sync">
           <div className="card-top">
-            <div className="card-badge">Buffer API</div>
-            <h4>Buffer Social Publishing</h4>
+            <div className="card-badge">Zernio</div>
+            <h4>Zernio</h4>
             <p>
-              Sincroniza canais do TikTok conectados ao Buffer e permite despacho direto de carrosséis.
-            </p>
-          </div>
-
-          <div className="card-sync-status">
-            <p className="text-muted text-sm">
-              Ao puxar as contas, os canais conectados no Buffer serão vinculados às personas existentes
-              ou importados automaticamente como novas contas.
+              Conecta o TikTok, puxa as contas e publica o carrossel com áudio.
             </p>
           </div>
 
           <div className="card-actions">
+            <button
+              type="button"
+              className="btn btn-secondary flex items-center gap-1.5"
+              onClick={() => void handleConnectTikTok()}
+              disabled={connectingTikTok || loading}
+            >
+              <span>{connectingTikTok ? "Abrindo..." : "Conectar TikTok"}</span>
+            </button>
             <button
               type="button"
               className="btn btn-primary flex items-center gap-1.5"
@@ -503,7 +518,7 @@ export function IntegrationsPage(): React.JSX.Element {
               data-testid="btn-buffer-sync"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${syncingBuffer ? "animate-spin" : ""}`} />
-              <span>{syncingBuffer ? "Puxando contas..." : "Puxar Contas do Buffer"}</span>
+              <span>{syncingBuffer ? "Puxando contas..." : "Puxar contas do Zernio"}</span>
             </button>
           </div>
         </div>

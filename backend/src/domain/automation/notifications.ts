@@ -43,7 +43,7 @@ export function buildApprovalKeyboard(
 ): { inline_keyboard: Array<Array<Record<string, string>>> } {
   const confirm = {
     text: "Confirmar envio",
-    callback_data: `approve_buffer:${runId}`,
+    callback_data: `approve_zernio:${runId}`,
   };
   const base = appBaseUrl?.trim().replace(/\/$/, "");
   if (!base) {
@@ -75,7 +75,7 @@ function formatMessage(
     case "awaiting_approval":
       return `🕐 Aguardando aprovação — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "buffer_accepted":
-      return `📤 No Buffer em ~30min — @${account} — abre o Buffer, adiciona a música e publica`;
+      return `📤 Enviado ao TikTok — @${account} — com áudio`;
     case "publish_ok":
       return `✅ Publicado no TikTok — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "publish_failed":

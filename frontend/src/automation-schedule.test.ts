@@ -47,7 +47,7 @@ describe("Task 12: Agenda panel, settings & account toggle (TDD)", () => {
               account_id: "acc_1",
               account_display_name: "Conta 1",
               account_enabled: true,
-              channel: "buffer",
+              channel: "zernio",
               scheduled_at: "2026-11-16T10:15:00.000Z",
               window_end: "2026-11-16T12:00:00.000Z",
               status: "pending",
@@ -133,7 +133,7 @@ describe("Task 12: Agenda panel, settings & account toggle (TDD)", () => {
 
   describe("Pure helpers: formatScheduleChannel (spec §5.9.2, §5.11 test 7)", () => {
     it("7. formatScheduleChannel maps all channels correctly", () => {
-      assert.equal(formatScheduleChannel("buffer"), "Buffer");
+      assert.equal(formatScheduleChannel("zernio"), "Zernio");
       assert.equal(formatScheduleChannel("telegram"), "Telegram");
       assert.equal(formatScheduleChannel("social"), "Social");
       // Fallback for unknown channel

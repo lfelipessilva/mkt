@@ -202,7 +202,7 @@ export async function approveBufferRun(
   try {
     const result = await dispatchFn({
       runId,
-      channel: "buffer",
+      channel: "zernio",
       triggeredBy: "approval",
       pool,
     });

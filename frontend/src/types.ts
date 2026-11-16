@@ -77,7 +77,7 @@ export function getBufferLinkageStatus(account: Account): {
   const isLinked = Boolean(account.external_account_id && account.external_account_id.trim());
   return {
     isLinked,
-    label: isLinked ? `Buffer (${account.external_account_id})` : "Não vinculado",
+    label: isLinked ? `Zernio (${account.external_account_id})` : "Não vinculado",
     externalAccountId: account.external_account_id || null,
     provider: account.social_provider || null,
   };
@@ -392,7 +392,7 @@ export type AutoPostSlotStatus =
   | "failed"
   | "skipped";
 
-export type AutoPostSlotChannel = "buffer" | "telegram" | "social";
+export type AutoPostSlotChannel = "zernio" | "telegram" | "social";
 
 export interface AutoPostSlot {
   id: string;
@@ -441,8 +441,8 @@ export function formatScheduleStatus(status: string): string {
 
 export function formatScheduleChannel(channel: string): string {
   switch (channel) {
-    case "buffer":
-      return "Buffer";
+    case "zernio":
+      return "Zernio";
     case "telegram":
       return "Telegram";
     case "social":

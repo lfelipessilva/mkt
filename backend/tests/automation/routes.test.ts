@@ -172,7 +172,7 @@ describe("Task 8: Schedule read API + settings validation (spec §5.7 / §5.8)",
             slot_date: slotDate,
             window_id: "morning",
             account_id: "acc_gabriel",
-            channel: "buffer",
+            channel: "zernio",
             scheduled_at: new Date("2026-11-16T10:17:00.000Z"),
             window_end: new Date("2026-11-16T12:00:00.000Z"),
             status: "done",
@@ -223,7 +223,7 @@ describe("Task 8: Schedule read API + settings validation (spec §5.7 / §5.8)",
       assert.equal(s1.account_id, "acc_gabriel");
       assert.equal(s1.account_display_name, "Gabriel");
       assert.equal(s1.account_enabled, true);
-      assert.equal(s1.channel, "buffer");
+      assert.equal(s1.channel, "zernio");
       assert.equal(s1.status, "done");
       assert.equal(s1.run_id, run.id);
       assert.equal(s1.run_status, "published");

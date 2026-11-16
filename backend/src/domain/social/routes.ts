@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
 import { getSocialPublisherProvider } from "./factory.js";
+import { ZernioPublisherAdapter } from "./providers/zernio.js";
 import { listAccounts, upsertAccount } from "../accounts/store.js";
 import type { SocialPublisherProvider, SocialAccount } from "./types.js";
 
@@ -122,7 +123,7 @@ export async function syncSocialAccounts(
           id: cleanId,
           display_name: channelName || cleanId,
           role: "single_woman",
-          persona: `Conta importada via Buffer (${ch.username || channelName})`,
+          persona: `Conta importada via Zernio (${ch.username || channelName})`,
           enabled: true,
           social_provider: ch.provider,
           external_account_id: ch.externalAccountId,
@@ -135,7 +136,7 @@ export async function syncSocialAccounts(
 
       matchedAccounts.push({
         id: cleanId,
-        persona: `Conta importada via Buffer (${ch.username || channelName})`,
+        persona: `Conta importada via Zernio (${ch.username || channelName})`,
         external_account_id: ch.externalAccountId,
         social_provider: ch.provider,
         username: ch.username,
@@ -153,10 +154,18 @@ export async function syncSocialAccounts(
 }
 
 export const socialRoutes: FastifyPluginAsync = async (app) => {
-  // POST /api/v1/social/accounts/sync
   app.post("/accounts/sync", async (_request, reply) => {
     const result = await syncSocialAccounts();
     return reply.send(result);
+  });
+
+  app.get("/connect/tiktok", async (_request, reply) => {
+    const provider = customProvider || getSocialPublisherProvider();
+    if (!(provider instanceof ZernioPublisherAdapter)) {
+      return reply.code(400).send({ error: "connect is only available for zernio" });
+    }
+    const authUrl = await provider.getTikTokConnectUrl();
+    return reply.send({ authUrl });
   });
 };
 

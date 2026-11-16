@@ -116,7 +116,7 @@ export async function getCarouselRun(
               SELECT de.sent_at
               FROM dispatch_events de
               WHERE de.run_id = carousel_runs.id
-                AND de.channel IN ('buffer', 'social')
+                AND de.channel IN ('zernio', 'social', 'buffer')
                 AND de.status = 'sent'
               ORDER BY de.sent_at DESC NULLS LAST
               LIMIT 1
@@ -239,7 +239,7 @@ export async function listCarouselRuns(
              SELECT de.sent_at
              FROM dispatch_events de
              WHERE de.run_id = carousel_runs.id
-               AND de.channel IN ('buffer', 'social')
+               AND de.channel IN ('zernio', 'social', 'buffer')
                AND de.status = 'sent'
              ORDER BY de.sent_at DESC NULLS LAST
              LIMIT 1

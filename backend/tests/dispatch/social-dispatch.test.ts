@@ -39,6 +39,8 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     tmpOutputDir = fs.mkdtempSync(path.join(os.tmpdir(), "task5-output-"));
     process.env.OUTPUT_DIR = tmpOutputDir;
     process.env.SILO_SERVER_URL = "https://silo.example.com";
+    process.env.SILO_ACCESS_KEY = "test";
+    process.env.SILO_SECRET_KEY = "test";
     process.env.SILO_CAROUSELS_BUCKET = "carousels";
 
     app = await buildApp();
@@ -139,31 +141,23 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
       },
     };
 
-    const beforeDispatch = Date.now();
     const res = await dispatchCarouselRun({
       runId,
-      channel: "buffer",
+      channel: "zernio",
       pool,
       socialPublisherProvider: mockProvider,
     });
 
     assert.ok(res.event);
-    assert.equal(res.event.channel, "buffer");
+    assert.equal(res.event.channel, "zernio");
     assert.equal(res.event.status, "sent");
     assert.equal(res.run.status, "dispatched");
 
     // Verify provider call
     assert.ok(publishedReq);
     assert.equal(publishedReq.externalAccountId, "buf_channel_123");
-    assert.equal(publishedReq.publishMode, "scheduled");
-    assert.equal(publishedReq.schedulingType, "notification");
-    assert.ok(publishedReq.scheduledAt);
-    const scheduledTime = new Date(publishedReq.scheduledAt).getTime();
-    const expectedTime = beforeDispatch + 30 * 60 * 1000;
-    assert.ok(
-      Math.abs(scheduledTime - expectedTime) < 2000,
-      `scheduledAt (${publishedReq.scheduledAt}) should be within 2s of now+30m`
-    );
+    assert.equal(publishedReq.publishMode, "immediate");
+    assert.equal(publishedReq.scheduledAt, undefined);
     assert.equal(publishedReq.media.type, "carousel");
     assert.equal((publishedReq.media as any).imageUrls.length, 2);
 
@@ -175,14 +169,14 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     assert.equal(postRes.rows.length, 1);
     const post = postRes.rows[0];
     assert.equal(post.tracking_mode, "api");
-    assert.equal(post.provider, "buffer");
+    assert.equal(post.provider, "zernio");
     assert.equal(post.external_post_id, "ext_buf_update_999");
     assert.equal(post.publish_status, "queued");
 
     // Verify dispatch_events
     const events = await getDispatchEvents(runId, pool);
     assert.equal(events.length, 1);
-    assert.equal(events[0].channel, "buffer");
+    assert.equal(events[0].channel, "zernio");
     assert.equal(events[0].status, "sent");
   });
 
@@ -219,7 +213,7 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
       async () => {
         await dispatchCarouselRun({
           runId,
-          channel: "buffer",
+          channel: "zernio",
           pool,
         });
       },
@@ -258,7 +252,7 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
       async () => {
         await dispatchCarouselRun({
           runId,
-          channel: "buffer",
+          channel: "zernio",
           pool,
           socialPublisherProvider: mockProvider,
         });
@@ -285,7 +279,7 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     const events = await getDispatchEvents(runId, pool);
     assert.equal(events.length, 1);
     assert.equal(events[0].status, "failed");
-    assert.equal(events[0].channel, "buffer");
+    assert.equal(events[0].channel, "zernio");
   });
 
   it("POST /api/v1/carousels/runs/:id/send?channel=buffer routes properly through API endpoint", async () => {
@@ -315,18 +309,18 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
 
     const response = await app.inject({
       method: "POST",
-      url: `/api/v1/carousels/runs/${runId}/send?channel=buffer`,
+      url: `/api/v1/carousels/runs/${runId}/send?channel=zernio`,
       headers: authHeaders,
     });
 
     const json = response.json();
     assert.equal(response.statusCode, 200);
     assert.equal(json.ok, true);
-    assert.equal(json.event.channel, "buffer");
+    assert.equal(json.event.channel, "zernio");
     assert.equal(json.event.status, "sent");
     assert.ok(publishedReq);
-    assert.equal((publishedReq as PublishPostRequest).publishMode, "scheduled");
-    assert.equal((publishedReq as PublishPostRequest).schedulingType, "notification");
+    assert.equal((publishedReq as PublishPostRequest).publishMode, "immediate");
+    assert.equal((publishedReq as PublishPostRequest).scheduledAt, undefined);
   });
 
   it("dispatches run with channel = 'social', leaves publishMode as immediate without schedulingType", async () => {

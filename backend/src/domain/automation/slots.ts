@@ -12,7 +12,7 @@ export type SlotStatus =
   | "failed"
   | "skipped";
 
-export type SlotChannel = "buffer" | "telegram" | "social";
+export type SlotChannel = "zernio" | "telegram" | "social";
 
 export interface AutoPostSlot {
   id: string;
