@@ -5,6 +5,9 @@ import {
   validCategoriesForScope,
   MEDIA_SCOPES,
   MEDIA_CATEGORIES,
+  toPortableOutputPath,
+  isCarouselStoragePath,
+  parseSiloMediaKey,
 } from "../../src/domain/media/paths.js";
 
 describe("media directory layout & paths", () => {
@@ -27,25 +30,65 @@ describe("media directory layout & paths", () => {
   });
 
   describe("categories", () => {
-    test("valid categories for shared include aleatorias and listo", () => {
+    test("valid categories for shared include random only", () => {
       const sharedCategories = validCategoriesForScope("shared");
-      assert.ok(sharedCategories.includes("aleatorias"));
-      assert.ok(sharedCategories.includes("listo"));
+      assert.deepEqual(Array.from(sharedCategories), ["random"]);
     });
 
-    test("valid categories for role scopes include capas and aleatorias", () => {
+    test("valid categories for role scopes include cover and random only", () => {
       const womanCategories = validCategoriesForScope("single_woman");
-      assert.ok(womanCategories.includes("capas"));
-      assert.ok(womanCategories.includes("aleatorias"));
-      assert.ok(!womanCategories.includes("listo"));
+      assert.deepEqual(Array.from(womanCategories), ["cover", "random"]);
     });
 
-    test("MEDIA_CATEGORIES defines cover, random, listo, capas, aleatorias", () => {
-      assert.ok(MEDIA_CATEGORIES.includes("cover"));
-      assert.ok(MEDIA_CATEGORIES.includes("random"));
-      assert.ok(MEDIA_CATEGORIES.includes("listo"));
-      assert.ok(MEDIA_CATEGORIES.includes("capas"));
-      assert.ok(MEDIA_CATEGORIES.includes("aleatorias"));
+    test("MEDIA_CATEGORIES defines cover, random, listo only", () => {
+      assert.deepEqual(Array.from(MEDIA_CATEGORIES), ["cover", "random", "listo"]);
+    });
+  });
+
+  describe("parseSiloMediaKey", () => {
+    test("parses role/category/file and listo keys", () => {
+      assert.deepEqual(parseSiloMediaKey("couple_women/random/foto.jpg"), {
+        scope: "couple_women",
+        category: "random",
+        filename: "foto.jpg",
+        storage_path: "media/couple_women/random/foto.jpg",
+      });
+      assert.deepEqual(parseSiloMediaKey("shared/aleatorias/old.jpg"), {
+        scope: "shared",
+        category: "random",
+        filename: "old.jpg",
+        storage_path: "media/shared/random/old.jpg",
+      });
+      assert.deepEqual(parseSiloMediaKey("listo/brand.png"), {
+        scope: "listo",
+        category: "listo",
+        filename: "brand.png",
+        storage_path: "media/listo/brand.png",
+      });
+      assert.equal(parseSiloMediaKey("readme.txt"), null);
+      assert.equal(parseSiloMediaKey("unknown/cover/x.jpg"), null);
+    });
+  });
+
+  describe("portable output paths", () => {
+    test("toPortableOutputPath stores output/ relative keys", () => {
+      assert.equal(
+        toPortableOutputPath("/app/backend/output/2026-11-16/acc/post_01", "/app/backend/output"),
+        "output/2026-11-16/acc/post_01"
+      );
+      assert.equal(
+        toPortableOutputPath(
+          "/app/backend/output/2026-11-16/acc/post_01/slide_2.jpg",
+          "/app/backend/output"
+        ),
+        "output/2026-11-16/acc/post_01/slide_2.jpg"
+      );
+    });
+
+    test("isCarouselStoragePath detects absolute and portable output paths", () => {
+      assert.equal(isCarouselStoragePath("output/2026-11-16/acc/post_01/slide_1.jpg"), true);
+      assert.equal(isCarouselStoragePath("/app/backend/output/2026-11-16/acc/post_01/slide_1.jpg"), true);
+      assert.equal(isCarouselStoragePath("media/shared/random/x.jpg"), false);
     });
   });
 
