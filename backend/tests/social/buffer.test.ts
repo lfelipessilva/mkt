@@ -25,34 +25,44 @@ describe("BufferPublisherAdapter", () => {
       globalThis.fetch = async (url: any, options: any) => {
         capturedUrl = url.toString();
         capturedOptions = options;
+        const body = JSON.parse(options.body);
+
+        if (body.query.includes("GetOrganizations")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: {
+                account: {
+                  organizations: [{ id: "org_1", name: "Org 1" }],
+                },
+              },
+            }),
+          } as any;
+        }
+
         return {
           ok: true,
           status: 200,
           json: async () => ({
             data: {
-              account: {
-                organizations: [
-                  {
-                    channels: [
-                      {
-                        id: "chan_instagram",
-                        service: "instagram",
-                        name: "instaprofile",
-                      },
-                      {
-                        id: "chan_tiktok_1",
-                        service: "tiktok",
-                        name: "tiktok_user_1",
-                      },
-                      {
-                        id: "chan_tiktok_2",
-                        service: "tiktok",
-                        name: "TikTokProfile2",
-                      },
-                    ],
-                  },
-                ],
-              },
+              channels: [
+                {
+                  id: "chan_instagram",
+                  service: "instagram",
+                  name: "instaprofile",
+                },
+                {
+                  id: "chan_tiktok_1",
+                  service: "tiktok",
+                  name: "tiktok_user_1",
+                },
+                {
+                  id: "chan_tiktok_2",
+                  service: "tiktok",
+                  name: "TikTokProfile2",
+                },
+              ],
             },
           }),
         } as any;
@@ -86,24 +96,33 @@ describe("BufferPublisherAdapter", () => {
     });
 
     it("enforces max 3 active accounts guardrail (Free tier)", async () => {
-      globalThis.fetch = async () => {
+      globalThis.fetch = async (_url: any, options: any) => {
+        const body = JSON.parse(options.body);
+        if (body.query.includes("GetOrganizations")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              data: {
+                account: {
+                  organizations: [{ id: "org_1", name: "Org 1" }],
+                },
+              },
+            }),
+          } as any;
+        }
+
         return {
           ok: true,
           status: 200,
           json: async () => ({
             data: {
-              account: {
-                organizations: [
-                  {
-                    channels: [
-                      { id: "tt1", service: "tiktok", name: "tt1" },
-                      { id: "tt2", service: "tiktok", name: "tt2" },
-                      { id: "tt3", service: "tiktok", name: "tt3" },
-                      { id: "tt4", service: "tiktok", name: "tt4" },
-                    ],
-                  },
-                ],
-              },
+              channels: [
+                { id: "tt1", service: "tiktok", name: "tt1" },
+                { id: "tt2", service: "tiktok", name: "tt2" },
+                { id: "tt3", service: "tiktok", name: "tt3" },
+                { id: "tt4", service: "tiktok", name: "tt4" },
+              ],
             },
           }),
         } as any;
