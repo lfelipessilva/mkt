@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   isValidRole,
   validateAccountInput,
+  getBufferLinkageStatus,
   ACCOUNT_ROLES,
 } from "./types";
 import {
@@ -270,6 +271,31 @@ describe("Accounts configuration & CRUD", () => {
       });
       assert.equal(result.external_account_id, "buffer-channel-xyz");
       assert.equal(result.social_provider, "buffer");
+    });
+
+    it("getBufferLinkageStatus returns correct label and linkage state", () => {
+      const unlinked = getBufferLinkageStatus({
+        id: "acc_1",
+        persona: "Persona",
+        role: "single_woman",
+        enabled: true,
+      });
+      assert.equal(unlinked.isLinked, false);
+      assert.equal(unlinked.label, "Não vinculado");
+      assert.equal(unlinked.externalAccountId, null);
+
+      const linked = getBufferLinkageStatus({
+        id: "acc_2",
+        persona: "Persona",
+        role: "single_woman",
+        enabled: true,
+        external_account_id: "buf_chan_123",
+        social_provider: "buffer",
+      });
+      assert.equal(linked.isLinked, true);
+      assert.equal(linked.label, "Buffer (buf_chan_123)");
+      assert.equal(linked.externalAccountId, "buf_chan_123");
+      assert.equal(linked.provider, "buffer");
     });
   });
 });

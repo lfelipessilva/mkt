@@ -65,6 +65,21 @@ export interface SyncAccountsResult {
   }>;
 }
 
+export function getBufferLinkageStatus(account: Account): {
+  isLinked: boolean;
+  label: string;
+  externalAccountId: string | null;
+  provider: string | null;
+} {
+  const isLinked = Boolean(account.external_account_id && account.external_account_id.trim());
+  return {
+    isLinked,
+    label: isLinked ? `Buffer (${account.external_account_id})` : "Não vinculado",
+    externalAccountId: account.external_account_id || null,
+    provider: account.social_provider || null,
+  };
+}
+
 export function validateAccountInput(input: {
   id?: string;
   role?: string;
