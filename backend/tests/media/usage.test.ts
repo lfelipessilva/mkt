@@ -28,7 +28,7 @@ describe("Task 10: Usage in Postgres & rotation", { timeout: 60000 }, () => {
   let tmpMediaDir: string;
 
   before(async () => {
-    let connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.TEST_DATABASE_URL;
 
     if (!connectionString) {
       container = await new PostgreSqlContainer("postgres:16-alpine").start();
@@ -333,6 +333,28 @@ describe("Task 10: Usage in Postgres & rotation", { timeout: 60000 }, () => {
           category: "capas",
           storage_path: "media/single_woman/capas/woman_capa_2.jpg",
           filename: "woman_capa_2.jpg",
+        },
+        pool
+      );
+
+      // Random & listo assets for selection
+      for (const name of ["woman_aleat_1.jpg", "woman_aleat_2.jpg", "woman_aleat_3.jpg"]) {
+        await upsertMediaAsset(
+          {
+            scope: "single_woman",
+            category: "random",
+            storage_path: `media/single_woman/random/${name}`,
+            filename: name,
+          },
+          pool
+        );
+      }
+      await upsertMediaAsset(
+        {
+          scope: "listo",
+          category: "listo",
+          storage_path: "media/listo/listo_1.png",
+          filename: "listo_1.png",
         },
         pool
       );

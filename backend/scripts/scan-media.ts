@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { scanMediaToDb } from "../src/domain/media/store.js";
-import { getMediaRoot } from "../src/domain/media/paths.js";
+import { scanSiloMediaToDb } from "../src/domain/media/store.js";
+import { isSiloEnabled } from "../src/shared/storage/silo.js";
 import { closePool, getPool } from "../src/shared/db/client.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -11,12 +11,16 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 dotenv.config();
 
 async function main() {
-  const mediaRoot = getMediaRoot();
-  console.log(`[media:scan] Scanning media root: ${mediaRoot}`);
   const pool = getPool();
   try {
-    const count = await scanMediaToDb(mediaRoot, pool);
-    console.log(`[media:scan] Completed: ${count} media assets scanned/upserted.`);
+    if (!isSiloEnabled()) {
+      console.warn("[media:scan] Silo is not enabled. Skipping scan.");
+      return;
+    }
+
+    console.log("[media:scan] Scanning Silo media bucket (source of truth)...");
+    const siloCount = await scanSiloMediaToDb(pool);
+    console.log(`[media:scan] Silo: ${siloCount} media assets scanned/upserted.`);
   } finally {
     await closePool();
   }

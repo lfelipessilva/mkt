@@ -15,7 +15,7 @@ npm install
 npm run build
 npm run db:migrate
 npm run db:seed    # Opcional: inicializa contas, arquétipos e baits a partir de config/
-npm run media:scan # Opcional: escaneia a pasta media/ para indexar imagens no banco
+npm run media:scan # Opcional: sincroniza objetos do Silo (MinIO) para indexar imagens no banco media_assets
 
 # PM2 (executa backend/dist/index.js)
 pm2 start ecosystem.config.cjs
@@ -46,8 +46,7 @@ Painel Web: `http://localhost:3000/`
 | `TELEGRAM_ALLOWED_USER_IDS` | IDs autorizados no Telegram (separados por vírgula) | `1234567,9876543` |
 | `CRON_SCHEDULE` | Expressão cron para geração agendada | `0 7,11,17 * * *` |
 | `TZ` | Timezone do agendador e timestamps | `America/Sao_Paulo` |
-| `MEDIA_ROOT` | Diretório raiz de mídias | `./media` |
-| `OUTPUT_DIR` | Diretório onde os carrosséis gerados são salvos | `./output` |
+| `OUTPUT_DIR` | Diretório temporário base onde os carrosséis são montados antes do upload ao Silo | `os.tmpdir()` / `./output` |
 | `USAGE_DAYS` | Janela de dias para deduplicação/rotação de imagens | `7` |
 | `DISPATCH_WEBHOOK_URL` | Webhook HTTP opcional para evento de envio/despacho | *(opcional)* |
 | `FRONTEND_DIST_DIR` | Caminho personalizado para os estáticos do frontend SPA | `frontend/dist` |
@@ -72,13 +71,13 @@ A plataforma suporta publicação automática de carrosséis gerados para perfis
 
 ## Estrutura de Mídia e Silo (MinIO)
 
-As mídias são organizadas por escopo e categoria (tanto localmente quanto no bucket `media` do Silo):
+As mídias são organizadas por escopo e categoria exclusivamente no bucket `media` do Silo:
 - `media/<role>/cover/` (`single_woman`, `single_man`, `couple_women`, `couple_men`)
 - `media/<role>/random/`
 - `media/shared/random/`
 - `media/listo/` (escopo separado direto sob `media/listo/`)
 
-Os carrosséis gerados (slides renderizados e `meta.json`) são armazenados no bucket `carousels` do Silo e em `./output`.
+Os carrosséis gerados (slides renderizados e `meta.json`) são armazenados de forma permanente no bucket `carousels` do Silo (com arquivos temporários em disco apenas durante a renderização e despacho).
 
 ## Telegram Bot
 

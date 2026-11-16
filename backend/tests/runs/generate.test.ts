@@ -11,7 +11,7 @@ import { closePool } from "../../src/shared/db/client.js";
 import { upsertAccount } from "../../src/domain/accounts/store.js";
 import { replaceArchetypesForScope } from "../../src/domain/archetypes/store.js";
 import { replaceBaitsForScope } from "../../src/domain/baits/store.js";
-import { scanMediaToDb, recentlyUsedFilenames } from "../../src/domain/media/store.js";
+import { upsertMediaAsset, recentlyUsedFilenames } from "../../src/domain/media/store.js";
 import { generateOneCarousel } from "../../src/domain/runs/generate.js";
 import {
   getCarouselRun,
@@ -66,7 +66,7 @@ describe("Task 11: Persist runs + slides on generate", { timeout: 60000 }, () =>
   };
 
   before(async () => {
-    let connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.TEST_DATABASE_URL;
 
     if (!connectionString) {
       container = await new PostgreSqlContainer("postgres:16-alpine").start();
@@ -154,8 +154,32 @@ describe("Task 11: Persist runs + slides on generate", { timeout: 60000 }, () =>
       pool
     );
 
-    // Scan media to DB
-    await scanMediaToDb(tmpMediaDir, pool);
+    // Seed media assets in DB
+    const seedMedia = [
+      { scope: "single_woman", category: "cover", filename: "capa_01.jpg", path: path.join(tmpMediaDir, "single_woman", "capas", "capa_01.jpg") },
+      { scope: "single_woman", category: "cover", filename: "capa_02.jpg", path: path.join(tmpMediaDir, "single_woman", "capas", "capa_02.jpg") },
+      { scope: "single_woman", category: "cover", filename: "capa_03.jpg", path: path.join(tmpMediaDir, "single_woman", "capas", "capa_03.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_01.jpg", path: path.join(tmpMediaDir, "single_woman", "aleatorias", "aleat_01.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_02.jpg", path: path.join(tmpMediaDir, "single_woman", "aleatorias", "aleat_02.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_03.jpg", path: path.join(tmpMediaDir, "single_woman", "aleatorias", "aleat_03.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_04.jpg", path: path.join(tmpMediaDir, "single_woman", "aleatorias", "aleat_04.jpg") },
+      { scope: "shared", category: "random", filename: "shared_01.jpg", path: path.join(tmpMediaDir, "shared", "aleatorias", "shared_01.jpg") },
+      { scope: "shared", category: "random", filename: "shared_02.jpg", path: path.join(tmpMediaDir, "shared", "aleatorias", "shared_02.jpg") },
+      { scope: "shared", category: "random", filename: "shared_03.jpg", path: path.join(tmpMediaDir, "shared", "aleatorias", "shared_03.jpg") },
+      { scope: "shared", category: "listo", filename: "listo_01.png", path: path.join(tmpMediaDir, "shared", "listo", "listo_01.png") },
+      { scope: "shared", category: "listo", filename: "listo_02.png", path: path.join(tmpMediaDir, "shared", "listo", "listo_02.png") },
+    ];
+    for (const m of seedMedia) {
+      await upsertMediaAsset(
+        {
+          scope: m.scope as any,
+          category: m.category as any,
+          storage_path: m.path,
+          filename: m.filename,
+        },
+        pool
+      );
+    }
   });
 
   after(async () => {
@@ -234,15 +258,22 @@ describe("Task 11: Persist runs + slides on generate", { timeout: 60000 }, () =>
       );
       assert.equal(dbUsageResult.rows.length, run.slides.length);
 
+      assert.ok(run.output_dir!.startsWith("output/"), "output_dir should be portable");
+      assert.ok(
+        run.slides!.every((s) => s.storage_path.startsWith("output/")),
+        "slide storage_path should be portable"
+      );
+
       // 5. Verify filesystem: meta.json exists under output_dir
-      assert.ok(fs.existsSync(run.output_dir!));
-      const metaPath = path.join(run.output_dir!, "meta.json");
+      const absOutDir = path.join(tmpOutputDir, run.output_dir!.replace(/^output\//, ""));
+      assert.ok(fs.existsSync(absOutDir));
+      const metaPath = path.join(absOutDir, "meta.json");
       assert.ok(fs.existsSync(metaPath), "meta.json should be written");
       const metaContent = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
       assert.equal(metaContent.copy.tema_escolhido, mockCopy.tema_escolhido);
 
       // Verify that slide images were NOT rendered because skipRender was true
-      const slide1Path = path.join(run.output_dir!, "slide_1.jpg");
+      const slide1Path = path.join(absOutDir, "slide_1.jpg");
       assert.equal(fs.existsSync(slide1Path), false, "slide_1.jpg should not exist when skipRender is true");
     });
   });
@@ -260,19 +291,21 @@ describe("Task 11: Persist runs + slides on generate", { timeout: 60000 }, () =>
 
       assert.equal(run.status, "generated");
       assert.ok(run.output_dir);
-      assert.ok(fs.existsSync(run.output_dir));
+      const absOutDir = path.join(tmpOutputDir, run.output_dir!.replace(/^output\//, ""));
+      assert.ok(fs.existsSync(absOutDir));
 
       // Verify each slide has a rendered image on disk
       for (const slide of run.slides!) {
-        assert.ok(fs.existsSync(slide.storage_path), `File should exist at ${slide.storage_path}`);
-        const meta = await sharp(slide.storage_path).metadata();
+        const absSlide = path.join(tmpOutputDir, slide.storage_path.replace(/^output\//, ""));
+        assert.ok(fs.existsSync(absSlide), `File should exist at ${absSlide}`);
+        const meta = await sharp(absSlide).metadata();
         assert.equal(meta.width, 1080);
         assert.equal(meta.height, 1920);
         assert.equal(meta.format, "jpeg");
       }
 
       // Verify meta.json exists
-      assert.ok(fs.existsSync(path.join(run.output_dir, "meta.json")));
+      assert.ok(fs.existsSync(path.join(absOutDir, "meta.json")));
     });
 
     it("increments postIndex directory on consecutive generations on same day", async () => {

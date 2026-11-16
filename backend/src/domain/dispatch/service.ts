@@ -1,7 +1,13 @@
+import fs from "node:fs";
+import path from "node:path";
 import type { Pool } from "pg";
 import { Api } from "grammy";
 import { getPool } from "../../shared/db/client.js";
 import { AppError } from "../../shared/errors.js";
+import {
+  isSiloEnabled,
+  downloadCarouselFromSilo,
+} from "../../shared/storage/silo.js";
 import {
   sendCarouselAlbum,
   type SendCarouselAlbumOptions,
@@ -11,6 +17,7 @@ import { getAccount } from "../accounts/store.js";
 import { getSocialPublisherProvider } from "../social/factory.js";
 import { resolveCarouselSlidePublicUrls } from "../social/urls.js";
 import type { SocialPublisherProvider } from "../social/types.js";
+import { safeResolveMediaPath } from "../media/paths.js";
 import type {
   DispatchChannel,
   DispatchEvent,
@@ -21,9 +28,12 @@ export type SendTelegramAlbumFn = (
   opts: SendCarouselAlbumOptions
 ) => Promise<void>;
 
+export type CarouselBytesLoader = (storagePath: string) => Promise<Buffer>;
+
 let customTelegramSender: SendTelegramAlbumFn | null = null;
 let customFetchFn: typeof fetch | null = null;
 let customSocialPublisherProvider: SocialPublisherProvider | null = null;
+let customCarouselLoader: CarouselBytesLoader | null = null;
 
 export function setTelegramSender(fn: SendTelegramAlbumFn | null): void {
   customTelegramSender = fn;
@@ -35,6 +45,10 @@ export function setFetchFn(fn: typeof fetch | null): void {
 
 export function setSocialPublisherProvider(provider: SocialPublisherProvider | null): void {
   customSocialPublisherProvider = provider;
+}
+
+export function setCarouselBytesLoader(fn: CarouselBytesLoader | null): void {
+  customCarouselLoader = fn;
 }
 
 export interface DispatchCarouselRunOptions {
@@ -49,6 +63,7 @@ export interface DispatchCarouselRunOptions {
   webhookUrl?: string;
   fetchFn?: typeof fetch;
   socialPublisherProvider?: SocialPublisherProvider;
+  carouselBytesLoader?: CarouselBytesLoader;
 }
 
 function mapDispatchEventRow(row: any): DispatchEvent {
@@ -113,9 +128,51 @@ export async function dispatchCarouselRun(
 
   // 2. Extract and sort slides
   const slides = (run.slides || []).slice().sort((a, b) => a.position - b.position);
-  const slidePaths = slides.map((s) => s.storage_path);
-  if (slidePaths.length === 0) {
+  if (slides.length === 0) {
     throw new AppError("Run has no slides to dispatch", 400, "no_slides");
+  }
+
+  // Ensure each slide is downloaded locally to temp before Telegram InputFile / dispatch
+  const loader = options.carouselBytesLoader || customCarouselLoader;
+  const slidePaths: string[] = [];
+
+  for (const s of slides) {
+    let localPath: string;
+    try {
+      localPath = safeResolveMediaPath(s.storage_path);
+    } catch {
+      localPath = s.storage_path;
+    }
+
+    if (!fs.existsSync(localPath)) {
+      let fileBuf: Buffer | null = null;
+      if (loader) {
+        fileBuf = await loader(s.storage_path);
+      } else if (isSiloEnabled()) {
+        try {
+          fileBuf = await downloadCarouselFromSilo(s.storage_path);
+        } catch (err: any) {
+          throw new AppError(
+            `Failed to download slide '${s.storage_path}' from Silo: ${err?.message || String(err)}`,
+            500,
+            "silo_download_failed"
+          );
+        }
+      }
+
+      if (fileBuf) {
+        fs.mkdirSync(path.dirname(localPath), { recursive: true });
+        fs.writeFileSync(localPath, fileBuf);
+      } else {
+        throw new AppError(
+          `Slide file '${s.storage_path}' not found on disk and Silo download unavailable`,
+          404,
+          "slide_not_found"
+        );
+      }
+    }
+
+    slidePaths.push(localPath);
   }
 
   // 3. Channel-specific validation & payload preparation

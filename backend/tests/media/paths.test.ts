@@ -5,6 +5,9 @@ import {
   validCategoriesForScope,
   MEDIA_SCOPES,
   MEDIA_CATEGORIES,
+  toPortableOutputPath,
+  isCarouselStoragePath,
+  parseSiloMediaKey,
 } from "../../src/domain/media/paths.js";
 
 describe("media directory layout & paths", () => {
@@ -27,85 +30,65 @@ describe("media directory layout & paths", () => {
   });
 
   describe("categories", () => {
-    test("valid categories for shared include aleatorias and listo", () => {
+    test("valid categories for shared include random only", () => {
       const sharedCategories = validCategoriesForScope("shared");
-      assert.ok(sharedCategories.includes("aleatorias"));
-      assert.ok(sharedCategories.includes("listo"));
+      assert.deepEqual(Array.from(sharedCategories), ["random"]);
     });
 
-    test("valid categories for role scopes include capas and aleatorias", () => {
+    test("valid categories for role scopes include cover and random only", () => {
       const womanCategories = validCategoriesForScope("single_woman");
-      assert.ok(womanCategories.includes("capas"));
-      assert.ok(womanCategories.includes("aleatorias"));
-      assert.ok(!womanCategories.includes("listo"));
+      assert.deepEqual(Array.from(womanCategories), ["cover", "random"]);
     });
 
-    test("MEDIA_CATEGORIES defines cover, random, listo, capas, aleatorias", () => {
-      assert.ok(MEDIA_CATEGORIES.includes("cover"));
-      assert.ok(MEDIA_CATEGORIES.includes("random"));
-      assert.ok(MEDIA_CATEGORIES.includes("listo"));
-      assert.ok(MEDIA_CATEGORIES.includes("capas"));
-      assert.ok(MEDIA_CATEGORIES.includes("aleatorias"));
+    test("MEDIA_CATEGORIES defines cover, random, listo only", () => {
+      assert.deepEqual(Array.from(MEDIA_CATEGORIES), ["cover", "random", "listo"]);
     });
   });
 
-  describe("migrateMediaDirs plan & execution", () => {
-    test("computeMediaMigrationPlans maps legacy directories to new role directories", async () => {
-      const { computeMediaMigrationPlans } = await import(
-        "../../scripts/migrate-media-dirs.js"
+  describe("parseSiloMediaKey", () => {
+    test("parses role/category/file and listo keys", () => {
+      assert.deepEqual(parseSiloMediaKey("couple_women/random/foto.jpg"), {
+        scope: "couple_women",
+        category: "random",
+        filename: "foto.jpg",
+        storage_path: "media/couple_women/random/foto.jpg",
+      });
+      assert.deepEqual(parseSiloMediaKey("shared/aleatorias/old.jpg"), {
+        scope: "shared",
+        category: "random",
+        filename: "old.jpg",
+        storage_path: "media/shared/random/old.jpg",
+      });
+      assert.deepEqual(parseSiloMediaKey("listo/brand.png"), {
+        scope: "listo",
+        category: "listo",
+        filename: "brand.png",
+        storage_path: "media/listo/brand.png",
+      });
+      assert.equal(parseSiloMediaKey("readme.txt"), null);
+      assert.equal(parseSiloMediaKey("unknown/cover/x.jpg"), null);
+    });
+  });
+
+  describe("portable output paths", () => {
+    test("toPortableOutputPath stores output/ relative keys", () => {
+      assert.equal(
+        toPortableOutputPath("/app/backend/output/2026-11-16/acc/post_01", "/app/backend/output"),
+        "output/2026-11-16/acc/post_01"
       );
-
-      const plans = computeMediaMigrationPlans("/test/media");
-      const mapped = new Map(plans.map((p: any) => [p.legacyDir, p]));
-
-      assert.equal(mapped.get("mulher")?.targetScope, "single_woman");
-      assert.equal(mapped.get("homem")?.targetScope, "single_man");
-      assert.equal(mapped.get("casal")?.targetScope, "couple_women");
-      assert.equal(mapped.get("casal")?.isAmbiguous, true);
+      assert.equal(
+        toPortableOutputPath(
+          "/app/backend/output/2026-11-16/acc/post_01/slide_2.jpg",
+          "/app/backend/output"
+        ),
+        "output/2026-11-16/acc/post_01/slide_2.jpg"
+      );
     });
 
-    test("executeMediaMigration physically moves legacy directories and logs ambiguous warning", async () => {
-      const fs = await import("node:fs");
-      const path = await import("node:path");
-      const os = await import("node:os");
-      const { executeMediaMigration } = await import(
-        "../../scripts/migrate-media-dirs.js"
-      );
-
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "media-test-"));
-      try {
-        fs.mkdirSync(path.join(tmpDir, "mulher", "capas"), { recursive: true });
-        fs.writeFileSync(path.join(tmpDir, "mulher", "capas", "test.jpg"), "dummy");
-
-        fs.mkdirSync(path.join(tmpDir, "homem", "aleatorias"), { recursive: true });
-        fs.writeFileSync(path.join(tmpDir, "homem", "aleatorias", "man.jpg"), "dummy");
-
-        fs.mkdirSync(path.join(tmpDir, "casal", "capas"), { recursive: true });
-        fs.writeFileSync(path.join(tmpDir, "casal", "capas", "couple.jpg"), "dummy");
-
-        const logged: string[] = [];
-        const warned: string[] = [];
-        const logger = {
-          log: (...args: any[]) => logged.push(args.join(" ")),
-          warn: (...args: any[]) => warned.push(args.join(" ")),
-        };
-
-        const result = executeMediaMigration(tmpDir, logger);
-
-        assert.equal(result.moved.length, 3);
-        assert.equal(result.ambiguous.length, 1);
-        assert.ok(warned.some((w) => w.includes("casal") && w.includes("couple_women")));
-
-        assert.ok(!fs.existsSync(path.join(tmpDir, "mulher")));
-        assert.ok(!fs.existsSync(path.join(tmpDir, "homem")));
-        assert.ok(!fs.existsSync(path.join(tmpDir, "casal")));
-
-        assert.ok(fs.existsSync(path.join(tmpDir, "single_woman", "capas", "test.jpg")));
-        assert.ok(fs.existsSync(path.join(tmpDir, "single_man", "aleatorias", "man.jpg")));
-        assert.ok(fs.existsSync(path.join(tmpDir, "couple_women", "capas", "couple.jpg")));
-      } finally {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-      }
+    test("isCarouselStoragePath detects absolute and portable output paths", () => {
+      assert.equal(isCarouselStoragePath("output/2026-11-16/acc/post_01/slide_1.jpg"), true);
+      assert.equal(isCarouselStoragePath("/app/backend/output/2026-11-16/acc/post_01/slide_1.jpg"), true);
+      assert.equal(isCarouselStoragePath("media/shared/random/x.jpg"), false);
     });
   });
 });

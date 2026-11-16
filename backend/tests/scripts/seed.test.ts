@@ -22,7 +22,7 @@ describe("Task 14: Legacy seed CLI (seed-from-legacy)", { timeout: 60000 }, () =
   let tempFixtureDir: string;
 
   before(async () => {
-    let connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.TEST_DATABASE_URL;
 
     if (!connectionString) {
       container = await new PostgreSqlContainer("postgres:16-alpine").start();

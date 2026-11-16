@@ -1,16 +1,19 @@
-import fs from "node:fs";
 import path from "node:path";
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
 import { AppError } from "../../shared/errors.js";
-import { isSiloEnabled, deleteMediaFromSilo } from "../../shared/storage/silo.js";
+import {
+  isSiloEnabled,
+  deleteMediaFromSilo,
+  getSiloConfig,
+  listSiloObjectEntries,
+} from "../../shared/storage/silo.js";
 import type { ContentScope } from "../archetypes/schemas.js";
 import type { AccountRole } from "../accounts/schemas.js";
 import {
   MEDIA_SCOPES,
   validCategoriesForScope,
-  getMediaRoot,
-  safeResolveMediaPath,
+  parseSiloMediaKey,
   type MediaCategory,
 } from "./paths.js";
 import type { MediaAsset } from "./schemas.js";
@@ -79,123 +82,50 @@ export function extractImageDimensions(buffer: Buffer): {
 }
 
 /**
- * Scans disk media directory and upserts media_assets into Postgres.
+ * Lists objects from the Silo media bucket and upserts media_assets.
+ * Deactivates DB rows whose storage_path is not present in Silo.
  * Returns the count of upserted assets.
  */
-export async function scanMediaToDb(
-  mediaRoot?: string,
-  poolInstance?: Pool
-): Promise<number> {
-  const root = getMediaRoot(mediaRoot);
-  const p = poolInstance || getPool();
-
-  if (!fs.existsSync(root)) {
+export async function scanSiloMediaToDb(poolInstance?: Pool): Promise<number> {
+  if (!isSiloEnabled()) {
     return 0;
   }
 
+  const config = getSiloConfig();
+  if (!config) return 0;
+
+  const p = poolInstance || getPool();
+  const entries = await listSiloObjectEntries(config.mediaBucket);
+  const seenPaths = new Set<string>();
   let count = 0;
 
-  for (const scope of MEDIA_SCOPES) {
-    if (scope === "listo") {
-      const listoDir = path.join(root, "listo");
-      if (fs.existsSync(listoDir)) {
-        const entries = fs.readdirSync(listoDir, { withFileTypes: true });
-        for (const entry of entries) {
-          if (!entry.isFile() || entry.name.startsWith(".")) continue;
-          const ext = path.extname(entry.name).toLowerCase();
-          if (!SUPPORTED_IMAGE_EXTENSIONS.has(ext)) continue;
+  for (const entry of entries) {
+    const parsed = parseSiloMediaKey(entry.key);
+    if (!parsed) continue;
 
-          const filePath = path.join(listoDir, entry.name);
-          const stat = fs.statSync(filePath);
-          const storagePath = path.posix.join("media", "listo", entry.name);
+    seenPaths.add(parsed.storage_path);
+    await upsertMediaAsset(
+      {
+        scope: parsed.scope,
+        category: parsed.category,
+        storage_path: parsed.storage_path,
+        filename: parsed.filename,
+        byte_size: entry.size || null,
+        active: true,
+      },
+      p
+    );
+    count++;
+  }
 
-          let width: number | null = null;
-          let height: number | null = null;
-          try {
-            const fd = fs.openSync(filePath, "r");
-            const buffer = Buffer.alloc(Math.min(stat.size, 65536));
-            fs.readSync(fd, buffer, 0, buffer.length, 0);
-            fs.closeSync(fd);
-            const dims = extractImageDimensions(buffer);
-            width = dims.width;
-            height = dims.height;
-          } catch {
-            // Ignore dimension read errors
-          }
-
-          await p.query(
-            `INSERT INTO media_assets (scope, category, storage_path, filename, byte_size, width, height, active, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW())
-             ON CONFLICT (storage_path) DO UPDATE SET
-               scope = EXCLUDED.scope,
-               category = EXCLUDED.category,
-               filename = EXCLUDED.filename,
-               byte_size = EXCLUDED.byte_size,
-               width = COALESCE(EXCLUDED.width, media_assets.width),
-               height = COALESCE(EXCLUDED.height, media_assets.height),
-               active = true,
-               updated_at = NOW()`,
-            ["listo", "listo", storagePath, entry.name, stat.size, width, height]
-          );
-
-          count++;
-        }
-      }
-      continue;
-    }
-
-    const categories = validCategoriesForScope(scope);
-
-    for (const category of categories) {
-      const categoryDir = path.join(root, scope, category);
-      if (!fs.existsSync(categoryDir)) continue;
-
-      const entries = fs.readdirSync(categoryDir, { withFileTypes: true });
-
-      for (const entry of entries) {
-        if (!entry.isFile()) continue;
-        if (entry.name.startsWith(".")) continue; // Skip .gitkeep, .DS_Store, etc.
-
-        const ext = path.extname(entry.name).toLowerCase();
-        if (!SUPPORTED_IMAGE_EXTENSIONS.has(ext)) continue;
-
-        const filePath = path.join(categoryDir, entry.name);
-        const stat = fs.statSync(filePath);
-        const storagePath = path.posix.join("media", scope, category, entry.name);
-
-        let width: number | null = null;
-        let height: number | null = null;
-        try {
-          // Read up to 64KB for header parsing to conserve memory
-          const fd = fs.openSync(filePath, "r");
-          const buffer = Buffer.alloc(Math.min(stat.size, 65536));
-          fs.readSync(fd, buffer, 0, buffer.length, 0);
-          fs.closeSync(fd);
-          const dims = extractImageDimensions(buffer);
-          width = dims.width;
-          height = dims.height;
-        } catch {
-          // Ignore dimension read errors
-        }
-
-        await p.query(
-          `INSERT INTO media_assets (scope, category, storage_path, filename, byte_size, width, height, active, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, true, NOW())
-           ON CONFLICT (storage_path) DO UPDATE SET
-             scope = EXCLUDED.scope,
-             category = EXCLUDED.category,
-             filename = EXCLUDED.filename,
-             byte_size = EXCLUDED.byte_size,
-             width = COALESCE(EXCLUDED.width, media_assets.width),
-             height = COALESCE(EXCLUDED.height, media_assets.height),
-             active = true,
-             updated_at = NOW()`,
-          [scope, category, storagePath, entry.name, stat.size, width, height]
-        );
-
-        count++;
-      }
-    }
+  if (seenPaths.size > 0) {
+    await p.query(
+      `UPDATE media_assets
+       SET active = false, updated_at = NOW()
+       WHERE active = true
+         AND NOT (storage_path = ANY($1::text[]))`,
+      [Array.from(seenPaths)]
+    );
   }
 
   return count;
@@ -247,6 +177,37 @@ export async function listMediaAssets(
 
   const result = await p.query(query, params);
   return result.rows.map(mapMediaAssetRow);
+}
+
+/**
+ * Lists active media assets for given scopes and category, mapped to { filename, path }.
+ * Slide path matches storage_path.
+ */
+export async function listActiveMediaImages(
+  scopes: (ContentScope | string)[],
+  category: MediaCategory | string,
+  poolInstance?: Pool
+): Promise<Array<{ filename: string; path: string }>> {
+  const p = poolInstance || getPool();
+  const canonical =
+    category === "capas" ? "cover" : category === "aleatorias" ? "random" : category;
+  const result = await p.query<{ filename: string; storage_path: string }>(
+    `SELECT filename, storage_path
+     FROM media_assets
+     WHERE active = true
+       AND scope::text = ANY($1::text[])
+       AND (
+         category = $2
+         OR ($2 = 'cover' AND category = 'capas')
+         OR ($2 = 'random' AND category = 'aleatorias')
+       )
+     ORDER BY filename ASC`,
+    [scopes, canonical]
+  );
+  return result.rows.map((row) => ({
+    filename: row.filename,
+    path: row.storage_path,
+  }));
 }
 
 /**
@@ -310,11 +271,11 @@ export async function upsertMediaAsset(
 }
 
 /**
- * Deletes a media asset from Postgres and deletes its file from disk.
+ * Deletes a media asset from Postgres and Silo.
  */
 export async function deleteMediaAsset(
   storagePath: string,
-  mediaRoot?: string,
+  _mediaRoot?: string,
   poolInstance?: Pool
 ): Promise<void> {
   const p = poolInstance || getPool();
@@ -326,17 +287,6 @@ export async function deleteMediaAsset(
 
   // Delete from Postgres
   await p.query("DELETE FROM media_assets WHERE id = $1", [asset.id]);
-
-  // Remove physical file from disk if it exists
-  try {
-    const diskPath = safeResolveMediaPath(asset.storage_path, mediaRoot);
-    if (fs.existsSync(diskPath)) {
-      fs.unlinkSync(diskPath);
-    }
-  } catch (err) {
-    // If safeResolve fails or file doesn't exist, log and proceed
-    console.warn(`[media:delete] Could not unlink disk file for '${storagePath}':`, err);
-  }
 
   // Remove from Silo if enabled
   if (isSiloEnabled()) {

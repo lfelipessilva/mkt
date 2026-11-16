@@ -11,7 +11,7 @@ describe('Database migrations', { timeout: 60000 }, () => {
   let pool: pg.Pool;
 
   before(async () => {
-    let connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.TEST_DATABASE_URL;
 
     if (!connectionString) {
       container = await new PostgreSqlContainer('postgres:16-alpine').start();

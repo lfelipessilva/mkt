@@ -11,7 +11,7 @@ import { closePool } from "../../src/shared/db/client.js";
 import { upsertAccount } from "../../src/domain/accounts/store.js";
 import { replaceArchetypesForScope } from "../../src/domain/archetypes/store.js";
 import { replaceBaitsForScope } from "../../src/domain/baits/store.js";
-import { scanMediaToDb } from "../../src/domain/media/store.js";
+import { upsertMediaAsset } from "../../src/domain/media/store.js";
 import { generateBatch } from "../../src/domain/runs/generate.js";
 import { isAutoDispatchEnabled, runCronTick } from "../../src/cron.js";
 import { withJobLock, getJobStatus } from "../../src/jobLock.js";
@@ -89,23 +89,34 @@ describe("Task 13: Cron, bot, auto-dispatch hooks", { timeout: 60000 }, () => {
     process.env.MEDIA_ROOT = tmpMediaDir;
     process.env.OUTPUT_DIR = tmpOutputDir;
 
-    // Shared media
-    await createBlankImage(path.join(tmpMediaDir, "shared/aleatorias/aleat_03.jpg"));
-    await createBlankImage(path.join(tmpMediaDir, "shared/aleatorias/aleat_04.jpg"));
-    await createBlankImage(path.join(tmpMediaDir, "shared/aleatorias/aleat_05.jpg"));
-    await createBlankImage(path.join(tmpMediaDir, "shared/listo/listo_01.png"));
+    const seedMedia = [
+      // Shared media
+      { scope: "shared", category: "random", filename: "aleat_03.jpg", path: path.join(tmpMediaDir, "shared/random/aleat_03.jpg") },
+      { scope: "shared", category: "random", filename: "aleat_04.jpg", path: path.join(tmpMediaDir, "shared/random/aleat_04.jpg") },
+      { scope: "shared", category: "random", filename: "aleat_05.jpg", path: path.join(tmpMediaDir, "shared/random/aleat_05.jpg") },
+      { scope: "shared", category: "listo", filename: "listo_01.png", path: path.join(tmpMediaDir, "shared/listo/listo_01.png") },
+      // Woman media
+      { scope: "single_woman", category: "cover", filename: "capa_01.jpg", path: path.join(tmpMediaDir, "single_woman/cover/capa_01.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_01.jpg", path: path.join(tmpMediaDir, "single_woman/random/aleat_01.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_02.jpg", path: path.join(tmpMediaDir, "single_woman/random/aleat_02.jpg") },
+      // Man media
+      { scope: "single_man", category: "cover", filename: "capa_man_01.jpg", path: path.join(tmpMediaDir, "single_man/cover/capa_man_01.jpg") },
+      { scope: "single_man", category: "random", filename: "aleat_man_01.jpg", path: path.join(tmpMediaDir, "single_man/random/aleat_man_01.jpg") },
+      { scope: "single_man", category: "random", filename: "aleat_man_02.jpg", path: path.join(tmpMediaDir, "single_man/random/aleat_man_02.jpg") },
+    ];
 
-    // Woman media
-    await createBlankImage(path.join(tmpMediaDir, "single_woman/capas/capa_01.jpg"));
-    await createBlankImage(path.join(tmpMediaDir, "single_woman/aleatorias/aleat_01.jpg"));
-    await createBlankImage(path.join(tmpMediaDir, "single_woman/aleatorias/aleat_02.jpg"));
-
-    // Man media
-    await createBlankImage(path.join(tmpMediaDir, "single_man/capas/capa_man_01.jpg"));
-    await createBlankImage(path.join(tmpMediaDir, "single_man/aleatorias/aleat_man_01.jpg"));
-    await createBlankImage(path.join(tmpMediaDir, "single_man/aleatorias/aleat_man_02.jpg"));
-
-    await scanMediaToDb(tmpMediaDir, pool);
+    for (const m of seedMedia) {
+      await createBlankImage(m.path);
+      await upsertMediaAsset(
+        {
+          scope: m.scope as any,
+          category: m.category as any,
+          storage_path: m.path,
+          filename: m.filename,
+        },
+        pool
+      );
+    }
 
     // Seed content
     await replaceArchetypesForScope(

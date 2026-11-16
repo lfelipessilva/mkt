@@ -2,7 +2,8 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { buildApp } from "./app.js";
-import { scanMediaToDb } from "./domain/media/store.js";
+import { scanSiloMediaToDb } from "./domain/media/store.js";
+import { isSiloEnabled } from "./shared/storage/silo.js";
 import { createBot } from "./bot.js";
 import { startCron } from "./cron.js";
 
@@ -19,11 +20,13 @@ export const app = buildApp();
 
 export async function start() {
   try {
-    // Scan media into database on dev startup
+    // Scan media into database on dev startup if Silo enabled
     if (process.env.NODE_ENV !== "test" && process.env.NODE_ENV !== "production") {
       try {
-        const scanned = await scanMediaToDb();
-        console.log(`[media:scan] Initial dev scan synced ${scanned} assets to database`);
+        if (isSiloEnabled()) {
+          const scanned = await scanSiloMediaToDb();
+          console.log(`[media:scan] Initial dev scan synced ${scanned} assets to database`);
+        }
       } catch (scanErr) {
         console.warn("[media:scan] Initial dev scan skipped or failed:", scanErr);
       }

@@ -1,12 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import {
-  resolveMediaForRole,
   unionImages,
-  allMediaImageDirs,
   selectCarousel,
   selectCarouselForAccount,
   categoryPrefix,
@@ -14,94 +9,177 @@ import {
 } from "../../src/pipeline/select.js";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import pg from "pg";
-import { getPool, closePool } from "../../src/shared/db/client.js";
+import { closePool } from "../../src/shared/db/client.js";
 import { runMigrations } from "../../src/shared/db/migrate.js";
 import { upsertAccount } from "../../src/domain/accounts/store.js";
 import { replaceArchetypesForScope } from "../../src/domain/archetypes/store.js";
 import { replaceBaitsForScope } from "../../src/domain/baits/store.js";
+import { upsertMediaAsset } from "../../src/domain/media/store.js";
 
-describe("pipeline: selection with role scopes", () => {
-  let tmpMediaRoot: string;
+describe("pipeline: selection with role scopes & media_assets DB", { timeout: 60000 }, () => {
+  let container: StartedPostgreSqlContainer | null = null;
+  let pool: pg.Pool;
 
   before(async () => {
-    tmpMediaRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pipeline-select-test-"));
+    let connectionString = process.env.TEST_DATABASE_URL;
 
-    // Set up directories
-    const dirs = [
-      path.join(tmpMediaRoot, "single_woman", "capas"),
-      path.join(tmpMediaRoot, "single_woman", "aleatorias"),
-      path.join(tmpMediaRoot, "single_man", "capas"),
-      path.join(tmpMediaRoot, "single_man", "aleatorias"),
-      path.join(tmpMediaRoot, "shared", "aleatorias"),
-      path.join(tmpMediaRoot, "shared", "listo"),
-    ];
-    for (const d of dirs) {
-      fs.mkdirSync(d, { recursive: true });
+    if (!connectionString) {
+      container = await new PostgreSqlContainer("postgres:16-alpine").start();
+      connectionString = container.getConnectionUri();
+      process.env.DATABASE_URL = connectionString;
     }
 
-    // Populate dummy images
-    fs.writeFileSync(path.join(tmpMediaRoot, "single_woman", "capas", "capa_w1.jpg"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "single_woman", "capas", "capa_w2.jpg"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "single_woman", "aleatorias", "mercado_01.jpg"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "single_woman", "aleatorias", "casa_01.jpg"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "single_woman", "aleatorias", "dupe_01.jpg"), "dummy");
+    pool = new pg.Pool({ connectionString });
+    await runMigrations(pool);
 
-    fs.writeFileSync(path.join(tmpMediaRoot, "single_man", "capas", "capa_m1.jpg"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "single_man", "aleatorias", "carro_01.jpg"), "dummy");
+    // Seed test media assets into media_assets table
+    // single_woman cover
+    await upsertMediaAsset(
+      {
+        scope: "single_woman",
+        category: "cover",
+        storage_path: "media/single_woman/cover/cover_w1.jpg",
+        filename: "cover_w1.jpg",
+      },
+      pool
+    );
+    await upsertMediaAsset(
+      {
+        scope: "single_woman",
+        category: "cover",
+        storage_path: "media/single_woman/cover/cover_w2.jpg",
+        filename: "cover_w2.jpg",
+      },
+      pool
+    );
 
-    fs.writeFileSync(path.join(tmpMediaRoot, "shared", "aleatorias", "dupe_01.jpg"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "shared", "aleatorias", "livro_01.jpg"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "shared", "listo", "listo_01.png"), "dummy");
-    fs.writeFileSync(path.join(tmpMediaRoot, "shared", "listo", "listo_02.png"), "dummy");
+    // single_woman random
+    await upsertMediaAsset(
+      {
+        scope: "single_woman",
+        category: "random",
+        storage_path: "media/single_woman/random/mercado_01.jpg",
+        filename: "mercado_01.jpg",
+      },
+      pool
+    );
+    await upsertMediaAsset(
+      {
+        scope: "single_woman",
+        category: "random",
+        storage_path: "media/single_woman/random/casa_01.jpg",
+        filename: "casa_01.jpg",
+      },
+      pool
+    );
+    await upsertMediaAsset(
+      {
+        scope: "single_woman",
+        category: "random",
+        storage_path: "media/single_woman/random/dupe_01.jpg",
+        filename: "dupe_01.jpg",
+      },
+      pool
+    );
+
+    // single_man cover & random (to verify role isolation)
+    await upsertMediaAsset(
+      {
+        scope: "single_man",
+        category: "cover",
+        storage_path: "media/single_man/cover/cover_m1.jpg",
+        filename: "cover_m1.jpg",
+      },
+      pool
+    );
+    await upsertMediaAsset(
+      {
+        scope: "single_man",
+        category: "random",
+        storage_path: "media/single_man/random/carro_01.jpg",
+        filename: "carro_01.jpg",
+      },
+      pool
+    );
+
+    // shared random
+    await upsertMediaAsset(
+      {
+        scope: "shared",
+        category: "random",
+        storage_path: "media/shared/random/dupe_01.jpg",
+        filename: "dupe_01.jpg",
+      },
+      pool
+    );
+    await upsertMediaAsset(
+      {
+        scope: "shared",
+        category: "random",
+        storage_path: "media/shared/random/livro_01.jpg",
+        filename: "livro_01.jpg",
+      },
+      pool
+    );
+    await upsertMediaAsset(
+      {
+        scope: "shared",
+        category: "random",
+        storage_path: "media/shared/random/cafe_01.jpg",
+        filename: "cafe_01.jpg",
+      },
+      pool
+    );
+
+    // listo (scope "listo")
+    await upsertMediaAsset(
+      {
+        scope: "listo",
+        category: "listo",
+        storage_path: "media/listo/listo_01.png",
+        filename: "listo_01.png",
+      },
+      pool
+    );
+    await upsertMediaAsset(
+      {
+        scope: "listo",
+        category: "listo",
+        storage_path: "media/listo/listo_02.png",
+        filename: "listo_02.png",
+      },
+      pool
+    );
   });
 
-  after(() => {
-    if (tmpMediaRoot && fs.existsSync(tmpMediaRoot)) {
-      fs.rmSync(tmpMediaRoot, { recursive: true, force: true });
+  after(async () => {
+    await closePool();
+    if (pool) {
+      await pool.end();
     }
-  });
-
-  describe("resolveMediaForRole & directory mapping", () => {
-    it("resolves paths for valid account_role enum", () => {
-      const dirs = resolveMediaForRole(tmpMediaRoot, "single_woman");
-      assert.equal(dirs.capas, path.join(tmpMediaRoot, "single_woman", "capas"));
-      assert.equal(dirs.aleatoriasRole, path.join(tmpMediaRoot, "single_woman", "aleatorias"));
-      assert.equal(dirs.aleatoriasShared, path.join(tmpMediaRoot, "shared", "aleatorias"));
-      assert.equal(dirs.listo, path.join(tmpMediaRoot, "shared", "listo"));
-    });
-
-    it("throws for invalid or legacy mediaRole strings", () => {
-      assert.throws(() => {
-        // @ts-expect-error test runtime validation
-        resolveMediaForRole(tmpMediaRoot, "mulher");
-      }, /role inválido/);
-
-      assert.throws(() => {
-        // @ts-expect-error test runtime validation
-        resolveMediaForRole(tmpMediaRoot, "unknown");
-      }, /role inválido/);
-    });
-
-    it("allMediaImageDirs includes all 4 account roles and shared aleatorias", () => {
-      const dirs = allMediaImageDirs(tmpMediaRoot);
-      assert.equal(dirs.length, 5);
-      assert.ok(dirs.includes(path.join(tmpMediaRoot, "single_man", "aleatorias")));
-      assert.ok(dirs.includes(path.join(tmpMediaRoot, "single_woman", "aleatorias")));
-      assert.ok(dirs.includes(path.join(tmpMediaRoot, "couple_men", "aleatorias")));
-      assert.ok(dirs.includes(path.join(tmpMediaRoot, "couple_women", "aleatorias")));
-      assert.ok(dirs.includes(path.join(tmpMediaRoot, "shared", "aleatorias")));
-    });
+    if (container) {
+      await container.stop();
+    }
   });
 
   describe("unionImages & helpers", () => {
     it("deduplicates images across pools by filename", () => {
-      const pool1 = [{ filename: "a.jpg", path: "/1/a.jpg" }, { filename: "b.jpg", path: "/1/b.jpg" }];
-      const pool2 = [{ filename: "b.jpg", path: "/2/b.jpg" }, { filename: "c.jpg", path: "/2/c.jpg" }];
+      const pool1 = [
+        { filename: "a.jpg", path: "media/shared/random/a.jpg" },
+        { filename: "b.jpg", path: "media/1/random/b.jpg" },
+      ];
+      const pool2 = [
+        { filename: "b.jpg", path: "media/2/random/b.jpg" },
+        { filename: "c.jpg", path: "media/shared/random/c.jpg" },
+      ];
       const res = unionImages(pool1, pool2);
       assert.equal(res.length, 3);
-      assert.deepEqual(res.map((r) => r.filename), ["a.jpg", "b.jpg", "c.jpg"]);
+      assert.deepEqual(
+        res.map((r) => r.filename),
+        ["a.jpg", "b.jpg", "c.jpg"]
+      );
       // First pool wins on path
-      assert.equal(res[1].path, "/1/b.jpg");
+      assert.equal(res[1].path, "media/1/random/b.jpg");
     });
 
     it("extracts filename stem and category prefix", () => {
@@ -111,19 +189,19 @@ describe("pipeline: selection with role scopes", () => {
     });
   });
 
-  describe("selectCarousel role scoping behavior", () => {
-    it("selects capas from role only, aleatorias from role ∪ shared, and listo from shared only", () => {
+  describe("selectCarousel role scoping behavior from DB", () => {
+    it("selects cover from role only, random from role ∪ shared, and listo from listo scope", async () => {
       const archetypes = ["Compre aos poucos e economize", "Segredos do mercado"];
       const baits = ["Você nunca percebeu isso?"];
 
-      const selection = selectCarousel({
-        mediaRoot: tmpMediaRoot,
+      const selection = await selectCarousel({
+        pool,
         role: "single_woman",
         archetypes,
         baits,
         persona: "Mulher jovem independente",
         accountId: "test_acc",
-        aleatoriasCount: 3,
+        randomCount: 3,
       });
 
       assert.ok(selection);
@@ -133,34 +211,48 @@ describe("pipeline: selection with role scopes", () => {
 
       // Slides inspection
       const slides = selection.slides;
-      assert.ok(slides.length >= 4);
+      assert.equal(slides.length, 5); // 1 cover + 3 random + 1 listo
 
-      // Slide 1 must be capa from single_woman
-      const capaSlide = slides[0];
-      assert.equal(capaSlide.numero, 1);
-      assert.equal(capaSlide.isCapa, true);
-      assert.ok(capaSlide.path.includes(path.join("single_woman", "capas")));
+      // Slide 1 must be cover from single_woman
+      const coverSlide = slides[0];
+      assert.equal(coverSlide.numero, 1);
+      assert.equal(coverSlide.isCapa, true);
+      assert.ok(
+        coverSlide.path.startsWith("media/single_woman/cover/"),
+        `cover path was ${coverSlide.path}`
+      );
 
-      // Exactly one listo slide from shared/listo
+      // Exactly one listo slide from listo
       const listoSlides = slides.filter((s) => s.isListo);
       assert.equal(listoSlides.length, 1);
-      assert.ok(listoSlides[0].path.includes(path.join("shared", "listo")));
+      assert.ok(
+        listoSlides[0].path.startsWith("media/listo/"),
+        `listo path was ${listoSlides[0].path}`
+      );
 
-      // Aleatorias slides should only be from single_woman/aleatorias or shared/aleatorias
-      const aleatoriaSlides = slides.filter((s) => !s.isCapa && !s.isListo);
-      assert.equal(aleatoriaSlides.length, 3);
-      for (const s of aleatoriaSlides) {
-        const fromRole = s.path.includes(path.join("single_woman", "aleatorias"));
-        const fromShared = s.path.includes(path.join("shared", "aleatorias"));
-        assert.ok(fromRole || fromShared, `Slide ${s.filename} came from invalid path ${s.path}`);
+      // Random slides should only be from single_woman/random or shared/random
+      const randomSlides = slides.filter((s) => !s.isCapa && !s.isListo);
+      assert.equal(randomSlides.length, 3);
+      for (const s of randomSlides) {
+        const fromRole = s.path.startsWith("media/single_woman/random/");
+        const fromShared = s.path.startsWith("media/shared/random/");
+        assert.ok(
+          fromRole || fromShared,
+          `Slide ${s.filename} came from invalid path ${s.path}`
+        );
         assert.ok(!s.path.includes("single_man"), "Must not leak from other roles");
+      }
+
+      // Check each slide path matches storage_path
+      for (const s of slides) {
+        assert.ok(s.path.startsWith("media/"), `Path must be storage_path, got ${s.path}`);
       }
     });
 
-    it("throws if archetypes array is empty or missing", () => {
-      assert.throws(() => {
-        selectCarousel({
-          mediaRoot: tmpMediaRoot,
+    it("throws if archetypes array is empty or missing", async () => {
+      await assert.rejects(async () => {
+        await selectCarousel({
+          pool,
           role: "single_woman",
           archetypes: [],
           baits: [],
@@ -169,26 +261,35 @@ describe("pipeline: selection with role scopes", () => {
       }, /arquétipos ausentes/);
     });
 
-    it("throws if role has insufficient media", () => {
-      assert.throws(() => {
-        selectCarousel({
-          mediaRoot: tmpMediaRoot,
-          role: "couple_men", // empty folder
-          archetypes: ["Título 1"],
-          baits: [],
-        });
-      }, /mídia insuficiente/);
+    it("throws if role has insufficient media with cover/random/listo message", async () => {
+      await assert.rejects(
+        async () => {
+          await selectCarousel({
+            pool,
+            role: "couple_men", // no media seeded for couple_men
+            archetypes: ["Título 1"],
+            baits: [],
+          });
+        },
+        (err: any) => {
+          assert.match(err.message, /mídia insuficiente/);
+          assert.match(err.message, /cover=0/);
+          assert.match(err.message, /random=/);
+          assert.match(err.message, /listo=/);
+          return true;
+        }
+      );
     });
 
-    it("respects usage exclusion when available", () => {
+    it("respects usage exclusion when available", async () => {
       const archetypes = ["Título teste"];
       const usage = {
-        entries: [{ filename: "capa_w1.jpg", at: new Date().toISOString() }],
+        entries: [{ filename: "cover_w1.jpg", at: new Date().toISOString() }],
         baits: [],
       };
 
-      const selection = selectCarousel({
-        mediaRoot: tmpMediaRoot,
+      const selection = await selectCarousel({
+        pool,
         role: "single_woman",
         archetypes,
         baits: [],
@@ -196,39 +297,32 @@ describe("pipeline: selection with role scopes", () => {
         usageDays: 7,
       });
 
-      // Since capa_w1 was used, capa_w2 must be picked
-      assert.equal(selection.slides[0].filename, "capa_w2.jpg");
+      // Since cover_w1 was used, cover_w2 must be picked
+      assert.equal(selection.slides[0].filename, "cover_w2.jpg");
+    });
+
+    it("supports randomCount parameter with aleatoriasCount backwards-compat alias", async () => {
+      const archetypes = ["Título teste"];
+      const selectionWithRandom = await selectCarousel({
+        pool,
+        role: "single_woman",
+        archetypes,
+        randomCount: 3,
+      });
+      assert.equal(selectionWithRandom.slides.length, 5);
+
+      const selectionWithAleatorias = await selectCarousel({
+        pool,
+        role: "single_woman",
+        archetypes,
+        aleatoriasCount: 3,
+      });
+      assert.equal(selectionWithAleatorias.slides.length, 5);
     });
   });
 
   describe("selectCarouselForAccount with DB effective content", () => {
-    let container: StartedPostgreSqlContainer | null = null;
-    let pool: pg.Pool;
-
-    before(async () => {
-      let connectionString = process.env.DATABASE_URL;
-
-      if (!connectionString) {
-        container = await new PostgreSqlContainer("postgres:16-alpine").start();
-        connectionString = container.getConnectionUri();
-        process.env.DATABASE_URL = connectionString;
-      }
-
-      pool = new pg.Pool({ connectionString });
-      await runMigrations(pool);
-    });
-
-    after(async () => {
-      await closePool();
-      if (pool) {
-        await pool.end();
-      }
-      if (container) {
-        await container.stop();
-      }
-    });
-
-    it("loads account role, merged archetypes & baits, and returns selection", async () => {
+    it("loads account role, merged archetypes & baits, and returns selection from media_assets", async () => {
       await upsertAccount(
         {
           id: "acc_select_test",
@@ -258,9 +352,8 @@ describe("pipeline: selection with role scopes", () => {
       );
 
       const selection = await selectCarouselForAccount("acc_select_test", {
-        mediaRoot: tmpMediaRoot,
         pool,
-        aleatoriasCount: 3,
+        randomCount: 3,
       });
 
       assert.equal(selection.role, "single_woman");
@@ -270,14 +363,14 @@ describe("pipeline: selection with role scopes", () => {
         selection.arquetipoTitulo === "Shared Title 1" ||
           selection.arquetipoTitulo === "Role Title 1"
       );
-      assert.equal(selection.slides.length, 5); // 1 capa + 3 aleatorias + 1 listo
+      assert.equal(selection.slides.length, 5); // 1 cover + 3 random + 1 listo
+      assert.ok(selection.slides[0].path.startsWith("media/single_woman/cover/"));
     });
 
     it("throws 404 AppError if account does not exist", async () => {
       await assert.rejects(
         async () => {
           await selectCarouselForAccount("non_existent_account", {
-            mediaRoot: tmpMediaRoot,
             pool,
           });
         },
