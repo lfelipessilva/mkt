@@ -20,9 +20,14 @@ describe("GalleryPage: resolveGalleryTargetAccountIds", () => {
     { id: "acc_3", display_name: "Account Three", persona: "P3", role: "couple_men", enabled: true },
   ];
 
-  it("returns only the pinned account ID when selectedAccountId is specific", () => {
+  it("returns only the pinned account ID when selectedAccountId is specific and enabled", () => {
     const targets = resolveGalleryTargetAccountIds("acc_1", mockAccounts);
     assert.deepEqual(targets, ["acc_1"]);
+  });
+
+  it("returns empty array when pinned account is disabled", () => {
+    const targets = resolveGalleryTargetAccountIds("acc_2", mockAccounts);
+    assert.deepEqual(targets, []);
   });
 
   it("returns all enabled account IDs when selectedAccountId is 'all'", () => {
@@ -261,6 +266,126 @@ describe("GalleryPage: Generation trigger & execution logic", () => {
     assert.equal(success, false);
     assert.equal(refreshCalled, false);
     assert.ok(toasts.some((t) => t.type === "error" && t.message.includes("Erro ao gerar carrossel")));
+  });
+
+  it("handles pollFn rejection/timeout gracefully and shows error toast", async () => {
+    const toasts: { message: string; type: string }[] = [];
+    let refreshCalled = false;
+
+    const fakeGenerate = async (): Promise<GenerationJobProgress> => ({
+      id: "job-timeout-1",
+      jobId: "job-timeout-1",
+      status: "running",
+      account_ids: ["acc_1"],
+      total: 1,
+      completed: 0,
+      failed: 0,
+      runs: [],
+    });
+
+    const rejectingPoll = async (): Promise<GenerationJobProgress> => {
+      throw new Error("Tempo limite de polling excedido para a geração do job job-timeout-1");
+    };
+
+    const success = await executeGalleryGeneration({
+      selectedAccountId: "acc_1",
+      accounts: mockAccounts,
+      onToast: (message, type) => toasts.push({ message, type }),
+      onRefresh: async () => {
+        refreshCalled = true;
+      },
+      generateFn: fakeGenerate,
+      pollFn: rejectingPoll,
+    });
+
+    assert.equal(success, false);
+    assert.equal(refreshCalled, false);
+    assert.ok(toasts.some((t) => t.type === "error" && t.message.includes("Tempo limite de polling excedido")));
+  });
+
+  it("shows error toast when all jobs fail upon poll completion", async () => {
+    const toasts: { message: string; type: string }[] = [];
+    let refreshCalled = false;
+
+    const fakeGenerate = async (): Promise<GenerationJobProgress> => ({
+      id: "job-fail-all",
+      jobId: "job-fail-all",
+      status: "running",
+      account_ids: ["acc_1"],
+      total: 1,
+      completed: 0,
+      failed: 0,
+      runs: [],
+    });
+
+    const allFailedPoll = async (): Promise<GenerationJobProgress> => ({
+      id: "job-fail-all",
+      jobId: "job-fail-all",
+      status: "failed",
+      account_ids: ["acc_1"],
+      total: 1,
+      completed: 0,
+      failed: 1,
+      runs: [],
+      error_message: "Erro interno no modelo",
+    });
+
+    const success = await executeGalleryGeneration({
+      selectedAccountId: "acc_1",
+      accounts: mockAccounts,
+      onToast: (message, type) => toasts.push({ message, type }),
+      onRefresh: async () => {
+        refreshCalled = true;
+      },
+      generateFn: fakeGenerate,
+      pollFn: allFailedPoll,
+    });
+
+    assert.equal(success, false);
+    assert.equal(refreshCalled, false);
+    assert.ok(toasts.some((t) => t.type === "error" && t.message.includes("Erro interno no modelo")));
+  });
+
+  it("shows warning toast indicating partial completion when some succeeded and some failed", async () => {
+    const toasts: { message: string; type: string }[] = [];
+    let refreshCalled = false;
+
+    const fakeGenerate = async (): Promise<GenerationJobProgress> => ({
+      id: "job-partial-1",
+      jobId: "job-partial-1",
+      status: "running",
+      account_ids: ["acc_1", "acc_3"],
+      total: 2,
+      completed: 0,
+      failed: 0,
+      runs: [],
+    });
+
+    const partialPoll = async (): Promise<GenerationJobProgress> => ({
+      id: "job-partial-1",
+      jobId: "job-partial-1",
+      status: "completed",
+      account_ids: ["acc_1", "acc_3"],
+      total: 2,
+      completed: 1,
+      failed: 1,
+      runs: [],
+    });
+
+    const success = await executeGalleryGeneration({
+      selectedAccountId: "all",
+      accounts: mockAccounts,
+      onToast: (message, type) => toasts.push({ message, type }),
+      onRefresh: async () => {
+        refreshCalled = true;
+      },
+      generateFn: fakeGenerate,
+      pollFn: partialPoll,
+    });
+
+    assert.equal(success, true);
+    assert.equal(refreshCalled, true);
+    assert.ok(toasts.some((t) => t.type === "info" && t.message.includes("1/2")));
   });
 
   it("generateCarousels calls POST /api/v1/carousels/generate with accountIds", async () => {

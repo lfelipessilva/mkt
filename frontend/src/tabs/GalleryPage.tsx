@@ -11,7 +11,8 @@ export function resolveGalleryTargetAccountIds(
   accounts: Account[]
 ): string[] {
   if (selectedAccountId && selectedAccountId !== "all") {
-    return [selectedAccountId];
+    const match = accounts.find((a) => a.id === selectedAccountId);
+    return match && match.enabled ? [match.id] : [];
   }
   return accounts.filter((a) => a.enabled).map((a) => a.id);
 }
@@ -44,9 +45,36 @@ export async function executeGalleryGeneration({
   try {
     const job = await generateFn({ accountIds: targetAccountIds });
     const result = await pollFn(job.id, { intervalMs: 1500 });
+
+    const total = result?.total ?? (result as any)?.result?.total ?? (result as any)?.job?.total ?? targetAccountIds.length;
+    const completed = result?.completed ?? (result as any)?.result?.completed ?? (result as any)?.job?.completed ?? 0;
+    const failed = result?.failed ?? (result as any)?.result?.failed ?? (result as any)?.job?.failed ?? 0;
+
     if (result && result.status === "failed") {
-      throw new Error(result.error_message || "O job de geração finalizou com status de falha.");
+      const errMsg = result.error_message
+        ? `Erro ao gerar carrossel: ${result.error_message}`
+        : `Erro ao gerar carrossel: geração finalizada com falhas (${failed} falhas).`;
+      onToast(errMsg, "error");
+      return false;
     }
+
+    if (failed > 0 && completed === 0) {
+      const errMsg = result?.error_message
+        ? `Erro ao gerar carrossel: ${result.error_message}`
+        : `Erro ao gerar carrossel: geração finalizada com falhas (${failed} falhas).`;
+      onToast(errMsg, "error");
+      return false;
+    }
+
+    if (failed > 0 && completed > 0) {
+      onToast(
+        `Geração finalizada com avisos/falhas: ${completed}/${total} carrosséis gerados (${failed} falhas).`,
+        "info"
+      );
+      await onRefresh();
+      return true;
+    }
+
     onToast("Geração concluída com sucesso!", "success");
     await onRefresh();
     return true;
