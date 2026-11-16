@@ -271,6 +271,24 @@ export async function claimNextSlot(
   return mapSlotRow(res.rows[0]);
 }
 
+export async function expireAwaitingApprovalSlots(
+  options: { now: Date },
+  poolInstance?: Pool
+): Promise<number> {
+  const p = poolInstance || getPool();
+  const res = await p.query(
+    `UPDATE auto_post_slots
+     SET status = 'skipped',
+         last_error = 'aprovação expirada',
+         finished_at = $1,
+         updated_at = $1
+     WHERE status = 'awaiting_approval'
+       AND window_end < $1`,
+    [options.now]
+  );
+  return res.rowCount ?? 0;
+}
+
 /**
  * Recovers stuck running slots.
  * - If isBoot: marks all running slots as failed ('processo reiniciou durante a execução').
@@ -296,6 +314,7 @@ export async function failStaleRunningSlots(
   }
 
   const timeoutMinutes = options.timeoutMinutes ?? 15;
+  const cutoff = new Date(now.getTime() - timeoutMinutes * 60 * 1000);
   const res = await p.query(
     `UPDATE auto_post_slots
      SET status = 'failed',
@@ -303,8 +322,8 @@ export async function failStaleRunningSlots(
          finished_at = $1,
          updated_at = $1
      WHERE status = 'running'
-       AND started_at < $1 - ($2 || ' minutes')::INTERVAL`,
-    [now, String(timeoutMinutes)]
+       AND started_at < $2`,
+    [now, cutoff]
   );
   return res.rowCount ?? 0;
 }
