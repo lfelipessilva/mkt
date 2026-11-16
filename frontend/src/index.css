@@ -653,24 +653,24 @@ body {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(15, 23, 42, 0.45);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 20px;
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(4px);
 }
 
 .modal-card {
-  background-color: var(--bg-secondary);
+  background-color: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   width: 100%;
   max-width: 540px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
 }
@@ -686,6 +686,7 @@ body {
 .modal-header h4 {
   font-size: 16px;
   font-weight: 600;
+  color: #0f172a;
 }
 
 .modal-form {
@@ -698,13 +699,14 @@ body {
 .form-group textarea,
 .form-group select {
   padding: 10px 12px;
-  background-color: var(--bg-primary);
-  border: 1px solid var(--border-color);
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-size: 13px;
   font-family: inherit;
   outline: none;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
 }
 
 .form-group textarea:focus,
@@ -1757,18 +1759,20 @@ body {
 
 /* Run Card */
 .run-card {
-  background-color: var(--bg-secondary);
+  background-color: #ffffff;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  transition: border-color 0.15s ease;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
 }
 
 .run-card:hover {
-  border-color: var(--bg-tertiary);
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 
 .run-card-header {
@@ -1797,9 +1801,10 @@ body {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: var(--radius-sm);
-  background-color: var(--bg-tertiary);
-  color: var(--text-secondary);
+  background-color: #f1f5f9;
+  color: #475569;
   font-weight: 500;
+  border: 1px solid #e2e8f0;
 }
 
 .run-timestamp {
@@ -1817,29 +1822,34 @@ body {
 }
 
 .status-pill.status-generated {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #34d399;
+  background-color: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
 }
 
 .status-pill.status-dispatched {
-  background-color: rgba(99, 102, 241, 0.15);
-  color: #818cf8;
+  background-color: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
 }
 
 .status-pill.status-published {
-  background-color: rgba(236, 72, 153, 0.15);
-  color: #f472b6;
+  background-color: #fdf2f8;
+  color: #be185d;
+  border: 1px solid #fbcfe8;
 }
 
 .status-pill.status-generating,
 .status-pill.status-dispatching {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
+  background-color: #f0f9ff;
+  color: #0284c7;
+  border: 1px solid #bae6fd;
 }
 
 .status-pill.status-failed {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  background-color: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 /* Run Card Meta */

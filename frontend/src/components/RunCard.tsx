@@ -4,6 +4,7 @@ import { ROLE_LABELS } from "../types";
 import { AuthImage } from "./AuthImage";
 import { dispatchCarouselRun } from "../api";
 import { orderSlides } from "../tabs/GalleryPage";
+import { Send, CheckCircle2, Edit3, AlertCircle, Check } from "lucide-react";
 
 export interface RunCardProps {
   run: CarouselRun;
@@ -113,7 +114,7 @@ export function RunCard({
             {run.legenda.length > 120 && (
               <button
                 type="button"
-                className="btn-toggle-caption"
+                className="btn-toggle-caption text-blue-600 hover:text-blue-800"
                 onClick={() => setExpandedCaption(!expandedCaption)}
               >
                 {expandedCaption ? "Ver menos" : "Ver legenda completa"}
@@ -126,7 +127,7 @@ export function RunCard({
       {/* Filmstrip */}
       <div className="run-filmstrip-section">
         <div className="filmstrip-header">
-          <span className="filmstrip-title">Slides ({slides.length})</span>
+          <span className="filmstrip-title font-medium text-slate-700">Slides ({slides.length})</span>
         </div>
 
         {slides.length === 0 ? (
@@ -159,13 +160,15 @@ export function RunCard({
 
       {/* Alerts */}
       {sendError && (
-        <div className="run-card-alert error">
+        <div className="run-card-alert error flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-500" />
           <span>{sendError}</span>
         </div>
       )}
       {sendSuccess && (
-        <div className="run-card-alert success">
-          <span>✓ Carrossel despachado com sucesso via Telegram!</span>
+        <div className="run-card-alert success flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-600" />
+          <span>Carrossel despachado com sucesso via Telegram!</span>
         </div>
       )}
 
@@ -173,7 +176,7 @@ export function RunCard({
       <div className="run-card-actions">
         <button
           type="button"
-          className="btn btn-secondary btn-send"
+          className="btn btn-secondary btn-send flex items-center gap-1.5"
           disabled={isSending}
           onClick={handleSendTelegram}
           title="Enviar carrossel para o Telegram configurado"
@@ -185,17 +188,28 @@ export function RunCard({
             </>
           ) : (
             <>
-              <span>✈ Enviar (Telegram)</span>
+              <Send className="w-3.5 h-3.5" />
+              <span>Enviar (Telegram)</span>
             </>
           )}
         </button>
 
         <button
           type="button"
-          className={`btn ${run.status === "published" ? "btn-outline" : "btn-primary"} btn-publish-tiktok`}
+          className={`btn ${run.status === "published" ? "btn-outline" : "btn-primary"} btn-publish-tiktok flex items-center gap-1.5`}
           onClick={() => onOpenManualPublish && onOpenManualPublish(run)}
         >
-          {run.status === "published" ? "✎ Editar TikTok" : "✓ Publicado TikTok"}
+          {run.status === "published" ? (
+            <>
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>Editar TikTok</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Publicado TikTok</span>
+            </>
+          )}
         </button>
       </div>
     </div>
