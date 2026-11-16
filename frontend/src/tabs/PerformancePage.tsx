@@ -8,6 +8,7 @@ import type {
 } from "../types";
 import { getTikTokPerformance, syncTikTok } from "../api";
 import { ManualTikTokModal } from "../components/ManualTikTokModal";
+import { RefreshCw, Zap, Eye, Heart, MessageSquare, BarChart3, Edit3 } from "lucide-react";
 
 export function filterPerformanceByAccount(
   items: TikTokPerformanceItem[],
@@ -209,23 +210,25 @@ export function PerformancePage(): React.JSX.Element {
           </p>
         </div>
 
-        <div className="header-actions">
+        <div className="header-actions flex items-center gap-2">
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn-secondary flex items-center gap-1.5"
             onClick={handleSyncTikTok}
             disabled={isSyncing}
             title="Executar sincronização TikTok"
           >
-            {isSyncing ? "Sincronizando..." : "⚡ Sincronizar TikTok"}
+            <Zap className={`w-3.5 h-3.5 ${isSyncing ? "animate-pulse" : "text-amber-500"}`} />
+            <span>{isSyncing ? "Sincronizando..." : "Sincronizar TikTok"}</span>
           </button>
           <button
             type="button"
-            className="btn btn-secondary btn-refresh"
+            className="btn btn-secondary btn-refresh flex items-center gap-1.5"
             onClick={loadPerformance}
             disabled={loading}
           >
-            {loading ? "Carregando..." : "↻ Atualizar"}
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
+            <span>{loading ? "Carregando..." : "Atualizar"}</span>
           </button>
         </div>
       </div>
@@ -242,19 +245,31 @@ export function PerformancePage(): React.JSX.Element {
       {/* KPI Cards */}
       <div className="metrics-summary-grid">
         <div className="kpi-card">
-          <span className="kpi-label">Total Publicações</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="kpi-label">Total Publicações</span>
+            <BarChart3 className="w-4 h-4 text-slate-400" />
+          </div>
           <span className="kpi-value">{stats.totalPosts}</span>
         </div>
         <div className="kpi-card highlight">
-          <span className="kpi-label">Total de Views</span>
-          <span className="kpi-value">{stats.totalViews.toLocaleString("pt-BR")}</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="kpi-label text-blue-700 font-semibold">Total de Views</span>
+            <Eye className="w-4 h-4 text-blue-600" />
+          </div>
+          <span className="kpi-value text-blue-900">{stats.totalViews.toLocaleString("pt-BR")}</span>
         </div>
         <div className="kpi-card">
-          <span className="kpi-label">Total de Curtidas</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="kpi-label">Total de Curtidas</span>
+            <Heart className="w-4 h-4 text-rose-500" />
+          </div>
           <span className="kpi-value">{stats.totalLikes.toLocaleString("pt-BR")}</span>
         </div>
         <div className="kpi-card">
-          <span className="kpi-label">Média Views / Post</span>
+          <div className="flex items-center justify-between mb-1">
+            <span className="kpi-label">Média Views / Post</span>
+            <MessageSquare className="w-4 h-4 text-emerald-500" />
+          </div>
           <span className="kpi-value">{stats.avgViewsPerPost.toLocaleString("pt-BR")}</span>
         </div>
       </div>
@@ -378,11 +393,12 @@ export function PerformancePage(): React.JSX.Element {
                     <td className="actions-cell">
                       <button
                         type="button"
-                        className="btn-action edit"
+                        className="btn-action edit flex items-center gap-1"
                         onClick={() => handleOpenEditModal(item)}
                         title="Editar métricas"
                       >
-                        Editar
+                        <Edit3 className="w-3 h-3" />
+                        <span>Editar</span>
                       </button>
                       {item.video_url && (
                         <a
