@@ -42,6 +42,12 @@ export interface TikTokPost {
   comments: number;
   shares: number;
   metrics_note: string | null;
+  provider?: string;
+  external_post_id?: string | null;
+  publish_status?: string;
+  scheduled_at?: Date | null;
+  last_polled_at?: Date | null;
+  raw_response?: Record<string, unknown> | null;
   created_at: Date;
   updated_at: Date;
 }

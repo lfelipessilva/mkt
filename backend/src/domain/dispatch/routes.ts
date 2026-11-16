@@ -4,7 +4,7 @@ import { SendCarouselRunQuerySchema } from "./schemas.js";
 import { dispatchCarouselRun } from "./service.js";
 
 export const dispatchRoutes: FastifyPluginAsync = async (app) => {
-  // POST /api/v1/carousels/runs/:id/send?channel=api|telegram
+  // POST /api/v1/carousels/runs/:id/send?channel=api|telegram|buffer|social
   app.post("/runs/:id/send", async (request, reply) => {
     const rawQuery = (request.query || {}) as Record<string, unknown>;
     const rawBody = (request.body || {}) as Record<string, unknown>;

@@ -15,7 +15,9 @@ export interface UpsertAccountInput {
 export async function listAccounts(poolInstance?: Pool): Promise<Account[]> {
   const p = poolInstance || getPool();
   const result = await p.query<Account>(
-    `SELECT id, display_name, persona, role, enabled, tiktok_open_id, created_at, updated_at
+    `SELECT id, display_name, persona, role, enabled, tiktok_open_id,
+            social_provider, external_account_id, social_account_metadata,
+            created_at, updated_at
      FROM accounts
      ORDER BY created_at ASC, id ASC`
   );
@@ -28,7 +30,9 @@ export async function getAccount(
 ): Promise<Account | null> {
   const p = poolInstance || getPool();
   const result = await p.query<Account>(
-    `SELECT id, display_name, persona, role, enabled, tiktok_open_id, created_at, updated_at
+    `SELECT id, display_name, persona, role, enabled, tiktok_open_id,
+            social_provider, external_account_id, social_account_metadata,
+            created_at, updated_at
      FROM accounts
      WHERE id = $1`,
     [id]

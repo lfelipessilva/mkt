@@ -7,6 +7,10 @@ import {
   type SendCarouselAlbumOptions,
 } from "../../pipeline/telegram.js";
 import { getCarouselRun, updateCarouselRun } from "../runs/store.js";
+import { getAccount } from "../accounts/store.js";
+import { getSocialPublisherProvider } from "../social/factory.js";
+import { resolveCarouselSlidePublicUrls } from "../social/urls.js";
+import type { SocialPublisherProvider } from "../social/types.js";
 import type {
   DispatchChannel,
   DispatchEvent,
@@ -19,6 +23,7 @@ export type SendTelegramAlbumFn = (
 
 let customTelegramSender: SendTelegramAlbumFn | null = null;
 let customFetchFn: typeof fetch | null = null;
+let customSocialPublisherProvider: SocialPublisherProvider | null = null;
 
 export function setTelegramSender(fn: SendTelegramAlbumFn | null): void {
   customTelegramSender = fn;
@@ -26,6 +31,10 @@ export function setTelegramSender(fn: SendTelegramAlbumFn | null): void {
 
 export function setFetchFn(fn: typeof fetch | null): void {
   customFetchFn = fn;
+}
+
+export function setSocialPublisherProvider(provider: SocialPublisherProvider | null): void {
+  customSocialPublisherProvider = provider;
 }
 
 export interface DispatchCarouselRunOptions {
@@ -39,6 +48,7 @@ export interface DispatchCarouselRunOptions {
   sendTelegramAlbum?: SendTelegramAlbumFn;
   webhookUrl?: string;
   fetchFn?: typeof fetch;
+  socialPublisherProvider?: SocialPublisherProvider;
 }
 
 function mapDispatchEventRow(row: any): DispatchEvent {
@@ -148,6 +158,29 @@ export async function dispatchCarouselRun(
       slide_paths: slidePaths,
       legenda: run.legenda,
     };
+  } else if (options.channel === "buffer" || options.channel === "social") {
+    const account = await getAccount(run.account_id, p);
+    if (!account) {
+      throw new AppError(`Account '${run.account_id}' not found`, 404, "not_found");
+    }
+    if (!account.external_account_id) {
+      throw new AppError(
+        `Account '${run.account_id}' does not have an external_account_id configured for social dispatch`,
+        400,
+        "config_error"
+      );
+    }
+
+    const imageUrls = resolveCarouselSlidePublicUrls(run);
+
+    requestPayload = {
+      run_id: run.id,
+      account_id: run.account_id,
+      external_account_id: account.external_account_id,
+      image_urls: imageUrls,
+      legenda: run.legenda,
+      channel: options.channel,
+    };
   } else {
     throw new AppError(
       `Unsupported dispatch channel: ${options.channel}`,
@@ -223,6 +256,56 @@ export async function dispatchCarouselRun(
         status: res.status,
         body: parsedBody,
       };
+    } else if (options.channel === "buffer" || options.channel === "social") {
+      const provider =
+        options.socialPublisherProvider ||
+        customSocialPublisherProvider ||
+        getSocialPublisherProvider(options.channel === "buffer" ? "buffer" : undefined);
+
+      const publishRes = await provider.publishPost({
+        internalPostId: run.id,
+        externalAccountId: requestPayload.external_account_id,
+        caption: run.legenda || "",
+        media: {
+          type: "carousel",
+          imageUrls: requestPayload.image_urls,
+        },
+        publishMode: "immediate",
+      });
+
+      responsePayload = publishRes;
+
+      const providerName = options.channel === "buffer" ? "buffer" : (process.env.SOCIAL_PROVIDER || "buffer");
+
+      await p.query(
+        `INSERT INTO tiktok_posts (
+          run_id,
+          tracking_mode,
+          provider,
+          external_post_id,
+          publish_status,
+          raw_response,
+          published_at,
+          updated_at
+        )
+        VALUES ($1, 'api', $2, $3, $4, $5, $6, NOW())
+        ON CONFLICT (run_id) DO UPDATE SET
+          tracking_mode = 'api',
+          provider = EXCLUDED.provider,
+          external_post_id = EXCLUDED.external_post_id,
+          publish_status = EXCLUDED.publish_status,
+          raw_response = EXCLUDED.raw_response,
+          published_at = COALESCE(EXCLUDED.published_at, tiktok_posts.published_at),
+          updated_at = NOW()`,
+        [
+          run.id,
+          providerName,
+          publishRes.externalPostId,
+          publishRes.status,
+          JSON.stringify(publishRes.rawResponse || {}),
+          publishRes.publishedAt ? new Date(publishRes.publishedAt) : (publishRes.status === "published" ? new Date() : null),
+        ]
+      );
     }
 
     // 6. On success: update dispatch_event to 'sent'

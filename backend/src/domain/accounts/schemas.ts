@@ -16,6 +16,9 @@ export const AccountSchema = z.object({
   role: AccountRoleSchema,
   enabled: z.boolean().default(true),
   tiktok_open_id: z.string().nullable().optional(),
+  social_provider: z.string().nullable().optional(),
+  external_account_id: z.string().nullable().optional(),
+  social_account_metadata: z.record(z.unknown()).optional(),
   created_at: z.coerce.date().optional(),
   updated_at: z.coerce.date().optional(),
 });

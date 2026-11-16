@@ -24,6 +24,12 @@ export function mapTikTokPostRow(row: any): TikTokPost {
     comments: Number(row.comments || 0),
     shares: Number(row.shares || 0),
     metrics_note: row.metrics_note ?? null,
+    provider: row.provider ?? "manual",
+    external_post_id: row.external_post_id ?? null,
+    publish_status: row.publish_status ?? "published",
+    scheduled_at: row.scheduled_at ? new Date(row.scheduled_at) : null,
+    last_polled_at: row.last_polled_at ? new Date(row.last_polled_at) : null,
+    raw_response: row.raw_response ?? null,
     created_at: new Date(row.created_at),
     updated_at: new Date(row.updated_at),
   };
