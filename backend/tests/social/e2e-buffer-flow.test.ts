@@ -190,7 +190,9 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     // Verify Buffer dispatch payload & slide URLs
     assert.ok(dispatchedPayload);
     assert.equal(dispatchedPayload.externalAccountId, "buf_e2e_channel_99");
-    assert.equal(dispatchedPayload.publishMode, "immediate");
+    assert.equal(dispatchedPayload.publishMode, "scheduled");
+    assert.equal(dispatchedPayload.schedulingType, "notification");
+    assert.ok(dispatchedPayload.scheduledAt);
     assert.equal(dispatchedPayload.media.type, "carousel");
     assert.deepEqual((dispatchedPayload.media as any).imageUrls, [
       "https://personal-minio.adaygq.easypanel.host/carousels/acc_e2e_tiktok/post_e2e_1/slide_1.jpg",
