@@ -35,7 +35,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV NODE_ENV=production
 ENV PORT=4002
-ENV MEDIA_ROOT=/app/media
 
 # Install production-only backend dependencies
 WORKDIR /app/backend
@@ -48,7 +47,6 @@ COPY backend/migrations ./migrations
 
 # Copy static assets & directories
 COPY config /app/config
-COPY media /app/media
 
 # Copy compiled frontend dist into /app/frontend/dist for Fastify static serving
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist

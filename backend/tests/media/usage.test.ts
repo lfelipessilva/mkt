@@ -28,7 +28,7 @@ describe("Task 10: Usage in Postgres & rotation", { timeout: 60000 }, () => {
   let tmpMediaDir: string;
 
   before(async () => {
-    let connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.TEST_DATABASE_URL;
 
     if (!connectionString) {
       container = await new PostgreSqlContainer("postgres:16-alpine").start();

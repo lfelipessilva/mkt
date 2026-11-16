@@ -22,13 +22,6 @@ export { getUsageDays, recordMediaUsage, recentlyUsedFilenames };
 
 const IMAGE_RE = /\.(jpe?g|png|webp)$/i;
 
-export interface MediaDirs {
-  capas: string;
-  aleatoriasRole: string;
-  aleatoriasShared: string;
-  listo: string;
-}
-
 export interface MediaImage {
   filename: string;
   path: string;
