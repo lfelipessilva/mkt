@@ -251,7 +251,7 @@
 **Interfaces:**
 - On transition `queued|processing` → `published|failed`, if run has `auto_post_slot_id` and `tiktok_posts.notified_at` is null: send final notify; set `notified_at`. Manual posts (no slot) stay silent.
 
-- [ ] **Step 1–4: TDD §5.11 item 28. Commit** `feat(polling): notify auto-schedule publish outcomes`
+- [x] **Step 1–4: TDD §5.11 item 28. Commit** `feat(polling): notify auto-schedule publish outcomes`
 
 ---
 

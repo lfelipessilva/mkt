@@ -4,6 +4,23 @@ import { getSocialPublisherProvider } from "./factory.js";
 import { resolveCarouselSlidePublicUrls } from "./urls.js";
 import { getCarouselRun } from "../runs/store.js";
 import type { SocialPublisherProvider } from "./types.js";
+import {
+  notifyAutomation,
+  type AutomationNotifyEvent,
+  type NotifyAutomationOptions,
+  type NotifyPayload,
+  type TelegramApiLike,
+} from "../automation/notifications.js";
+import type { NotifyAutomationFn } from "../automation/ticker.js";
+
+export type { NotifyAutomationFn };
+
+export interface PollPendingPostsOptions {
+  notifyFn?: NotifyAutomationFn;
+  telegramApi?: TelegramApiLike;
+  chatId?: string | null;
+  appBaseUrl?: string | null;
+}
 
 export interface PollPendingPostsResult {
   checkedCount: number;
@@ -20,10 +37,21 @@ export interface PollPendingPostsResult {
  */
 export async function pollPendingPostsJob(
   poolInstance?: Pool,
-  providerInstance?: SocialPublisherProvider
+  providerInstance?: SocialPublisherProvider,
+  options: PollPendingPostsOptions = {}
 ): Promise<PollPendingPostsResult> {
   const p = poolInstance || getPool();
   const provider = providerInstance || getSocialPublisherProvider();
+
+  const notifyFn: NotifyAutomationFn =
+    options.notifyFn ||
+    (async (event, payload, opts) => notifyAutomation(event, payload, opts));
+
+  const notifyOpts: NotifyAutomationOptions = {
+    telegramApi: options.telegramApi,
+    appBaseUrl: options.appBaseUrl,
+    chatId: options.chatId,
+  };
 
   let checkedCount = 0;
   let updatedCount = 0;
@@ -33,7 +61,8 @@ export async function pollPendingPostsJob(
   // 1. Process 'queued' and 'processing' posts
   try {
     const pendingPostsRes = await p.query(
-      `SELECT tp.id, tp.run_id, tp.external_post_id, tp.publish_status, cr.legenda
+      `SELECT tp.id, tp.run_id, tp.external_post_id, tp.publish_status, tp.notified_at,
+              cr.legenda, cr.auto_post_slot_id, cr.account_id, cr.archetype_title
        FROM tiktok_posts tp
        JOIN carousel_runs cr ON cr.id = tp.run_id
        WHERE tp.publish_status IN ('queued', 'processing')
@@ -49,15 +78,18 @@ export async function pollPendingPostsJob(
         if (statusRes.status !== row.publish_status) {
           if (statusRes.status === "published") {
             const publishedAt = statusRes.publishedAt ? new Date(statusRes.publishedAt) : new Date();
+            const shouldNotify = Boolean(row.auto_post_slot_id && !row.notified_at);
+
             await p.query(
               `UPDATE tiktok_posts
                SET publish_status = 'published',
                    published_at = COALESCE(published_at, $1),
                    last_polled_at = NOW(),
                    raw_response = $2,
+                   notified_at = CASE WHEN $3::boolean THEN NOW() ELSE notified_at END,
                    updated_at = NOW()
-               WHERE id = $3`,
-              [publishedAt, JSON.stringify(statusRes.rawResponse || {}), row.id]
+               WHERE id = $4`,
+              [publishedAt, JSON.stringify(statusRes.rawResponse || {}), shouldNotify, row.id]
             );
 
             await p.query(
@@ -67,15 +99,33 @@ export async function pollPendingPostsJob(
               [row.run_id]
             );
             updatedCount++;
+
+            if (shouldNotify) {
+              await notifyFn(
+                "publish_ok",
+                {
+                  account: row.account_id,
+                  archetype: row.archetype_title || undefined,
+                  runId: row.run_id,
+                },
+                notifyOpts
+              ).catch((err) => {
+                console.error("[polling:notify]", err);
+              });
+            }
           } else if (statusRes.status === "failed") {
+            const shouldNotify = Boolean(row.auto_post_slot_id && !row.notified_at);
+            const errorMessage = statusRes.errorMessage || "Publish failed according to provider status";
+
             await p.query(
               `UPDATE tiktok_posts
                SET publish_status = 'failed',
                    last_polled_at = NOW(),
                    raw_response = $1,
+                   notified_at = CASE WHEN $2::boolean THEN NOW() ELSE notified_at END,
                    updated_at = NOW()
-               WHERE id = $2`,
-              [JSON.stringify(statusRes.rawResponse || {}), row.id]
+               WHERE id = $3`,
+              [JSON.stringify(statusRes.rawResponse || {}), shouldNotify, row.id]
             );
 
             await p.query(
@@ -84,9 +134,24 @@ export async function pollPendingPostsJob(
                    error_message = $1,
                    updated_at = NOW()
                WHERE id = $2`,
-              [statusRes.errorMessage || "Publish failed according to provider status", row.run_id]
+              [errorMessage, row.run_id]
             );
             updatedCount++;
+
+            if (shouldNotify) {
+              await notifyFn(
+                "publish_failed",
+                {
+                  account: row.account_id,
+                  reason: errorMessage,
+                  archetype: row.archetype_title || undefined,
+                  runId: row.run_id,
+                },
+                notifyOpts
+              ).catch((err) => {
+                console.error("[polling:notify]", err);
+              });
+            }
           } else {
             // Still queued / processing, just update last_polled_at
             await p.query(
