@@ -57,6 +57,18 @@ Painel Web: `http://localhost:3000/`
 | `SILO_SECRET_KEY` | Secret key do Silo (MinIO) | *(obrigatório para storage remoto)* |
 | `SILO_MEDIA_BUCKET` | Bucket para mídias base | `media` |
 | `SILO_CAROUSELS_BUCKET` | Bucket para carrosséis gerados | `carousels` |
+| `SOCIAL_PROVIDER` | Provedor de publicação social (`buffer`, `postforme`) | `buffer` |
+| `BUFFER_API_URL` | URL base da API do Buffer | `https://api.buffer.com` |
+| `BUFFER_ACCESS_TOKEN` | Token de acesso OAuth / API do Buffer | *(obrigatório para Buffer)* |
+
+## Publicação Social (Buffer & TikTok)
+
+A plataforma suporta publicação automática de carrosséis gerados para perfis do TikTok conectados via Buffer:
+
+1. **Sincronização de Contas:** `POST /api/v1/social/accounts/sync` obtém os canais/perfis do Buffer e vincula o `external_account_id` às contas cadastradas.
+2. **Despacho / Publicação:** Ao despachar com o canal `buffer` (`POST /api/v1/carousels/runs/:id/send?channel=buffer`), as imagens dos slides são resolvidas via URLs públicas do Silo e enviadas para a API do Buffer.
+3. **Polling Worker:** Rotina periódica consulta o Buffer para atualizar o status de posts `queued`/`processing` para `published` ou `failed`.
+4. **Métricas Diárias:** Worker diário sincroniza visualizações, curtidas, comentários e compartilhamentos de posts publicados há menos de 30 dias (`syncTikTokMetricsDailyJob`), atualizando rankings em `GET /api/v1/tiktok/performance`.
 
 ## Estrutura de Mídia e Silo (MinIO)
 
