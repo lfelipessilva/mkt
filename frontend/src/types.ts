@@ -25,6 +25,8 @@ export interface Account {
   role: AccountRole;
   enabled: boolean;
   tiktok_open_id?: string | null;
+  social_provider?: string | null;
+  external_account_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -36,6 +38,8 @@ export interface CreateAccountInput {
   role: AccountRole;
   enabled?: boolean;
   tiktok_open_id?: string | null;
+  social_provider?: string | null;
+  external_account_id?: string | null;
 }
 
 export interface UpdateAccountInput {
@@ -44,6 +48,36 @@ export interface UpdateAccountInput {
   role?: AccountRole;
   enabled?: boolean;
   tiktok_open_id?: string | null;
+  social_provider?: string | null;
+  external_account_id?: string | null;
+}
+
+export interface SyncAccountsResult {
+  synced: number;
+  matched: number;
+  created: number;
+  accounts: Array<{
+    id: string;
+    persona?: string;
+    external_account_id?: string | null;
+    social_provider?: string | null;
+    username?: string;
+  }>;
+}
+
+export function getBufferLinkageStatus(account: Account): {
+  isLinked: boolean;
+  label: string;
+  externalAccountId: string | null;
+  provider: string | null;
+} {
+  const isLinked = Boolean(account.external_account_id && account.external_account_id.trim());
+  return {
+    isLinked,
+    label: isLinked ? `Buffer (${account.external_account_id})` : "Não vinculado",
+    externalAccountId: account.external_account_id || null,
+    provider: account.social_provider || null,
+  };
 }
 
 export function validateAccountInput(input: {

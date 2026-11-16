@@ -2,6 +2,7 @@ import type {
   Account,
   CreateAccountInput,
   UpdateAccountInput,
+  SyncAccountsResult,
   Archetype,
   ArchetypeInputItem,
   Bait,
@@ -161,6 +162,12 @@ export async function updateAccount(
 export async function deleteAccount(id: string): Promise<{ ok: boolean }> {
   return apiFetch<{ ok: boolean }>(`/accounts/${encodeURIComponent(id)}`, {
     method: "DELETE",
+  });
+}
+
+export async function syncSocialAccounts(): Promise<SyncAccountsResult> {
+  return apiFetch<SyncAccountsResult>("/social/accounts/sync", {
+    method: "POST",
   });
 }
 

@@ -2,7 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
 import { getSocialPublisherProvider } from "./factory.js";
-import { listAccounts } from "../accounts/store.js";
+import { listAccounts, upsertAccount } from "../accounts/store.js";
 import type { SocialPublisherProvider, SocialAccount } from "./types.js";
 
 let customProvider: SocialPublisherProvider | null = null;
@@ -14,6 +14,7 @@ export function setCustomSocialProvider(provider: SocialPublisherProvider | null
 export interface SyncAccountsResult {
   synced: number;
   matched: number;
+  created: number;
   accounts: Array<{
     id: string;
     persona: string;
@@ -46,6 +47,8 @@ export async function syncSocialAccounts(
   }> = [];
 
   let matchedCount = 0;
+  let createdCount = 0;
+  const matchedChannelIds = new Set<string>();
 
   for (const acc of existingAccounts) {
     // Attempt match by username, persona, or id (case-insensitive substring or equality)
@@ -66,6 +69,7 @@ export async function syncSocialAccounts(
     });
 
     if (matchedChannel) {
+      matchedChannelIds.add(matchedChannel.externalAccountId);
       await p.query(
         `UPDATE accounts
          SET external_account_id = $1,
@@ -103,9 +107,47 @@ export async function syncSocialAccounts(
     }
   }
 
+  // Auto-import channels not matched with any existing account
+  for (const ch of channels) {
+    if (!matchedChannelIds.has(ch.externalAccountId)) {
+      const channelName = (ch as { name?: string }).name || ch.username;
+      const cleanId = (ch.username || channelName)
+        .replace(/^@/, "")
+        .replace(/[^a-zA-Z0-9_.-]/g, "_")
+        .toLowerCase()
+        .trim();
+
+      await upsertAccount(
+        {
+          id: cleanId,
+          display_name: channelName || cleanId,
+          role: "single_woman",
+          persona: `Conta importada via Buffer (${ch.username || channelName})`,
+          enabled: true,
+          social_provider: ch.provider,
+          external_account_id: ch.externalAccountId,
+          social_account_metadata: {
+            channel_username: ch.username,
+          },
+        },
+        p
+      );
+
+      matchedAccounts.push({
+        id: cleanId,
+        persona: `Conta importada via Buffer (${ch.username || channelName})`,
+        external_account_id: ch.externalAccountId,
+        social_provider: ch.provider,
+        username: ch.username,
+      });
+      createdCount++;
+    }
+  }
+
   return {
     synced: channels.length,
     matched: matchedCount,
+    created: createdCount,
     accounts: matchedAccounts,
   };
 }

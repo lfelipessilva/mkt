@@ -4,13 +4,14 @@ import {
   ACCOUNT_ROLES,
   ROLE_LABELS,
   validateAccountInput,
+  getBufferLinkageStatus,
   type Account,
   type AccountRole,
   type CreateAccountInput,
   type UpdateAccountInput,
 } from "../../types";
-import { createAccount, updateAccount, deleteAccount } from "../../api";
-import { UserPlus } from "lucide-react";
+import { createAccount, updateAccount, deleteAccount, syncSocialAccounts } from "../../api";
+import { UserPlus, RefreshCw } from "lucide-react";
 
 interface AccountFormState {
   id: string;
@@ -19,6 +20,8 @@ interface AccountFormState {
   persona: string;
   enabled: boolean;
   tiktok_open_id: string;
+  external_account_id: string;
+  social_provider: string;
 }
 
 const emptyFormState: AccountFormState = {
@@ -28,6 +31,8 @@ const emptyFormState: AccountFormState = {
   persona: "",
   enabled: true,
   tiktok_open_id: "",
+  external_account_id: "",
+  social_provider: "buffer",
 };
 
 export function AccountsPage(): React.JSX.Element {
@@ -40,6 +45,7 @@ export function AccountsPage(): React.JSX.Element {
 
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [syncingBuffer, setSyncingBuffer] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
@@ -58,8 +64,30 @@ export function AccountsPage(): React.JSX.Element {
       persona: acc.persona || "",
       enabled: acc.enabled,
       tiktok_open_id: acc.tiktok_open_id || "",
+      external_account_id: acc.external_account_id || "",
+      social_provider: acc.social_provider || "buffer",
     });
     setFormError(null);
+  };
+
+  const handleSyncBuffer = async () => {
+    setSyncingBuffer(true);
+    setStatusMessage(null);
+    try {
+      const res = await syncSocialAccounts();
+      await reloadAccounts();
+      setStatusMessage(
+        `Sincronização Buffer concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).`
+      );
+    } catch (err) {
+      alert(
+        err instanceof Error
+          ? err.message
+          : "Erro ao sincronizar contas do Buffer"
+      );
+    } finally {
+      setSyncingBuffer(false);
+    }
   };
 
   const handleCreateSubmit = async (e: React.FormEvent) => {
@@ -87,6 +115,8 @@ export function AccountsPage(): React.JSX.Element {
         enabled: createForm.enabled,
         display_name: createForm.display_name.trim() || null,
         tiktok_open_id: createForm.tiktok_open_id.trim() || null,
+        external_account_id: createForm.external_account_id.trim() || null,
+        social_provider: createForm.social_provider.trim() || null,
       };
 
       await createAccount(payload);
@@ -116,6 +146,8 @@ export function AccountsPage(): React.JSX.Element {
         enabled: editForm.enabled,
         display_name: editForm.display_name.trim() || null,
         tiktok_open_id: editForm.tiktok_open_id.trim() || null,
+        external_account_id: editForm.external_account_id.trim() || null,
+        social_provider: editForm.social_provider.trim() || null,
       };
 
       await updateAccount(editingAccount.id, payload);
@@ -170,15 +202,27 @@ export function AccountsPage(): React.JSX.Element {
             papéis (roles) para geração direcionada.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary flex items-center gap-1.5"
-          onClick={handleOpenCreate}
-          data-testid="btn-add-account"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Adicionar Conta</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-outline flex items-center gap-1.5"
+            onClick={() => void handleSyncBuffer()}
+            disabled={actionLoading || syncingBuffer}
+            data-testid="btn-sync-buffer"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncingBuffer ? "animate-spin text-blue-600" : ""}`} />
+            <span>{syncingBuffer ? "Puxando do Buffer..." : "Puxar Contas do Buffer"}</span>
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary flex items-center gap-1.5"
+            onClick={handleOpenCreate}
+            data-testid="btn-add-account"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Adicionar Conta</span>
+          </button>
+        </div>
       </div>
 
       {statusMessage && (
@@ -218,13 +262,16 @@ export function AccountsPage(): React.JSX.Element {
                 <th>Nome de Exibição</th>
                 <th>Role (Papel)</th>
                 <th>Persona</th>
+                <th>Buffer / Canal</th>
                 <th>TikTok Open ID</th>
                 <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {accounts.map((acc) => (
+              {accounts.map((acc) => {
+                const bufferStatus = getBufferLinkageStatus(acc);
+                return (
                 <tr key={acc.id} className={!acc.enabled ? "row-disabled" : ""}>
                   <td className="account-id-cell">
                     <strong>@{acc.id}</strong>
@@ -239,6 +286,15 @@ export function AccountsPage(): React.JSX.Element {
                     <span className="persona-text" title={acc.persona}>
                       {acc.persona ? acc.persona.slice(0, 75) + (acc.persona.length > 75 ? "..." : "") : "-"}
                     </span>
+                  </td>
+                  <td>
+                    {bufferStatus.isLinked ? (
+                      <span className="role-badge role-shared" title={`Buffer ID: ${bufferStatus.externalAccountId}`}>
+                        Buffer ({bufferStatus.externalAccountId})
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm">Não vinculado</span>
+                    )}
                   </td>
                   <td>
                     <span className="code-snippet">
@@ -295,7 +351,8 @@ export function AccountsPage(): React.JSX.Element {
                     )}
                   </td>
                 </tr>
-              ))}
+              );
+              })}
             </tbody>
           </table>
         </div>
@@ -391,6 +448,20 @@ export function AccountsPage(): React.JSX.Element {
                     setCreateForm({ ...createForm, tiktok_open_id: e.target.value })
                   }
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="create-acc-buffer">ID do Canal Buffer (external_account_id)</label>
+                <input
+                  id="create-acc-buffer"
+                  type="text"
+                  placeholder="ex: 64b1f... (deixe em branco se não vinculado)"
+                  value={createForm.external_account_id}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, external_account_id: e.target.value })
+                  }
+                />
+                <span className="form-hint">Provider: {createForm.social_provider || "buffer"}</span>
               </div>
 
               <div className="form-checkbox">
@@ -500,6 +571,20 @@ export function AccountsPage(): React.JSX.Element {
                     setEditForm({ ...editForm, tiktok_open_id: e.target.value })
                   }
                 />
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="edit-acc-buffer">ID do Canal Buffer (external_account_id)</label>
+                <input
+                  id="edit-acc-buffer"
+                  type="text"
+                  placeholder="ID do canal no Buffer (ex: 64b1f...)"
+                  value={editForm.external_account_id}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, external_account_id: e.target.value })
+                  }
+                />
+                <span className="form-hint">Provider: {editForm.social_provider || "buffer"}</span>
               </div>
 
               <div className="form-checkbox">

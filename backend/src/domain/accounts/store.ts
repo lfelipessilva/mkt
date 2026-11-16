@@ -10,6 +10,9 @@ export interface UpsertAccountInput {
   role?: AccountRole;
   enabled?: boolean;
   tiktok_open_id?: string | null;
+  social_provider?: string | null;
+  external_account_id?: string | null;
+  social_account_metadata?: Record<string, unknown>;
 }
 
 export async function listAccounts(poolInstance?: Pool): Promise<Account[]> {
@@ -62,19 +65,36 @@ export async function upsertAccount(
     input.tiktok_open_id !== undefined
       ? input.tiktok_open_id
       : (existing?.tiktok_open_id ?? null);
+  const socialProvider =
+    input.social_provider !== undefined
+      ? input.social_provider
+      : (existing?.social_provider ?? null);
+  const externalAccountId =
+    input.external_account_id !== undefined
+      ? input.external_account_id
+      : (existing?.external_account_id ?? null);
+  const socialAccountMetadata =
+    input.social_account_metadata !== undefined
+      ? JSON.stringify(input.social_account_metadata)
+      : (existing?.social_account_metadata !== undefined
+          ? JSON.stringify(existing.social_account_metadata)
+          : "{}");
 
   const result = await p.query<Account>(
-    `INSERT INTO accounts (id, display_name, persona, role, enabled, tiktok_open_id, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+    `INSERT INTO accounts (id, display_name, persona, role, enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
      ON CONFLICT (id) DO UPDATE SET
        display_name = EXCLUDED.display_name,
        persona = EXCLUDED.persona,
        role = EXCLUDED.role,
        enabled = EXCLUDED.enabled,
        tiktok_open_id = EXCLUDED.tiktok_open_id,
+       social_provider = EXCLUDED.social_provider,
+       external_account_id = EXCLUDED.external_account_id,
+       social_account_metadata = EXCLUDED.social_account_metadata,
        updated_at = NOW()
-     RETURNING id, display_name, persona, role, enabled, tiktok_open_id, created_at, updated_at`,
-    [id, displayName, persona, role, enabled, tiktokOpenId]
+     RETURNING id, display_name, persona, role, enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, created_at, updated_at`,
+    [id, displayName, persona, role, enabled, tiktokOpenId, socialProvider, externalAccountId, socialAccountMetadata]
   );
 
   return result.rows[0];

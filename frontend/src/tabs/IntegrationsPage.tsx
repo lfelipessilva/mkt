@@ -5,6 +5,7 @@ import {
   testDispatch,
   syncTikTok,
   getLatestTikTokSync,
+  syncSocialAccounts,
   type TikTokSyncResult,
 } from "../api";
 import type { AppSettings, TikTokSyncRun } from "../types";
@@ -17,6 +18,7 @@ export function IntegrationsPage(): React.JSX.Element {
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [testingDispatch, setTestingDispatch] = useState<boolean>(false);
   const [syncingTikTok, setSyncingTikTok] = useState<boolean>(false);
+  const [syncingBuffer, setSyncingBuffer] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -105,6 +107,24 @@ export function IntegrationsPage(): React.JSX.Element {
       );
     } finally {
       setSyncingTikTok(false);
+    }
+  };
+
+  const handleSyncBuffer = async () => {
+    setSyncingBuffer(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+    try {
+      const res = await syncSocialAccounts();
+      setStatusMessage(
+        `Sincronização Buffer concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).`
+      );
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "Erro ao sincronizar Buffer"
+      );
+    } finally {
+      setSyncingBuffer(false);
     }
   };
 
@@ -247,6 +267,37 @@ export function IntegrationsPage(): React.JSX.Element {
             >
               <Zap className={`w-3.5 h-3.5 ${syncingTikTok ? "animate-pulse" : ""}`} />
               <span>{syncingTikTok ? "Sincronizando..." : "Sincronizar TikTok Agora"}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Card 3: Buffer Social Publishing */}
+        <div className="integration-card" data-testid="card-buffer-sync">
+          <div className="card-top">
+            <div className="card-badge">Buffer API</div>
+            <h4>Buffer Social Publishing</h4>
+            <p>
+              Sincroniza canais do TikTok conectados ao Buffer e permite despacho direto de carrosséis.
+            </p>
+          </div>
+
+          <div className="card-sync-status">
+            <p className="text-muted text-sm">
+              Ao puxar as contas, os canais conectados no Buffer serão vinculados às personas existentes
+              ou importados automaticamente como novas contas.
+            </p>
+          </div>
+
+          <div className="card-actions">
+            <button
+              type="button"
+              className="btn btn-primary flex items-center gap-1.5"
+              onClick={() => void handleSyncBuffer()}
+              disabled={syncingBuffer || loading}
+              data-testid="btn-buffer-sync"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingBuffer ? "animate-spin" : ""}`} />
+              <span>{syncingBuffer ? "Puxando contas..." : "Puxar Contas do Buffer"}</span>
             </button>
           </div>
         </div>
