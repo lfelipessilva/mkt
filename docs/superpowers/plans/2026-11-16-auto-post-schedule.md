@@ -308,7 +308,7 @@
 **Interfaces:**
 - `?tab=galeria&run=<uuid>` → tab galeria + focus
 
-- [ ] **Step 1–4: TDD parse + wire. Commit** `feat(gallery): deep link focus for approval`
+- [x] **Step 1–4: TDD parse + wire. Commit** `feat(gallery): deep link focus for approval`
 
 ---
 

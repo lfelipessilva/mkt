@@ -126,7 +126,29 @@ export function filterRunsBySearch(
   });
 }
 
-export function GalleryPage(): React.JSX.Element {
+export function isRunInView(runs: CarouselRun[], runId?: string): boolean {
+  if (!runId) return false;
+  return runs.some((r) => r.id === runId);
+}
+
+export function checkFocusedRunVisibility(
+  runs: CarouselRun[],
+  focusedRunId?: string,
+  loading: boolean = false
+): { inView: boolean; showMissingBanner: boolean } {
+  if (!focusedRunId) {
+    return { inView: false, showMissingBanner: false };
+  }
+  const inView = isRunInView(runs, focusedRunId);
+  const showMissingBanner = !loading && !inView;
+  return { inView, showMissingBanner };
+}
+
+export interface GalleryPageProps {
+  focusedRunId?: string;
+}
+
+export function GalleryPage({ focusedRunId }: GalleryPageProps = {}): React.JSX.Element {
   const { selectedAccountId, selectedAccount, accounts } = useAccount();
 
   const [runs, setRuns] = useState<CarouselRun[]>([]);
@@ -220,6 +242,23 @@ export function GalleryPage(): React.JSX.Element {
     list = filterRunsBySearch(list, searchQuery);
     return list;
   }, [runs, selectedAccountId, statusFilter, searchQuery]);
+
+  const { showMissingBanner } = checkFocusedRunVisibility(
+    filteredRuns,
+    focusedRunId,
+    loading
+  );
+
+  useEffect(() => {
+    if (!focusedRunId || loading) return;
+
+    const el =
+      document.getElementById(`run-card-${focusedRunId}`) ||
+      document.querySelector(`[data-testid="run-card-${focusedRunId}"]`);
+    if (el && typeof el.scrollIntoView === "function") {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [focusedRunId, loading, filteredRuns]);
 
   return (
     <div className="gallery-page" data-testid="gallery-page">
@@ -324,6 +363,17 @@ export function GalleryPage(): React.JSX.Element {
         </div>
       )}
 
+      {/* Missing focused run banner */}
+      {showMissingBanner && (
+        <div
+          className="focused-run-missing-banner alert-banner flex items-center gap-2"
+          role="alert"
+          data-testid="focused-run-missing-banner"
+        >
+          <span>Carrossel não encontrado nesta visualização</span>
+        </div>
+      )}
+
       {/* Error state */}
       {error && (
         <div className="error-card" role="alert">
@@ -379,6 +429,7 @@ export function GalleryPage(): React.JSX.Element {
             key={run.id}
             run={run}
             account={accountsById.get(run.account_id)}
+            isFocused={Boolean(focusedRunId && run.id === focusedRunId)}
             onDispatched={handleRunUpdated}
             onOpenManualPublish={handleOpenManualModal}
             onRunUpdated={handleRunUpdated}

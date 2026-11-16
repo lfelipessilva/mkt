@@ -13,6 +13,7 @@ export interface RunCardProps {
   onOpenManualPublish?: (run: CarouselRun) => void;
   onRunUpdated?: (run: CarouselRun) => void;
   onToast?: (message: string, type: "success" | "error" | "info") => void;
+  isFocused?: boolean;
 }
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -24,6 +25,10 @@ export const STATUS_LABELS: Record<string, string> = {
   published: "Publicado",
   failed: "Falhou",
 };
+
+export function resolveRunCardClassName(status: string, isFocused?: boolean): string {
+  return `run-card status-${status}${isFocused ? " run-card--focused" : ""}`;
+}
 
 export function resolveBufferPublishState(
   account: Account | null | undefined,
@@ -72,6 +77,7 @@ export function RunCard({
   onOpenManualPublish,
   onRunUpdated,
   onToast,
+  isFocused = false,
 }: RunCardProps): React.JSX.Element {
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -159,7 +165,11 @@ export function RunCard({
   };
 
   return (
-    <div className={`run-card status-${run.status}`} data-testid={`run-card-${run.id}`}>
+    <div
+      id={`run-card-${run.id}`}
+      className={resolveRunCardClassName(run.status, isFocused)}
+      data-testid={`run-card-${run.id}`}
+    >
       {/* Top Header */}
       <div className="run-card-header">
         <div className="run-card-account">
