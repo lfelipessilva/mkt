@@ -30,6 +30,8 @@
 
 ### Task 1: Função de resolução de contas e testes unitários
 
+**WDD class:** wiring
+
 **Files:**
 - Create: `frontend/src/gallery-generate.test.ts`
 - Modify: `frontend/src/tabs/GalleryPage.tsx:1-30`
@@ -108,6 +110,8 @@ git commit -m "feat(gallery): add target account resolution for gallery carousel
 
 ### Task 2: Implementar botão de geração, polling e auto-refresh na Galeria
 
+**WDD class:** dense
+
 **Files:**
 - Modify: `frontend/src/tabs/GalleryPage.tsx`
 - Modify: `frontend/src/gallery-generate.test.ts`
@@ -175,6 +179,8 @@ git commit -m "feat(gallery): add carousel generation button with context-aware 
 ---
 
 ### Task 3: Remover página GeneratePage da navegação e tipos
+
+**WDD class:** wiring
 
 **Files:**
 - Modify: `frontend/src/components/Sidebar.tsx`
