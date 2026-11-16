@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 import type { Pool } from "pg";
 import { getPool } from "../../shared/db/client.js";
@@ -14,7 +13,6 @@ import type { AccountRole } from "../accounts/schemas.js";
 import {
   MEDIA_SCOPES,
   validCategoriesForScope,
-  safeResolveMediaPath,
   parseSiloMediaKey,
   type MediaCategory,
 } from "./paths.js";
@@ -273,11 +271,11 @@ export async function upsertMediaAsset(
 }
 
 /**
- * Deletes a media asset from Postgres and deletes its file from disk.
+ * Deletes a media asset from Postgres and Silo.
  */
 export async function deleteMediaAsset(
   storagePath: string,
-  mediaRoot?: string,
+  _mediaRoot?: string,
   poolInstance?: Pool
 ): Promise<void> {
   const p = poolInstance || getPool();
@@ -289,17 +287,6 @@ export async function deleteMediaAsset(
 
   // Delete from Postgres
   await p.query("DELETE FROM media_assets WHERE id = $1", [asset.id]);
-
-  // Remove physical file from disk if it exists
-  try {
-    const diskPath = safeResolveMediaPath(asset.storage_path);
-    if (fs.existsSync(diskPath)) {
-      fs.unlinkSync(diskPath);
-    }
-  } catch (err) {
-    // If safeResolve fails or file doesn't exist, log and proceed
-    console.warn(`[media:delete] Could not unlink disk file for '${storagePath}':`, err);
-  }
 
   // Remove from Silo if enabled
   if (isSiloEnabled()) {

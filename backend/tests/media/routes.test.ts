@@ -1,16 +1,24 @@
 import { describe, it, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import pg from "pg";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { runMigrations } from "../../src/shared/db/migrate.js";
 import { closePool } from "../../src/shared/db/client.js";
 import { buildApp } from "../../src/app.js";
 import type { FastifyInstance } from "fastify";
-import { scanMediaToDb, listMediaAssets, deleteMediaAsset } from "../../src/domain/media/store.js";
-import { scopeToDir } from "../../src/domain/media/paths.js";
+import {
+  scanSiloMediaToDb,
+  listMediaAssets,
+  deleteMediaAsset,
+} from "../../src/domain/media/store.js";
+import {
+  enableMockSilo,
+  disableMockSilo,
+  resetMockSilo,
+  uploadMediaToSilo,
+  downloadMediaFromSilo,
+  siloObjectExists,
+} from "../../src/shared/storage/silo.js";
 
 const { Pool } = pg;
 
@@ -18,13 +26,12 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
   let container: StartedPostgreSqlContainer | null = null;
   let pool: pg.Pool;
   let app: FastifyInstance;
-  let tmpMediaDir: string;
   const testToken = "test-secret-token-media";
   const authHeaders = { authorization: `Bearer ${testToken}` };
 
   before(async () => {
     process.env.API_TOKEN = testToken;
-    let connectionString = process.env.DATABASE_URL;
+    let connectionString = process.env.TEST_DATABASE_URL;
 
     if (!connectionString) {
       container = await new PostgreSqlContainer("postgres:16-alpine").start();
@@ -35,26 +42,19 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
     pool = new Pool({ connectionString });
     await runMigrations(pool);
 
-    // Create temporary media root directory for isolated test operations
-    tmpMediaDir = fs.mkdtempSync(path.join(os.tmpdir(), "media-test-root-"));
-    process.env.MEDIA_ROOT = tmpMediaDir;
+    enableMockSilo();
 
-    // Create standard scope directories
-    fs.mkdirSync(path.join(tmpMediaDir, "single_man", "capas"), { recursive: true });
-    fs.mkdirSync(path.join(tmpMediaDir, "single_man", "aleatorias"), { recursive: true });
-    fs.mkdirSync(path.join(tmpMediaDir, "shared", "listo"), { recursive: true });
-
-    // Seed dummy image files
-    fs.writeFileSync(
-      path.join(tmpMediaDir, "single_man", "capas", "man_capa.jpg"),
-      Buffer.from("sample-jpg-bytes")
+    // Seed dummy media in Silo
+    await uploadMediaToSilo(
+      "media/single_man/cover/man_capa.jpg",
+      Buffer.from("sample-jpg-bytes"),
+      "image/jpeg"
     );
-    fs.writeFileSync(
-      path.join(tmpMediaDir, "shared", "listo", "listo_screen.png"),
-      Buffer.from("sample-png-bytes")
+    await uploadMediaToSilo(
+      "media/shared/listo/listo_screen.png",
+      Buffer.from("sample-png-bytes"),
+      "image/png"
     );
-    // .gitkeep should be ignored
-    fs.writeFileSync(path.join(tmpMediaDir, "single_man", "aleatorias", ".gitkeep"), "");
 
     app = await buildApp();
   });
@@ -64,6 +64,7 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
   });
 
   after(async () => {
+    disableMockSilo();
     if (app) {
       await app.close();
     }
@@ -74,16 +75,13 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
     if (container) {
       await container.stop();
     }
-    if (tmpMediaDir && fs.existsSync(tmpMediaDir)) {
-      fs.rmSync(tmpMediaDir, { recursive: true, force: true });
-    }
   });
 
   describe("Step 1: Test file endpoint rejects ../../etc/passwd & enforces auth", () => {
     it("rejects unauthenticated requests with 401", async () => {
       const res = await app.inject({
         method: "GET",
-        url: "/api/v1/media/file?path=single_man/capas/man_capa.jpg",
+        url: "/api/v1/media/file?path=single_man/cover/man_capa.jpg",
       });
       assert.equal(res.statusCode, 401);
     });
@@ -126,19 +124,19 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
       assert.equal(res.statusCode, 400);
     });
 
-    it("returns 404 for non-existent file inside media root", async () => {
+    it("returns 404 for non-existent file inside Silo", async () => {
       const res = await app.inject({
         method: "GET",
-        url: "/api/v1/media/file?path=single_man/capas/non_existent.jpg",
+        url: "/api/v1/media/file?path=single_man/cover/non_existent.jpg",
         headers: authHeaders,
       });
       assert.equal(res.statusCode, 404);
     });
 
-    it("returns 200 and image file contents when file exists", async () => {
+    it("returns 200 and image file contents when file exists in Silo", async () => {
       const res = await app.inject({
         method: "GET",
-        url: "/api/v1/media/file?path=single_man/capas/man_capa.jpg",
+        url: "/api/v1/media/file?path=single_man/cover/man_capa.jpg",
         headers: authHeaders,
       });
       assert.equal(res.statusCode, 200);
@@ -158,20 +156,20 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
     });
   });
 
-  describe("Step 2: scanMediaToDb & GET /api/v1/media", () => {
-    it("scans files from disk and upserts into media_assets ignoring .gitkeep", async () => {
-      const count = await scanMediaToDb(tmpMediaDir, pool);
+  describe("Step 2: scanSiloMediaToDb & GET /api/v1/media", () => {
+    it("scans files from Silo and upserts into media_assets", async () => {
+      const count = await scanSiloMediaToDb(pool);
       assert.equal(count, 2);
 
       const items = await listMediaAssets({}, pool);
       assert.equal(items.length, 2);
 
-      const capas = items.find((i) => i.filename === "man_capa.jpg");
-      assert.ok(capas);
-      assert.equal(capas.scope, "single_man");
-      assert.equal(capas.category, "capas");
-      assert.equal(capas.byte_size, 16);
-      assert.equal(capas.active, true);
+      const cover = items.find((i) => i.filename === "man_capa.jpg");
+      assert.ok(cover);
+      assert.equal(cover.scope, "single_man");
+      assert.equal(cover.category, "cover");
+      assert.equal(cover.byte_size, 16);
+      assert.equal(cover.active, true);
 
       const listo = items.find((i) => i.filename === "listo_screen.png");
       assert.ok(listo);
@@ -180,10 +178,10 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
     });
 
     it("is idempotent: scanning twice does not duplicate records", async () => {
-      const count1 = await scanMediaToDb(tmpMediaDir, pool);
+      const count1 = await scanSiloMediaToDb(pool);
       assert.equal(count1, 2);
 
-      const count2 = await scanMediaToDb(tmpMediaDir, pool);
+      const count2 = await scanSiloMediaToDb(pool);
       assert.equal(count2, 2);
 
       const items = await listMediaAssets({}, pool);
@@ -191,7 +189,7 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
     });
 
     it("GET /api/v1/media filters by scope and category", async () => {
-      await scanMediaToDb(tmpMediaDir, pool);
+      await scanSiloMediaToDb(pool);
 
       // Filter by scope
       const resScope = await app.inject({
@@ -226,11 +224,11 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
     });
   });
 
-  describe("Step 3: Upload writes under scopeToDir(scope)/category/", () => {
-    it("POST /api/v1/media/upload writes file under scope directory and creates DB asset", async () => {
+  describe("Step 3: Upload writes to Silo and upserts into DB", () => {
+    it("POST /api/v1/media/upload writes buffer to Silo and creates DB asset", async () => {
       const form = new FormData();
       form.append("scope", "single_woman");
-      form.append("category", "capas");
+      form.append("category", "cover");
       form.append(
         "file",
         new Blob(["uploaded-test-image-content"], { type: "image/jpeg" }),
@@ -253,21 +251,20 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
       assert.equal(res.statusCode, 201);
       const asset = res.json();
       assert.equal(asset.scope, "single_woman");
-      assert.equal(asset.category, "capas");
+      assert.equal(asset.category, "cover");
       assert.equal(asset.filename, "uploaded_woman.jpg");
       assert.equal(asset.byte_size, 27);
-      assert.equal(asset.storage_path, "media/single_woman/capas/uploaded_woman.jpg");
+      assert.equal(asset.storage_path, "media/single_woman/cover/uploaded_woman.jpg");
 
-      // Verify file exists on disk under mediaRoot/single_woman/capas/uploaded_woman.jpg
-      const expectedDiskPath = path.join(tmpMediaDir, "single_woman", "capas", "uploaded_woman.jpg");
-      assert.ok(fs.existsSync(expectedDiskPath));
-      assert.equal(fs.readFileSync(expectedDiskPath, "utf-8"), "uploaded-test-image-content");
+      // Verify file exists in Silo
+      const siloBuf = await downloadMediaFromSilo(asset.storage_path);
+      assert.equal(siloBuf.toString(), "uploaded-test-image-content");
     });
 
     it("rejects invalid scope or category with 400", async () => {
       const form = new FormData();
       form.append("scope", "invalid_scope");
-      form.append("category", "capas");
+      form.append("category", "cover");
       form.append(
         "file",
         new Blob(["data"], { type: "image/jpeg" }),
@@ -318,11 +315,11 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
   });
 
   describe("Step 4: DELETE /api/v1/media body { storage_path }", () => {
-    it("deletes asset from DB and disk", async () => {
+    it("deletes asset from DB and Silo", async () => {
       // First upload an asset
       const form = new FormData();
       form.append("scope", "single_man");
-      form.append("category", "capas");
+      form.append("category", "cover");
       form.append(
         "file",
         new Blob(["to-be-deleted"], { type: "image/jpeg" }),
@@ -344,8 +341,9 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
       assert.equal(uploadRes.statusCode, 201);
       const asset = uploadRes.json();
 
-      const diskPath = path.join(tmpMediaDir, "single_man", "capas", "delete_me.jpg");
-      assert.ok(fs.existsSync(diskPath));
+      // Verify exists in Silo
+      const existsBefore = await siloObjectExists("media", asset.storage_path);
+      assert.ok(existsBefore);
 
       // DELETE /api/v1/media
       const delRes = await app.inject({
@@ -361,8 +359,9 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
       assert.equal(delRes.statusCode, 200);
       assert.equal(delRes.json().ok, true);
 
-      // Verify file was deleted from disk
-      assert.ok(!fs.existsSync(diskPath));
+      // Verify file was deleted from Silo
+      const existsAfter = await siloObjectExists("media", asset.storage_path);
+      assert.ok(!existsAfter);
 
       // Verify asset is no longer returned in DB list
       const list = await listMediaAssets({ scope: "single_man" }, pool);
@@ -383,11 +382,11 @@ describe("media assets routes, store & traversal security", { timeout: 60000 }, 
     });
 
     it("direct deleteMediaAsset store function deletes asset", async () => {
-      await scanMediaToDb(tmpMediaDir, pool);
+      await scanSiloMediaToDb(pool);
       const items = await listMediaAssets({ scope: "single_man" }, pool);
       assert.ok(items.length > 0);
 
-      await deleteMediaAsset(items[0].storage_path, tmpMediaDir, pool);
+      await deleteMediaAsset(items[0].storage_path, undefined, pool);
       const after = await listMediaAssets({ scope: "single_man" }, pool);
       assert.ok(!after.some((a) => a.storage_path === items[0].storage_path));
     });

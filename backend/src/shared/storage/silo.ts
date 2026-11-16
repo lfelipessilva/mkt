@@ -21,12 +21,43 @@ export interface SiloConfig {
 let cachedS3Client: S3Client | null = null;
 let cachedConfig: SiloConfig | null = null;
 
+interface MockSiloItem {
+  body: Buffer;
+  contentType?: string;
+}
+
+let mockSiloStore: Map<string, MockSiloItem> | null = null;
+
+export function enableMockSilo(): void {
+  mockSiloStore = new Map();
+}
+
+export function disableMockSilo(): void {
+  mockSiloStore = null;
+}
+
+export function resetMockSilo(): void {
+  if (mockSiloStore) {
+    mockSiloStore.clear();
+  }
+}
+
 export function getSiloConfig(): SiloConfig | null {
   const serverUrl = process.env.SILO_SERVER_URL;
   const accessKey = process.env.SILO_ACCESS_KEY;
   const secretKey = process.env.SILO_SECRET_KEY;
 
   if (!serverUrl || !accessKey || !secretKey) {
+    if (mockSiloStore) {
+      return {
+        serverUrl: "http://mock-silo",
+        accessKey: "mock-key",
+        secretKey: "mock-secret",
+        mediaBucket: process.env.SILO_MEDIA_BUCKET || "media",
+        carouselsBucket: process.env.SILO_CAROUSELS_BUCKET || "carousels",
+        browserRedirectUrl: process.env.SILO_BROWSER_REDIRECT_URL,
+      };
+    }
     return null;
   }
 
@@ -41,7 +72,7 @@ export function getSiloConfig(): SiloConfig | null {
 }
 
 export function isSiloEnabled(): boolean {
-  return getSiloConfig() !== null;
+  return mockSiloStore !== null || getSiloConfig() !== null;
 }
 
 export function getSiloClient(): S3Client {
@@ -82,8 +113,14 @@ export async function uploadToSilo(
   body: Buffer | Uint8Array | string,
   contentType?: string
 ): Promise<void> {
-  const s3 = getSiloClient();
   const cleanKey = key.replace(/^\/+/, "");
+  if (mockSiloStore) {
+    const buf = typeof body === "string" ? Buffer.from(body, "utf-8") : Buffer.from(body);
+    mockSiloStore.set(`${bucket}/${cleanKey}`, { body: buf, contentType });
+    return;
+  }
+
+  const s3 = getSiloClient();
   await s3.send(
     new PutObjectCommand({
       Bucket: bucket,
@@ -98,8 +135,19 @@ export async function uploadToSilo(
  * Download an object from Silo S3 as Buffer.
  */
 export async function downloadFromSilo(bucket: string, key: string): Promise<Buffer> {
-  const s3 = getSiloClient();
   const cleanKey = key.replace(/^\/+/, "");
+  if (mockSiloStore) {
+    const item = mockSiloStore.get(`${bucket}/${cleanKey}`);
+    if (!item) {
+      const err: any = new Error(`Object '${cleanKey}' not found in bucket '${bucket}'`);
+      err.name = "NoSuchKey";
+      err.$metadata = { httpStatusCode: 404 };
+      throw err;
+    }
+    return item.body;
+  }
+
+  const s3 = getSiloClient();
   const response = await s3.send(
     new GetObjectCommand({
       Bucket: bucket,
@@ -126,8 +174,23 @@ export async function getSiloObjectStream(
   contentType?: string;
   contentLength?: number;
 }> {
-  const s3 = getSiloClient();
   const cleanKey = key.replace(/^\/+/, "");
+  if (mockSiloStore) {
+    const item = mockSiloStore.get(`${bucket}/${cleanKey}`);
+    if (!item) {
+      const err: any = new Error(`Object '${cleanKey}' not found in bucket '${bucket}'`);
+      err.name = "NoSuchKey";
+      err.$metadata = { httpStatusCode: 404 };
+      throw err;
+    }
+    return {
+      stream: Readable.from(item.body),
+      contentType: item.contentType,
+      contentLength: item.body.length,
+    };
+  }
+
+  const s3 = getSiloClient();
   const response = await s3.send(
     new GetObjectCommand({
       Bucket: bucket,
@@ -151,8 +214,13 @@ export async function getSiloObjectStream(
  * Delete an object from Silo S3.
  */
 export async function deleteFromSilo(bucket: string, key: string): Promise<void> {
-  const s3 = getSiloClient();
   const cleanKey = key.replace(/^\/+/, "");
+  if (mockSiloStore) {
+    mockSiloStore.delete(`${bucket}/${cleanKey}`);
+    return;
+  }
+
+  const s3 = getSiloClient();
   await s3.send(
     new DeleteObjectCommand({
       Bucket: bucket,
@@ -165,9 +233,13 @@ export async function deleteFromSilo(bucket: string, key: string): Promise<void>
  * Check if an object exists in Silo S3.
  */
 export async function siloObjectExists(bucket: string, key: string): Promise<boolean> {
+  const cleanKey = key.replace(/^\/+/, "");
+  if (mockSiloStore) {
+    return mockSiloStore.has(`${bucket}/${cleanKey}`);
+  }
+
   try {
     const s3 = getSiloClient();
-    const cleanKey = key.replace(/^\/+/, "");
     await s3.send(
       new HeadObjectCommand({
         Bucket: bucket,
@@ -183,13 +255,41 @@ export async function siloObjectExists(bucket: string, key: string): Promise<boo
   }
 }
 
+export interface SiloObjectEntry {
+  key: string;
+  size: number;
+}
+
 /**
  * List object keys with optional prefix.
  */
 export async function listSiloObjects(bucket: string, prefix?: string): Promise<string[]> {
-  const s3 = getSiloClient();
+  const entries = await listSiloObjectEntries(bucket, prefix);
+  return entries.map((e) => e.key);
+}
+
+export async function listSiloObjectEntries(
+  bucket: string,
+  prefix?: string
+): Promise<SiloObjectEntry[]> {
   const cleanPrefix = prefix ? prefix.replace(/^\/+/, "") : undefined;
-  const keys: string[] = [];
+
+  if (mockSiloStore) {
+    const prefixStr = cleanPrefix || "";
+    const entries: SiloObjectEntry[] = [];
+    for (const [k, v] of mockSiloStore.entries()) {
+      if (k.startsWith(`${bucket}/`)) {
+        const itemKey = k.slice(bucket.length + 1);
+        if (!prefixStr || itemKey.startsWith(prefixStr)) {
+          entries.push({ key: itemKey, size: v.body.length });
+        }
+      }
+    }
+    return entries;
+  }
+
+  const s3 = getSiloClient();
+  const entries: SiloObjectEntry[] = [];
   let continuationToken: string | undefined;
 
   do {
@@ -203,14 +303,16 @@ export async function listSiloObjects(bucket: string, prefix?: string): Promise<
 
     if (response.Contents) {
       for (const item of response.Contents) {
-        if (item.Key) keys.push(item.Key);
+        if (item.Key && !item.Key.endsWith("/")) {
+          entries.push({ key: item.Key, size: item.Size ?? 0 });
+        }
       }
     }
 
     continuationToken = response.NextContinuationToken;
   } while (continuationToken);
 
-  return keys;
+  return entries;
 }
 
 // Convenient helpers for Media bucket
@@ -233,6 +335,13 @@ export async function deleteMediaFromSilo(key: string): Promise<void> {
   await deleteFromSilo(bucket, normalizedKey);
 }
 
+export async function downloadMediaFromSilo(key: string): Promise<Buffer> {
+  const config = getSiloConfig();
+  const bucket = config?.mediaBucket || "media";
+  const normalizedKey = key.startsWith("media/") ? key.slice(6) : key;
+  return downloadFromSilo(bucket, normalizedKey);
+}
+
 export async function getMediaStreamFromSilo(
   key: string
 ): Promise<{ stream: Readable; contentType?: string; contentLength?: number }> {
@@ -243,6 +352,20 @@ export async function getMediaStreamFromSilo(
 }
 
 // Convenient helpers for Carousels bucket
+function normalizeCarouselKey(key: string): string {
+  let normalizedKey = key.replace(/^\/+/, "").replace(/\\/g, "/");
+  if (normalizedKey.startsWith("output/")) {
+    normalizedKey = normalizedKey.slice(7);
+  } else {
+    const marker = "/output/";
+    const idx = normalizedKey.indexOf(marker);
+    if (idx >= 0) {
+      normalizedKey = normalizedKey.slice(idx + marker.length);
+    }
+  }
+  return normalizedKey;
+}
+
 export async function uploadCarouselToSilo(
   key: string,
   body: Buffer | string,
@@ -250,13 +373,14 @@ export async function uploadCarouselToSilo(
 ): Promise<void> {
   const config = getSiloConfig();
   const bucket = config?.carouselsBucket || "carousels";
-  // Normalize key: remove leading "output/" if present
-  let normalizedKey = key.replace(/^\/+/, "");
-  if (normalizedKey.startsWith("output/")) {
-    normalizedKey = normalizedKey.slice(7);
-  }
   const bufferBody = typeof body === "string" ? Buffer.from(body, "utf-8") : body;
-  await uploadToSilo(bucket, normalizedKey, bufferBody, contentType);
+  await uploadToSilo(bucket, normalizeCarouselKey(key), bufferBody, contentType);
+}
+
+export async function downloadCarouselFromSilo(key: string): Promise<Buffer> {
+  const config = getSiloConfig();
+  const bucket = config?.carouselsBucket || "carousels";
+  return downloadFromSilo(bucket, normalizeCarouselKey(key));
 }
 
 export async function getCarouselStreamFromSilo(
@@ -264,9 +388,5 @@ export async function getCarouselStreamFromSilo(
 ): Promise<{ stream: Readable; contentType?: string; contentLength?: number }> {
   const config = getSiloConfig();
   const bucket = config?.carouselsBucket || "carousels";
-  let normalizedKey = key.replace(/^\/+/, "");
-  if (normalizedKey.startsWith("output/")) {
-    normalizedKey = normalizedKey.slice(7);
-  }
-  return getSiloObjectStream(bucket, normalizedKey);
+  return getSiloObjectStream(bucket, normalizeCarouselKey(key));
 }
