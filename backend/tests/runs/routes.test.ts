@@ -13,7 +13,7 @@ import type { FastifyInstance } from "fastify";
 import { upsertAccount } from "../../src/domain/accounts/store.js";
 import { replaceArchetypesForScope } from "../../src/domain/archetypes/store.js";
 import { replaceBaitsForScope } from "../../src/domain/baits/store.js";
-import { scanMediaToDb } from "../../src/domain/media/store.js";
+import { upsertMediaAsset } from "../../src/domain/media/store.js";
 import { generateBatch } from "../../src/domain/runs/generate.js";
 
 const { Pool } = pg;
@@ -24,6 +24,7 @@ describe("Task 12: Generation jobs API (carousels routes)", { timeout: 60000 }, 
   let app: FastifyInstance;
   let tmpMediaDir: string;
   let tmpOutputDir: string;
+  let seedMedia: Array<{ scope: string; category: string; filename: string; path: string }>;
 
   const testToken = "test-secret-token-routes";
   const authHeaders = { authorization: `Bearer ${testToken}` };
@@ -84,19 +85,8 @@ describe("Task 12: Generation jobs API (carousels routes)", { timeout: 60000 }, 
     process.env.MEDIA_ROOT = tmpMediaDir;
     process.env.OUTPUT_DIR = tmpOutputDir;
 
-    const dirs = [
-      path.join(tmpMediaDir, "single_woman", "capas"),
-      path.join(tmpMediaDir, "single_woman", "aleatorias"),
-      path.join(tmpMediaDir, "single_man", "capas"),
-      path.join(tmpMediaDir, "single_man", "aleatorias"),
-      path.join(tmpMediaDir, "shared", "aleatorias"),
-      path.join(tmpMediaDir, "shared", "listo"),
-    ];
-    for (const d of dirs) {
-      fs.mkdirSync(d, { recursive: true });
-    }
-
     const createTestImage = async (dest: string) => {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
       await sharp({
         create: {
           width: 1080,
@@ -109,23 +99,29 @@ describe("Task 12: Generation jobs API (carousels routes)", { timeout: 60000 }, 
         .toFile(dest);
     };
 
-    // Woman media
-    await createTestImage(path.join(tmpMediaDir, "single_woman", "capas", "capa_01.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "single_woman", "capas", "capa_02.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "single_woman", "aleatorias", "aleat_01.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "single_woman", "aleatorias", "aleat_02.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "single_woman", "aleatorias", "aleat_03.jpg"));
+    seedMedia = [
+      // Woman media
+      { scope: "single_woman", category: "cover", filename: "capa_01.jpg", path: path.join(tmpMediaDir, "single_woman", "cover", "capa_01.jpg") },
+      { scope: "single_woman", category: "cover", filename: "capa_02.jpg", path: path.join(tmpMediaDir, "single_woman", "cover", "capa_02.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_01.jpg", path: path.join(tmpMediaDir, "single_woman", "random", "aleat_01.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_02.jpg", path: path.join(tmpMediaDir, "single_woman", "random", "aleat_02.jpg") },
+      { scope: "single_woman", category: "random", filename: "aleat_03.jpg", path: path.join(tmpMediaDir, "single_woman", "random", "aleat_03.jpg") },
 
-    // Man media
-    await createTestImage(path.join(tmpMediaDir, "single_man", "capas", "capa_man_01.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "single_man", "aleatorias", "aleat_man_01.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "single_man", "aleatorias", "aleat_man_02.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "single_man", "aleatorias", "aleat_man_03.jpg"));
+      // Man media
+      { scope: "single_man", category: "cover", filename: "capa_man_01.jpg", path: path.join(tmpMediaDir, "single_man", "cover", "capa_man_01.jpg") },
+      { scope: "single_man", category: "random", filename: "aleat_man_01.jpg", path: path.join(tmpMediaDir, "single_man", "random", "aleat_man_01.jpg") },
+      { scope: "single_man", category: "random", filename: "aleat_man_02.jpg", path: path.join(tmpMediaDir, "single_man", "random", "aleat_man_02.jpg") },
+      { scope: "single_man", category: "random", filename: "aleat_man_03.jpg", path: path.join(tmpMediaDir, "single_man", "random", "aleat_man_03.jpg") },
 
-    // Shared media
-    await createTestImage(path.join(tmpMediaDir, "shared", "aleatorias", "shared_01.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "shared", "aleatorias", "shared_02.jpg"));
-    await createTestImage(path.join(tmpMediaDir, "shared", "listo", "listo_01.png"));
+      // Shared media
+      { scope: "shared", category: "random", filename: "shared_01.jpg", path: path.join(tmpMediaDir, "shared", "random", "shared_01.jpg") },
+      { scope: "shared", category: "random", filename: "shared_02.jpg", path: path.join(tmpMediaDir, "shared", "random", "shared_02.jpg") },
+      { scope: "listo", category: "listo", filename: "listo_01.png", path: path.join(tmpMediaDir, "listo", "listo_01.png") },
+    ];
+
+    for (const m of seedMedia) {
+      await createTestImage(m.path);
+    }
 
     app = await buildApp();
   });
@@ -193,8 +189,18 @@ describe("Task 12: Generation jobs API (carousels routes)", { timeout: 60000 }, 
       pool
     );
 
-    // Scan media to DB
-    await scanMediaToDb(tmpMediaDir, pool);
+    // Seed media assets in DB
+    for (const m of seedMedia) {
+      await upsertMediaAsset(
+        {
+          scope: m.scope as any,
+          category: m.category as any,
+          storage_path: m.path,
+          filename: m.filename,
+        },
+        pool
+      );
+    }
   });
 
   after(async () => {

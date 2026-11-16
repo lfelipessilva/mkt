@@ -337,6 +337,28 @@ describe("Task 10: Usage in Postgres & rotation", { timeout: 60000 }, () => {
         pool
       );
 
+      // Random & listo assets for selection
+      for (const name of ["woman_aleat_1.jpg", "woman_aleat_2.jpg", "woman_aleat_3.jpg"]) {
+        await upsertMediaAsset(
+          {
+            scope: "single_woman",
+            category: "random",
+            storage_path: `media/single_woman/random/${name}`,
+            filename: name,
+          },
+          pool
+        );
+      }
+      await upsertMediaAsset(
+        {
+          scope: "listo",
+          category: "listo",
+          storage_path: "media/listo/listo_1.png",
+          filename: "listo_1.png",
+        },
+        pool
+      );
+
       // Record usage for woman_capa_1.jpg
       const runRes = await pool.query(
         `INSERT INTO carousel_runs (id, account_id, account_role, archetype_title, legenda)

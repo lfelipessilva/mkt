@@ -195,7 +195,7 @@ export async function listActiveMediaImages(
     `SELECT filename, storage_path
      FROM media_assets
      WHERE active = true
-       AND scope = ANY($1::text[])
+       AND scope::text = ANY($1::text[])
        AND (
          category = $2
          OR ($2 = 'cover' AND category = 'capas')

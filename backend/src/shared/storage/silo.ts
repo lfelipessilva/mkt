@@ -233,7 +233,15 @@ export async function deleteFromSilo(bucket: string, key: string): Promise<void>
  * Check if an object exists in Silo S3.
  */
 export async function siloObjectExists(bucket: string, key: string): Promise<boolean> {
-  const cleanKey = key.replace(/^\/+/, "");
+  let cleanKey = key.replace(/^\/+/, "");
+  const config = getSiloConfig();
+  const mediaBucket = config?.mediaBucket || "media";
+  const carouselsBucket = config?.carouselsBucket || "carousels";
+  if (bucket === mediaBucket && cleanKey.startsWith("media/")) {
+    cleanKey = cleanKey.slice(6);
+  } else if (bucket === carouselsBucket && cleanKey.startsWith("output/")) {
+    cleanKey = cleanKey.slice(7);
+  }
   if (mockSiloStore) {
     return mockSiloStore.has(`${bucket}/${cleanKey}`);
   }
