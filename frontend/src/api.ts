@@ -359,10 +359,27 @@ export async function getCarouselRun(id: string): Promise<CarouselRun> {
 
 export async function dispatchCarouselRun(
   runId: string,
-  channel: "telegram" | "api" = "telegram"
+  channel: "telegram" | "api" | "buffer" | "social" = "telegram"
 ): Promise<DispatchResult> {
   return apiFetch<DispatchResult>(
     `/carousels/runs/${encodeURIComponent(runId)}/send?channel=${encodeURIComponent(channel)}`,
+    {
+      method: "POST",
+    }
+  );
+}
+
+export interface ApproveAutomationRunResult {
+  ok: true;
+  already?: boolean;
+  run: CarouselRun;
+}
+
+export async function approveAutomationRun(
+  runId: string
+): Promise<ApproveAutomationRunResult> {
+  return apiFetch<ApproveAutomationRunResult>(
+    `/automation/runs/${encodeURIComponent(runId)}/approve`,
     {
       method: "POST",
     }

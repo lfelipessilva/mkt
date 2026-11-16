@@ -1,36 +1,84 @@
 import React, { useState } from "react";
-import type { CarouselRun, CarouselSlide } from "../types";
+import type { Account, CarouselRun, CarouselSlide } from "../types";
 import { ROLE_LABELS } from "../types";
 import { AuthImage } from "./AuthImage";
-import { dispatchCarouselRun } from "../api";
+import { dispatchCarouselRun, approveAutomationRun } from "../api";
 import { orderSlides } from "../tabs/GalleryPage";
-import { Send, CheckCircle2, Edit3, AlertCircle, Check } from "lucide-react";
+import { Send, CheckCircle2, Edit3, AlertCircle, Check, Share2 } from "lucide-react";
 
 export interface RunCardProps {
   run: CarouselRun;
+  account?: Account | null;
   onDispatched?: (updatedRun: CarouselRun) => void;
   onOpenManualPublish?: (run: CarouselRun) => void;
   onRunUpdated?: (run: CarouselRun) => void;
+  onToast?: (message: string, type: "success" | "error" | "info") => void;
 }
 
 export const STATUS_LABELS: Record<string, string> = {
   generating: "Gerando",
   generated: "Gerado",
+  awaiting_approval: "Aguardando aprovação",
   dispatching: "Despachando",
   dispatched: "Despachado",
   published: "Publicado",
   failed: "Falhou",
 };
 
+export function resolveBufferPublishState(
+  account: Account | null | undefined,
+  run: CarouselRun
+): { visible: boolean; disabled: boolean; label: string } {
+  const isLinked = Boolean(
+    account &&
+    account.external_account_id &&
+    account.external_account_id.trim() !== "" &&
+    (!account.social_provider || account.social_provider.trim() === "" || account.social_provider.trim().toLowerCase() === "buffer")
+  );
+
+  // 1. Se run.buffer_dispatched_at existe e run.status !== 'failed' → visible: true, disabled: true, label 'Enviado ao Buffer'
+  if (run.buffer_dispatched_at && run.status !== "failed") {
+    return { visible: true, disabled: true, label: "Enviado ao Buffer" };
+  }
+
+  // 2. Se run.buffer_dispatched_at existe e run.status === 'failed' → visible: true, disabled: false, label 'Reenviar ao Buffer'
+  if (run.buffer_dispatched_at && run.status === "failed") {
+    return { visible: true, disabled: false, label: "Reenviar ao Buffer" };
+  }
+
+  // 3. Se run está aguardando aprovação da rotina (status = 'awaiting_approval' ou slot vinculado em awaiting_approval)
+  if (run.status === "awaiting_approval") {
+    return { visible: true, disabled: false, label: "Confirmar envio" };
+  }
+
+  // Conta sem vínculo → invisível
+  if (!isLinked) {
+    return { visible: false, disabled: false, label: "" };
+  }
+
+  // 4. Se não existe buffer_dispatched_at e run.status === 'published' → visible: true, disabled: true, label 'Já publicado'
+  if (run.status === "published") {
+    return { visible: true, disabled: true, label: "Já publicado" };
+  }
+
+  // 5. Se não existe buffer_dispatched_at, a conta está vinculada e o run não está published → visible: true, disabled: false, label 'Publicar no Buffer'
+  return { visible: true, disabled: false, label: "Publicar no Buffer" };
+}
+
 export function RunCard({
   run,
+  account,
   onDispatched,
   onOpenManualPublish,
   onRunUpdated,
+  onToast,
 }: RunCardProps): React.JSX.Element {
   const [isSending, setIsSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [isPublishingBuffer, setIsPublishingBuffer] = useState(false);
+  const [bufferSuccess, setBufferSuccess] = useState(false);
+  const [bufferError, setBufferError] = useState<string | null>(null);
   const [expandedCaption, setExpandedCaption] = useState(false);
 
   const slides: CarouselSlide[] = orderSlides(run.slides || []);
@@ -40,6 +88,15 @@ export function RunCard({
         timeStyle: "short",
       })
     : "";
+
+  const isLinked = Boolean(
+    account &&
+    account.external_account_id &&
+    account.external_account_id.trim() !== "" &&
+    (!account.social_provider || account.social_provider.trim() === "" || account.social_provider.trim().toLowerCase() === "buffer")
+  );
+
+  const bufferState = resolveBufferPublishState(account, run);
 
   const handleSendTelegram = async () => {
     if (isSending) return;
@@ -64,6 +121,43 @@ export function RunCard({
     }
   };
 
+  const handlePublishBuffer = async () => {
+    if (isPublishingBuffer || bufferState.disabled) return;
+    setIsPublishingBuffer(true);
+    setBufferError(null);
+    setBufferSuccess(false);
+
+    try {
+      let updatedRun: CarouselRun;
+      if (run.status === "awaiting_approval") {
+        const result = await approveAutomationRun(run.id);
+        updatedRun = result.run || {
+          ...run,
+          status: "dispatched",
+          buffer_dispatched_at: new Date().toISOString(),
+        };
+      } else {
+        const result = await dispatchCarouselRun(run.id, "buffer");
+        updatedRun = result.run || {
+          ...run,
+          status: "dispatched",
+          buffer_dispatched_at: new Date().toISOString(),
+        };
+      }
+      setBufferSuccess(true);
+      if (onDispatched) onDispatched(updatedRun);
+      if (onRunUpdated) onRunUpdated(updatedRun);
+      if (onToast) onToast("Carrossel enviado ao Buffer", "success");
+      setTimeout(() => setBufferSuccess(false), 4000);
+    } catch (err: any) {
+      const msg = err.message || "Erro ao publicar no Buffer";
+      setBufferError(msg);
+      if (onToast) onToast(msg, "error");
+    } finally {
+      setIsPublishingBuffer(false);
+    }
+  };
+
   return (
     <div className={`run-card status-${run.status}`} data-testid={`run-card-${run.id}`}>
       {/* Top Header */}
@@ -78,7 +172,12 @@ export function RunCard({
           {formattedDate && <span className="run-timestamp">{formattedDate}</span>}
         </div>
 
-        <div className="run-card-badges">
+        <div className="run-card-badges flex items-center gap-1.5">
+          {isLinked && (
+            <span className="buffer-badge" title={`Conta vinculada ao Buffer (${account?.external_account_id})`}>
+              Buffer
+            </span>
+          )}
           <span className={`status-pill status-${run.status}`}>
             {STATUS_LABELS[run.status] || run.status}
           </span>
@@ -171,6 +270,18 @@ export function RunCard({
           <span>Carrossel despachado com sucesso via Telegram!</span>
         </div>
       )}
+      {bufferError && (
+        <div className="run-card-alert error flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-red-500" />
+          <span>{bufferError}</span>
+        </div>
+      )}
+      {bufferSuccess && (
+        <div className="run-card-alert success flex items-center gap-2">
+          <Check className="w-4 h-4 text-emerald-600" />
+          <span>Carrossel enviado ao Buffer</span>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="run-card-actions">
@@ -193,6 +304,28 @@ export function RunCard({
             </>
           )}
         </button>
+
+        {bufferState.visible && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-buffer flex items-center gap-1.5"
+            disabled={bufferState.disabled || isPublishingBuffer}
+            onClick={handlePublishBuffer}
+            title={bufferState.label}
+          >
+            {isPublishingBuffer ? (
+              <>
+                <span className="spinner-sm" />
+                <span>Enviando...</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="w-3.5 h-3.5" />
+                <span>{bufferState.label}</span>
+              </>
+            )}
+          </button>
+        )}
 
         <button
           type="button"

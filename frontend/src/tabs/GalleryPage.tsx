@@ -206,6 +206,14 @@ export function GalleryPage(): React.JSX.Element {
     }
   };
 
+  const accountsById = useMemo(() => {
+    const map = new Map<string, Account>();
+    for (const acc of accounts) {
+      map.set(acc.id, acc);
+    }
+    return map;
+  }, [accounts]);
+
   const filteredRuns = useMemo(() => {
     let list = filterRunsByAccount(runs, selectedAccountId);
     list = filterRunsByStatus(list, statusFilter);
@@ -370,9 +378,11 @@ export function GalleryPage(): React.JSX.Element {
           <RunCard
             key={run.id}
             run={run}
+            account={accountsById.get(run.account_id)}
             onDispatched={handleRunUpdated}
             onOpenManualPublish={handleOpenManualModal}
             onRunUpdated={handleRunUpdated}
+            onToast={showToast}
           />
         ))}
       </div>
