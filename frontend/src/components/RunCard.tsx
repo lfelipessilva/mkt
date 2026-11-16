@@ -257,16 +257,18 @@ export function RunCard({
 
         {/* Collapsed Images Section */}
         <div
-          className="run-collapsed-media-wrapper cursor-pointer group"
-          onClick={() => setSlidesModalOpen(true)}
-          role="button"
-          tabIndex={0}
+          className={`run-collapsed-media-wrapper ${slides.length > 0 ? "cursor-pointer group" : "cursor-default"}`}
+          onClick={() => {
+            if (slides.length > 0) setSlidesModalOpen(true);
+          }}
+          role={slides.length > 0 ? "button" : undefined}
+          tabIndex={slides.length > 0 ? 0 : undefined}
           onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
+            if (slides.length > 0 && (e.key === "Enter" || e.key === " ")) {
               setSlidesModalOpen(true);
             }
           }}
-          title="Clique para visualizar todos os slides"
+          title={slides.length > 0 ? "Clique para visualizar todos os slides" : undefined}
         >
           {coverSlide ? (
             <div className="run-collapsed-media-stack">
@@ -439,6 +441,18 @@ export function RunCard({
                 </>
               )}
             </button>
+          )}
+
+          {metrics?.video_url && (
+            <a
+              href={metrics.video_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary flex items-center gap-1.5 text-xs"
+              title="Abrir no TikTok"
+            >
+              <span>Ver ↗</span>
+            </a>
           )}
 
           <button

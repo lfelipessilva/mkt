@@ -309,14 +309,25 @@ export function PerformancePage(): React.JSX.Element {
             <select
               className="bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
               value={sortField}
-              onChange={(e) => handleSortChange(e.target.value as TikTokPerformanceSortField)}
+              onChange={(e) => {
+                setSortField(e.target.value as TikTokPerformanceSortField);
+                setSortOrder("desc");
+              }}
             >
-              <option value="views">Visualizações {sortField === "views" ? (sortOrder === "asc" ? "(menor)" : "(maior)") : ""}</option>
-              <option value="likes">Curtidas {sortField === "likes" ? (sortOrder === "asc" ? "(menor)" : "(maior)") : ""}</option>
+              <option value="views">Visualizações</option>
+              <option value="likes">Curtidas</option>
               <option value="comments">Comentários</option>
               <option value="shares">Compartilhamentos</option>
               <option value="published_at">Data de Publicação</option>
             </select>
+            <button
+              type="button"
+              className="px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium transition-all"
+              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+              title={`Alternar ordem (atual: ${sortOrder === "asc" ? "crescente" : "decrescente"})`}
+            >
+              {sortOrder === "asc" ? "Crescente ↑" : "Decrescente ↓"}
+            </button>
           </div>
 
           <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-start sm:self-auto">
