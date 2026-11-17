@@ -171,4 +171,84 @@ describe("accounts store - social fields persistence", () => {
     assert.equal(parsedUpdate.external_account_id, null);
     assert.deepEqual(parsedUpdate.social_account_metadata, { updated: true });
   });
+
+  it("upsertAccount saves and returns zernio_api_key", async () => {
+    const executedQueries: { text: string; values?: unknown[] }[] = [];
+    let savedRow: any = null;
+
+    const mockPool = {
+      async query(textOrConfig: string | { text: string; values?: unknown[] }, values?: unknown[]) {
+        const queryText = typeof textOrConfig === "string" ? textOrConfig : textOrConfig.text;
+        const queryValues = typeof textOrConfig === "string" ? values : textOrConfig.values;
+        executedQueries.push({ text: queryText, values: queryValues });
+
+        if (queryText.includes("SELECT")) {
+          if (savedRow && queryValues?.[0] === savedRow.id) {
+            return { rows: [savedRow] };
+          }
+          return { rows: [] };
+        }
+
+        if (queryText.includes("INSERT INTO accounts")) {
+          savedRow = {
+            id: queryValues?.[0],
+            display_name: queryValues?.[1],
+            persona: queryValues?.[2],
+            role: queryValues?.[3],
+            enabled: queryValues?.[4],
+            auto_post_enabled: queryValues?.[5],
+            tiktok_open_id: queryValues?.[6],
+            social_provider: queryValues?.[7],
+            external_account_id: queryValues?.[8],
+            social_account_metadata: queryValues?.[9] ? JSON.parse(queryValues[9] as string) : {},
+            zernio_api_key: queryValues?.[10],
+            created_at: new Date(),
+            updated_at: new Date(),
+          };
+          return { rows: [savedRow] };
+        }
+
+        return { rows: [] };
+      },
+    } as unknown as Pool;
+
+    const account = await upsertAccount(
+      {
+        id: "test-zernio-key-acc",
+        persona: "Test",
+        role: "single_woman",
+        zernio_api_key: "zk_test_custom_key_123",
+      } as any,
+      mockPool
+    );
+    assert.strictEqual(account.zernio_api_key, "zk_test_custom_key_123");
+
+    const fetched = await getAccount("test-zernio-key-acc", mockPool);
+    assert.strictEqual(fetched?.zernio_api_key, "zk_test_custom_key_123");
+
+    const insertQuery = executedQueries.find((q) => q.text.includes("INSERT INTO accounts"));
+    assert.ok(insertQuery, "Expected INSERT INTO accounts query to be executed");
+    assert.match(insertQuery.text, /zernio_api_key/);
+  });
+
+  it("AccountSchema, CreateAccountSchema, and UpdateAccountSchema accept zernio_api_key", () => {
+    const createData = {
+      id: "acc_zernio_create",
+      role: "single_woman" as const,
+      zernio_api_key: "zk_custom_key_456",
+    };
+    const parsedCreate = CreateAccountSchema.parse(createData);
+    assert.equal(parsedCreate.zernio_api_key, "zk_custom_key_456");
+
+    const updateData = {
+      zernio_api_key: "zk_custom_key_789",
+    };
+    const parsedUpdate = UpdateAccountSchema.parse(updateData);
+    assert.equal(parsedUpdate.zernio_api_key, "zk_custom_key_789");
+
+    const updateNull = UpdateAccountSchema.parse({
+      zernio_api_key: null,
+    });
+    assert.equal(updateNull.zernio_api_key, null);
+  });
 });

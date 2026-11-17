@@ -20,6 +20,7 @@ export const AccountSchema = z.object({
   social_provider: z.string().nullable().optional(),
   external_account_id: z.string().nullable().optional(),
   social_account_metadata: z.record(z.string(), z.unknown()).optional(),
+  zernio_api_key: z.string().nullable().optional(),
   created_at: z.coerce.date().optional(),
   updated_at: z.coerce.date().optional(),
 });
@@ -37,6 +38,7 @@ export const CreateAccountSchema = z.object({
   external_account_id: z.string().nullable().optional(),
   social_provider: z.string().nullable().optional(),
   social_account_metadata: z.record(z.string(), z.unknown()).optional(),
+  zernio_api_key: z.string().nullable().optional(),
 });
 
 export type CreateAccountInput = z.infer<typeof CreateAccountSchema>;
@@ -52,6 +54,7 @@ export const UpdateAccountSchema = z.object({
   external_account_id: z.string().nullable().optional(),
   social_provider: z.string().nullable().optional(),
   social_account_metadata: z.record(z.string(), z.unknown()).optional(),
+  zernio_api_key: z.string().nullable().optional(),
 });
 
 export type UpdateAccountInput = z.infer<typeof UpdateAccountSchema>;

@@ -14,13 +14,14 @@ export interface UpsertAccountInput {
   social_provider?: string | null;
   external_account_id?: string | null;
   social_account_metadata?: Record<string, unknown>;
+  zernio_api_key?: string | null;
 }
 
 export async function listAccounts(poolInstance?: Pool): Promise<Account[]> {
   const p = poolInstance || getPool();
   const result = await p.query<Account>(
     `SELECT id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id,
-            social_provider, external_account_id, social_account_metadata,
+            social_provider, external_account_id, social_account_metadata, zernio_api_key,
             created_at, updated_at
      FROM accounts
      ORDER BY created_at ASC, id ASC`
@@ -35,7 +36,7 @@ export async function getAccount(
   const p = poolInstance || getPool();
   const result = await p.query<Account>(
     `SELECT id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id,
-            social_provider, external_account_id, social_account_metadata,
+            social_provider, external_account_id, social_account_metadata, zernio_api_key,
             created_at, updated_at
      FROM accounts
      WHERE id = $1`,
@@ -84,10 +85,14 @@ export async function upsertAccount(
       : (existing?.social_account_metadata !== undefined
           ? JSON.stringify(existing.social_account_metadata)
           : "{}");
+  const zernioApiKey =
+    input.zernio_api_key !== undefined
+      ? input.zernio_api_key
+      : (existing?.zernio_api_key ?? null);
 
   const result = await p.query<Account>(
-    `INSERT INTO accounts (id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+    `INSERT INTO accounts (id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, zernio_api_key, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
      ON CONFLICT (id) DO UPDATE SET
        display_name = EXCLUDED.display_name,
        persona = EXCLUDED.persona,
@@ -98,9 +103,10 @@ export async function upsertAccount(
        social_provider = EXCLUDED.social_provider,
        external_account_id = EXCLUDED.external_account_id,
        social_account_metadata = EXCLUDED.social_account_metadata,
+       zernio_api_key = EXCLUDED.zernio_api_key,
        updated_at = NOW()
-     RETURNING id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, created_at, updated_at`,
-    [id, displayName, persona, role, enabled, autoPostEnabled, tiktokOpenId, socialProvider, externalAccountId, socialAccountMetadata]
+     RETURNING id, display_name, persona, role, enabled, auto_post_enabled, tiktok_open_id, social_provider, external_account_id, social_account_metadata, zernio_api_key, created_at, updated_at`,
+    [id, displayName, persona, role, enabled, autoPostEnabled, tiktokOpenId, socialProvider, externalAccountId, socialAccountMetadata, zernioApiKey]
   );
 
   return result.rows[0];
