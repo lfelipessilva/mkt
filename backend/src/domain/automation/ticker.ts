@@ -313,24 +313,64 @@ export async function executeSlot(
   }
 
   if (channel === "zernio") {
-    await updateSlot(
-      slot.id,
-      {
-        channel: "zernio",
-        status: "awaiting_approval",
-      },
-      pool
-    );
+    const dispatchFn: DispatchCarouselFn =
+      options.dispatchFn ||
+      (async (opts) =>
+        dispatchCarouselRun({
+          runId: opts.runId,
+          channel: opts.channel,
+          triggeredBy: opts.triggeredBy || "auto_schedule",
+          pool: opts.pool,
+        }));
 
-    await notifyFn(
-      "awaiting_approval",
-      {
-        account: account.id,
-        archetype: run.archetype_title,
+    try {
+      const result = await dispatchFn({
         runId: run.id,
-      },
-      notifyOpts
-    ).catch(() => {});
+        channel: "zernio",
+        triggeredBy: "auto_schedule",
+        pool,
+      });
+
+      if (result?.event?.status === "failed") {
+        const reason =
+          result.event.response_payload?.error ||
+          result.event.response_payload?.message ||
+          "falha no dispatch zernio";
+        throw new Error(reason);
+      }
+
+      await updateSlot(
+        slot.id,
+        {
+          channel: "zernio",
+          status: "done",
+          finished_at: now,
+        },
+        pool
+      );
+
+      await notifyFn(
+        "buffer_accepted",
+        {
+          account: account.id,
+          archetype: run.archetype_title,
+          runId: run.id,
+        },
+        notifyOpts
+      ).catch(() => {});
+    } catch (err: any) {
+      const errorMsg = err?.message || String(err);
+      await notifyFn(
+        "publish_failed",
+        {
+          account: account.id,
+          reason: errorMsg,
+          runId: run.id,
+        },
+        notifyOpts
+      ).catch(() => {});
+      await handleRetry(slot, errorMsg, now, pool);
+    }
     return;
   }
 }

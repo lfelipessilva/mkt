@@ -377,9 +377,9 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
       };
     };
 
-    // Tick 1: processes acc-buf -> goes to awaiting_approval, NOT dispatched yet
+    // Tick 1: processes acc-buf -> dispatches zernio directly
     await runAutomationTick({ pool, now, generateFn, dispatchFn });
-    assert.equal(dispatchedChannel, null, "Buffer account must not be auto-dispatched");
+    assert.equal(dispatchedChannel, "zernio");
 
     // Tick 2: processes acc-tg -> dispatches telegram
     await runAutomationTick({
@@ -394,7 +394,7 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
     const bufSlot = slots.find((s) => s.account_id === "acc-buf");
     const tgSlot = slots.find((s) => s.account_id === "acc-tg");
 
-    assert.equal(bufSlot?.status, "awaiting_approval");
+    assert.equal(bufSlot?.status, "done");
     assert.equal(bufSlot?.channel, "zernio");
     assert.equal(tgSlot?.status, "done");
     assert.equal(tgSlot?.channel, "telegram");
@@ -679,12 +679,32 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
       return createTestRunInDb(opts.accountId);
     };
 
-    // Tick 1: Telegram event exists, but channel is Buffer -> reuses run, transitions to awaiting_approval
-    await runAutomationTick({ pool, now, generateFn });
+    let dispatchedChannel: string | null = null;
+    const dispatchFn: DispatchCarouselFn = async (opts) => {
+      dispatchedChannel = opts.channel;
+      return {
+        event: {
+          id: "evt-17",
+          run_id: opts.runId,
+          channel: opts.channel,
+          status: "sent",
+          triggered_by: opts.triggeredBy || "auto_schedule",
+          request_payload: {},
+          response_payload: {},
+          sent_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        },
+        run: {} as any,
+      };
+    };
+
+    // Tick 1: Telegram event exists, but channel is Zernio -> reuses run, dispatches to Zernio
+    await runAutomationTick({ pool, now, generateFn, dispatchFn });
     assert.equal(generateCount, 0, "must reuse run1");
+    assert.equal(dispatchedChannel, "zernio");
 
     const slot1After = await getSlotById(slot1.id, pool);
-    assert.equal(slot1After?.status, "awaiting_approval");
+    assert.equal(slot1After?.status, "done");
 
     // Part B: Run is already published, without sent event for Buffer -> slot skipped
     const run2 = await createTestRunInDb("acc-buf-17", { status: "published" });
@@ -761,8 +781,8 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
     assert.equal(slot.last_error, "provider não suportado nesta fase");
   });
 
-  // Spec §5.11 Item 20: conta Buffer → slot vai para awaiting_approval, run fica generated, notificação de "aguardando aprovação" enviada com deep link.
-  it("Item 20: Buffer account -> slot goes to awaiting_approval, run remains generated, notification sent with deep link", async () => {
+  // Spec §5.11 Item 20: conta Zernio → slot despachado diretamente para Zernio, slot done, notificação buffer_accepted enviada.
+  it("Item 20: Zernio account -> slot is dispatched directly to zernio, slot done, buffer_accepted notification sent", async () => {
     await upsertAccount(
       {
         id: "acc-buf-20",
@@ -803,9 +823,22 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
     };
 
     let dispatchCalled = false;
-    const dispatchFn: DispatchCarouselFn = async () => {
+    const dispatchFn: DispatchCarouselFn = async (opts) => {
       dispatchCalled = true;
-      throw new Error("Should not dispatch for buffer");
+      return {
+        event: {
+          id: "evt-buf-20",
+          run_id: opts.runId,
+          channel: opts.channel,
+          status: "sent",
+          triggered_by: opts.triggeredBy || "auto_schedule",
+          request_payload: {},
+          response_payload: {},
+          sent_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        },
+        run: {} as any,
+      };
     };
 
     await runAutomationTick({
@@ -817,21 +850,21 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
       appBaseUrl: "https://redhorse.app",
     });
 
-    assert.equal(dispatchCalled, false);
+    assert.equal(dispatchCalled, true);
 
     const [slot] = await listSlotsByDate("2026-11-16", pool);
-    assert.equal(slot.status, "awaiting_approval");
+    assert.equal(slot.status, "done");
     assert.equal(slot.channel, "zernio");
     assert.ok(slot.run_id);
 
     const run = await getCarouselRun(slot.run_id, pool);
     assert.equal(run?.status, "generated");
 
-    // Notifications: generation_ok + awaiting_approval
-    const awaitingNotif = notifications.find((n) => n.event === "awaiting_approval");
-    assert.ok(awaitingNotif, "awaiting_approval notification must be sent");
-    assert.equal(awaitingNotif.payload.runId, slot.run_id);
-    assert.equal(awaitingNotif.options?.appBaseUrl, "https://redhorse.app");
+    // Notifications: generation_ok + buffer_accepted
+    const acceptedNotif = notifications.find((n) => n.event === "buffer_accepted");
+    assert.ok(acceptedNotif, "buffer_accepted notification must be sent");
+    assert.equal(acceptedNotif.payload.runId, slot.run_id);
+    assert.equal(acceptedNotif.options?.appBaseUrl, "https://redhorse.app");
   });
 
   // Spec §5.11 Item 21: conta Telegram → gera e envia álbum, slot done, notificação de sucesso enviada.
@@ -1337,5 +1370,158 @@ describe("Task 6: Ticker + executeSlot (spec §5.11 items 7–12, 17, 19–21)",
     assert.equal(slotAfter2.attempts, 2);
     assert.equal(slotAfter2.last_error, "Telegram API rate limit 429");
     assert.ok(slotAfter2.finished_at);
+  });
+
+  it("slot with channel zernio is dispatched directly to zernio without awaiting approval", async () => {
+    await upsertAccount(
+      {
+        id: "acc-zernio-direct",
+        persona: "P1",
+        role: "single_woman",
+        enabled: true,
+        auto_post_enabled: true,
+        external_account_id: "ext-zernio-123",
+        social_provider: "zernio",
+      },
+      pool
+    );
+
+    const now = new Date("2026-11-16T10:00:00.000Z");
+    const windowEnd = new Date("2026-11-16T12:00:00.000Z");
+
+    await insertSlots(
+      [
+        {
+          slot_date: "2026-11-16",
+          window_id: "morning",
+          account_id: "acc-zernio-direct",
+          channel: "zernio",
+          scheduled_at: now,
+          window_end: windowEnd,
+        },
+      ],
+      pool
+    );
+
+    const generateFn: GenerateCarouselFn = async (opts) => {
+      return createTestRunInDb(opts.accountId);
+    };
+
+    let dispatchedChannel: string | null = null;
+    const customDispatchFn: DispatchCarouselFn = async (opts: any) => {
+      dispatchedChannel = opts.channel;
+      return {
+        event: {
+          id: "evt-zernio-1",
+          run_id: opts.runId,
+          channel: opts.channel,
+          status: "sent",
+          triggered_by: opts.triggeredBy || "auto_schedule",
+          request_payload: {},
+          response_payload: {},
+          sent_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+        },
+        run: {} as any,
+      };
+    };
+
+    const notifications: Array<{ event: AutomationNotifyEvent; payload: NotifyPayload }> = [];
+    const notifyFn: NotifyAutomationFn = async (event, payload) => {
+      notifications.push({ event, payload });
+    };
+
+    await runAutomationTick({
+      pool,
+      now,
+      generateFn,
+      dispatchFn: customDispatchFn,
+      notifyFn,
+    });
+
+    assert.equal(dispatchedChannel, "zernio");
+
+    const [slot] = await listSlotsByDate("2026-11-16", pool);
+    assert.equal(slot.status, "done");
+    assert.equal(slot.channel, "zernio");
+    assert.ok(slot.finished_at);
+
+    const bufferAcceptedNotif = notifications.find((n) => n.event === "buffer_accepted");
+    assert.ok(bufferAcceptedNotif, "buffer_accepted notification must be sent");
+  });
+
+  it("slot with channel zernio enters retry when dispatch fails", async () => {
+    await upsertAccount(
+      {
+        id: "acc-zernio-fail",
+        persona: "P1",
+        role: "single_woman",
+        enabled: true,
+        auto_post_enabled: true,
+        external_account_id: "ext-zernio-fail",
+        social_provider: "zernio",
+      },
+      pool
+    );
+
+    const now = new Date("2026-11-16T10:00:00.000Z");
+    const windowEnd = new Date("2026-11-16T12:00:00.000Z");
+
+    await insertSlots(
+      [
+        {
+          slot_date: "2026-11-16",
+          window_id: "morning",
+          account_id: "acc-zernio-fail",
+          channel: "zernio",
+          scheduled_at: now,
+          window_end: windowEnd,
+        },
+      ],
+      pool
+    );
+
+    const generateFn: GenerateCarouselFn = async (opts) => {
+      return createTestRunInDb(opts.accountId);
+    };
+
+    const failingDispatchFn: DispatchCarouselFn = async (opts: any) => {
+      return {
+        event: {
+          id: "evt-zernio-fail",
+          run_id: opts.runId,
+          channel: opts.channel,
+          status: "failed",
+          triggered_by: opts.triggeredBy || "auto_schedule",
+          request_payload: {},
+          response_payload: { error: "Zernio network timeout" },
+          sent_at: null,
+          created_at: new Date().toISOString(),
+        },
+        run: {} as any,
+      };
+    };
+
+    const notifications: Array<{ event: AutomationNotifyEvent; payload: NotifyPayload }> = [];
+    const notifyFn: NotifyAutomationFn = async (event, payload) => {
+      notifications.push({ event, payload });
+    };
+
+    await runAutomationTick({
+      pool,
+      now,
+      generateFn,
+      dispatchFn: failingDispatchFn,
+      notifyFn,
+    });
+
+    const [slot] = await listSlotsByDate("2026-11-16", pool);
+    assert.equal(slot.status, "pending");
+    assert.equal(slot.attempts, 1);
+    assert.equal(slot.last_error, "Zernio network timeout");
+
+    const failedNotif = notifications.find((n) => n.event === "publish_failed");
+    assert.ok(failedNotif, "publish_failed notification must be sent");
+    assert.equal(failedNotif.payload.reason, "Zernio network timeout");
   });
 });
