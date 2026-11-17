@@ -1,3 +1,5 @@
+import { Api } from "grammy";
+
 export type AutomationNotifyEvent =
   | "generation_ok"
   | "generation_failed"
@@ -71,15 +73,15 @@ function formatMessage(
     case "generation_ok":
       return `✅ Carrossel gerado — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "generation_failed":
-      return `❌ Falha ao gerar — @${account} — ${payload.reason ?? ""}`;
+      return `❌ Falha ao gerar carrossel — @${account} — motivo: ${payload.reason ?? "erro desconhecido"}`;
     case "awaiting_approval":
       return `🕐 Aguardando aprovação — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "buffer_accepted":
-      return `📤 Enviado ao TikTok — @${account} — com áudio`;
+      return `📤 Enviado ao Zernio / TikTok — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "publish_ok":
       return `✅ Publicado no TikTok — @${account} — arquétipo: ${payload.archetype ?? ""}`;
     case "publish_failed":
-      return `❌ Falha na publicação — @${account} — ${payload.reason ?? ""}`;
+      return `❌ Falha na publicação Zernio — @${account} — motivo: ${payload.reason ?? "erro desconhecido"}`;
     case "telegram_sent":
       return `✅ Enviado ao Telegram — @${account} — arquétipo: ${payload.archetype ?? ""}`;
   }
@@ -92,7 +94,12 @@ export async function notifyAutomation(
 ): Promise<void> {
   const chatId =
     options.chatId !== undefined ? options.chatId : getNotifyChatId();
-  if (!chatId || !options.telegramApi) return;
+  const api =
+    options.telegramApi ||
+    (process.env.TELEGRAM_BOT_TOKEN
+      ? new Api(process.env.TELEGRAM_BOT_TOKEN)
+      : undefined);
+  if (!chatId || !api) return;
 
   const text = formatMessage(event, payload);
   const extra: { reply_markup?: unknown } = {};
@@ -104,5 +111,5 @@ export async function notifyAutomation(
     extra.reply_markup = buildApprovalKeyboard(payload.runId, baseUrl);
   }
 
-  await options.telegramApi.sendMessage(chatId, text, extra);
+  await api.sendMessage(chatId, text, extra);
 }

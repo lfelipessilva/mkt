@@ -11,6 +11,7 @@ describe("automation notifications", () => {
   const prevNotify = process.env.TELEGRAM_NOTIFY_CHAT_ID;
   const prevChat = process.env.TELEGRAM_CHAT_ID;
   const prevBase = process.env.APP_BASE_URL;
+  const prevBotToken = process.env.TELEGRAM_BOT_TOKEN;
 
   afterEach(() => {
     if (prevNotify === undefined) delete process.env.TELEGRAM_NOTIFY_CHAT_ID;
@@ -19,6 +20,8 @@ describe("automation notifications", () => {
     else process.env.TELEGRAM_CHAT_ID = prevChat;
     if (prevBase === undefined) delete process.env.APP_BASE_URL;
     else process.env.APP_BASE_URL = prevBase;
+    if (prevBotToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
+    else process.env.TELEGRAM_BOT_TOKEN = prevBotToken;
   });
 
   it("getNotifyChatId prefers TELEGRAM_NOTIFY_CHAT_ID then TELEGRAM_CHAT_ID", () => {
@@ -72,7 +75,7 @@ describe("automation notifications", () => {
       {
         event: "generation_failed",
         payload: { account: "gabriel", reason: "timeout" },
-        expect: /❌ Falha ao gerar — @gabriel — timeout/,
+        expect: /❌ Falha ao gerar carrossel — @gabriel — motivo: timeout/,
       },
       {
         event: "awaiting_approval",
@@ -86,8 +89,8 @@ describe("automation notifications", () => {
       },
       {
         event: "buffer_accepted",
-        payload: { account: "gabriel" },
-        expect: /📤 Enviado ao TikTok — @gabriel — com áudio/,
+        payload: { account: "gabriel", archetype: "Foco" },
+        expect: /📤 Enviado ao Zernio \/ TikTok — @gabriel — arquétipo: Foco/,
       },
       {
         event: "publish_ok",
@@ -97,7 +100,7 @@ describe("automation notifications", () => {
       {
         event: "publish_failed",
         payload: { account: "gabriel", reason: "denied" },
-        expect: /❌ Falha na publicação — @gabriel — denied/,
+        expect: /❌ Falha na publicação Zernio — @gabriel — motivo: denied/,
       },
       {
         event: "telegram_sent",
@@ -140,5 +143,52 @@ describe("automation notifications", () => {
       }
     );
     assert.equal(called, false);
+  });
+
+  it("notifyAutomation creates Api client using TELEGRAM_BOT_TOKEN when options.telegramApi is undefined", async () => {
+    delete process.env.TELEGRAM_BOT_TOKEN;
+    delete process.env.TELEGRAM_NOTIFY_CHAT_ID;
+    delete process.env.TELEGRAM_CHAT_ID;
+
+    // With no bot token and no telegramApi, it should silently return without throwing
+    await notifyAutomation("generation_ok", { account: "test" });
+
+    // When TELEGRAM_BOT_TOKEN is set, it falls back to creating an Api client
+    process.env.TELEGRAM_BOT_TOKEN = "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11";
+    process.env.TELEGRAM_NOTIFY_CHAT_ID = "12345";
+
+    const { Api } = await import("grammy");
+    const originalSendMessage = Api.prototype.sendMessage;
+    let interceptedCall: { token: string; chatId: string | number; text: string } | null = null;
+
+    Api.prototype.sendMessage = (async function (
+      this: { token: string },
+      chatId: string | number,
+      text: string,
+      _extra?: any
+    ) {
+      interceptedCall = { token: this.token, chatId, text };
+      return {} as any;
+    }) as any;
+
+    try {
+      await notifyAutomation("publish_failed", {
+        account: "pedro",
+        reason: "network error",
+      });
+
+      assert.ok(interceptedCall !== null, "Api.prototype.sendMessage should have been called");
+      assert.equal(
+        (interceptedCall as { token: string }).token,
+        "123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+      );
+      assert.equal((interceptedCall as { chatId: string | number }).chatId, "12345");
+      assert.match(
+        (interceptedCall as { text: string }).text,
+        /❌ Falha na publicação Zernio — @pedro — motivo: network error/
+      );
+    } finally {
+      Api.prototype.sendMessage = originalSendMessage;
+    }
   });
 });
