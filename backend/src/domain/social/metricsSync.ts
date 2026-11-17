@@ -60,23 +60,32 @@ export async function syncTikTokMetricsDailyJob(
                  likes = $2,
                  comments = $3,
                  shares = $4,
-                 video_url = COALESCE(video_url, $6),
+                 saves = $5,
+                 video_url = COALESCE(video_url, $7),
                  updated_at = NOW()
-             WHERE id = $5`,
+             WHERE id = $6`,
             [
               metrics.views,
               metrics.likes,
               metrics.comments,
               metrics.shares,
+              metrics.saves,
               post.id,
               metrics.postUrl ?? null,
             ]
           );
 
           await client.query(
-            `INSERT INTO tiktok_metrics (tiktok_post_id, views, likes, comments, shares, synced_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())`,
-            [post.id, metrics.views, metrics.likes, metrics.comments, metrics.shares]
+            `INSERT INTO tiktok_metrics (tiktok_post_id, views, likes, comments, shares, saves, synced_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+            [
+              post.id,
+              metrics.views,
+              metrics.likes,
+              metrics.comments,
+              metrics.shares,
+              metrics.saves,
+            ]
           );
 
           await client.query("COMMIT");

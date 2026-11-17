@@ -10,13 +10,17 @@ import type {
 import { getTikTokPerformance, syncTikTok } from "../api";
 import { ManualTikTokModal } from "../components/ManualTikTokModal";
 import { PerformanceChart } from "../components/PerformanceChart";
-import { RunCard } from "../components/RunCard";
+import { PerformanceCard, buildPerformanceRun } from "../components/PerformanceCard";
+import { AuthImage } from "../components/AuthImage";
+import { orderSlides } from "./GalleryPage";
 import {
   RefreshCw,
   Zap,
   Eye,
   Heart,
   MessageSquare,
+  Bookmark,
+  Repeat2,
   BarChart3,
   Edit3,
   LayoutGrid,
@@ -67,7 +71,8 @@ export function sortPerformanceItems(
       sortField === "views" ||
       sortField === "likes" ||
       sortField === "comments" ||
-      sortField === "shares"
+      sortField === "shares" ||
+      sortField === "saves"
     ) {
       const valA = Number((a as any)[sortField]) || 0;
       const valB = Number((b as any)[sortField]) || 0;
@@ -92,7 +97,9 @@ export interface PerformanceStats {
   totalLikes: number;
   totalComments: number;
   totalShares: number;
+  totalSaves: number;
   avgViewsPerPost: number;
+  engagementRate: number;
 }
 
 export function computePerformanceStats(items: TikTokPerformanceItem[]): PerformanceStats {
@@ -103,7 +110,9 @@ export function computePerformanceStats(items: TikTokPerformanceItem[]): Perform
       totalLikes: 0,
       totalComments: 0,
       totalShares: 0,
+      totalSaves: 0,
       avgViewsPerPost: 0,
+      engagementRate: 0,
     };
   }
 
@@ -112,15 +121,19 @@ export function computePerformanceStats(items: TikTokPerformanceItem[]): Perform
   let totalLikes = 0;
   let totalComments = 0;
   let totalShares = 0;
+  let totalSaves = 0;
 
   for (const item of items) {
     totalViews += Number(item.views) || 0;
     totalLikes += Number(item.likes) || 0;
     totalComments += Number(item.comments) || 0;
     totalShares += Number(item.shares) || 0;
+    totalSaves += Number(item.saves) || 0;
   }
 
   const avgViewsPerPost = Math.round(totalViews / totalPosts);
+  const interactions = totalLikes + totalComments + totalShares + totalSaves;
+  const engagementRate = totalViews > 0 ? (interactions / totalViews) * 100 : 0;
 
   return {
     totalPosts,
@@ -128,7 +141,9 @@ export function computePerformanceStats(items: TikTokPerformanceItem[]): Perform
     totalLikes,
     totalComments,
     totalShares,
+    totalSaves,
     avgViewsPerPost,
+    engagementRate,
   };
 }
 
@@ -246,7 +261,7 @@ export function PerformancePage(): React.JSX.Element {
       <PageHeader
         icon={<TrendingUp className="h-5 w-5" />}
         title="Desempenho de Carrosséis"
-        description="Acompanhe métricas de engajamento do TikTok (visualizações, curtidas, comentários, compartilhamentos) dos carrosséis publicados."
+        description="Acompanhe todas as métricas do TikTok (views, curtidas, comentários, salvos e compartilhamentos) dos carrosséis publicados, com ranking de engajamento e cards completos."
         actions={
           <>
             <Button
@@ -283,31 +298,45 @@ export function PerformancePage(): React.JSX.Element {
         </InlineAlert>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <StatCard
-          label="Total Publicações"
+          label="Publicações"
           value={stats.totalPosts}
           icon={<BarChart3 className="h-4 w-4" />}
           tone="slate"
+          hint={`Média ${stats.avgViewsPerPost.toLocaleString("pt-BR")} views/post`}
         />
         <StatCard
-          label="Total de Views"
+          label="Views"
           value={stats.totalViews.toLocaleString("pt-BR")}
           icon={<Eye className="h-4 w-4" />}
           tone="blue"
           highlight
         />
         <StatCard
-          label="Total de Curtidas"
+          label="Curtidas"
           value={stats.totalLikes.toLocaleString("pt-BR")}
           icon={<Heart className="h-4 w-4" />}
           tone="rose"
         />
         <StatCard
-          label="Média Views / Post"
-          value={stats.avgViewsPerPost.toLocaleString("pt-BR")}
+          label="Comentários"
+          value={stats.totalComments.toLocaleString("pt-BR")}
           icon={<MessageSquare className="h-4 w-4" />}
           tone="emerald"
+        />
+        <StatCard
+          label="Salvos"
+          value={stats.totalSaves.toLocaleString("pt-BR")}
+          icon={<Bookmark className="h-4 w-4" />}
+          tone="slate"
+        />
+        <StatCard
+          label="Compartilhamentos"
+          value={stats.totalShares.toLocaleString("pt-BR")}
+          icon={<Repeat2 className="h-4 w-4" />}
+          tone="slate"
+          hint={`Engajamento ${stats.engagementRate.toFixed(2)}%`}
         />
       </div>
 
@@ -329,6 +358,7 @@ export function PerformancePage(): React.JSX.Element {
               <option value="likes">Curtidas</option>
               <option value="comments">Comentários</option>
               <option value="shares">Compartilhamentos</option>
+              <option value="saves">Salvos</option>
               <option value="published_at">Data de Publicação</option>
             </Select>
             <Button
@@ -402,59 +432,14 @@ export function PerformancePage(): React.JSX.Element {
 
       {filteredItems.length > 0 && viewMode === "cards" && (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filteredItems.map((item) => {
-            const baseRun: CarouselRun = item.run
-              ? item.run
-              : {
-                  id: item.run_id,
-                  account_id: item.account_id,
-                  account_role: item.account_role as any,
-                  archetype_title: item.archetype_title,
-                  tema: item.tema,
-                  bait_body: item.bait_body,
-                  legenda: item.legenda,
-                  status: (item.status as any) || "published",
-                  output_dir: item.output_dir,
-                  slides: [],
-                };
-
-            const synthesizedRun: CarouselRun = {
-              ...baseRun,
-              status:
-                item.publish_status === "published"
-                  ? "published"
-                  : baseRun.status,
-              tiktok_post:
-                baseRun.tiktok_post ??
-                (item.external_post_id
-                  ? {
-                      provider: item.provider ?? null,
-                      external_post_id: item.external_post_id,
-                      publish_status: item.publish_status ?? null,
-                      published_at: item.published_at ?? null,
-                      last_polled_at: item.last_polled_at ?? null,
-                      video_url: item.video_url ?? null,
-                    }
-                  : null),
-            };
-
-            return (
-              <RunCard
-                key={item.id || item.tiktok_post_id}
-                run={synthesizedRun}
-                account={accountsById.get(item.account_id)}
-                metrics={{
-                  views: item.views,
-                  likes: item.likes,
-                  comments: item.comments,
-                  shares: item.shares,
-                  video_url: item.video_url,
-                }}
-                onOpenManualPublish={() => handleOpenEditModal(item)}
-                onToast={showToast}
-              />
-            );
-          })}
+          {filteredItems.map((item) => (
+            <PerformanceCard
+              key={item.id || item.tiktok_post_id}
+              item={item}
+              account={accountsById.get(item.account_id)}
+              onEdit={handleOpenEditModal}
+            />
+          ))}
         </div>
       )}
 
@@ -477,6 +462,7 @@ export function PerformancePage(): React.JSX.Element {
                   ["likes", "Curtidas"],
                   ["comments", "Comentários"],
                   ["shares", "Compartilhamentos"],
+                  ["saves", "Salvos"],
                 ] as const
               ).map(([field, label]) => (
                 <TableHeaderCell
@@ -511,15 +497,42 @@ export function PerformancePage(): React.JSX.Element {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <strong className="font-semibold text-slate-800">
-                        {item.tema || item.archetype_title}
-                      </strong>
-                      {item.tema && item.archetype_title && (
-                        <span className="text-[11px] text-slate-400">
-                          {item.archetype_title}
-                        </span>
-                      )}
+                    <div className="flex items-center gap-2.5">
+                      {(() => {
+                        const slides = orderSlides(
+                          buildPerformanceRun(item).slides || []
+                        );
+                        const cover =
+                          slides.find((slide) => slide.position === 1) ??
+                          slides[0] ??
+                          null;
+                        return (
+                          <div className="h-11 w-9 flex-none overflow-hidden rounded border border-slate-200 bg-slate-100">
+                            {cover ? (
+                              <AuthImage
+                                storagePath={cover.storage_path}
+                                alt={`Capa de ${item.tema || item.archetype_title}`}
+                                className="h-full w-full object-cover"
+                                fallbackText=""
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-[9px] text-slate-400">
+                                —
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <strong className="truncate font-semibold text-slate-800">
+                          {item.tema || item.archetype_title}
+                        </strong>
+                        {item.tema && item.archetype_title && (
+                          <span className="truncate text-[11px] text-slate-400">
+                            {item.archetype_title}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>{pubDate}</TableCell>
@@ -534,6 +547,9 @@ export function PerformancePage(): React.JSX.Element {
                   </TableCell>
                   <TableCell className="text-right font-mono">
                     {Number(item.shares || 0).toLocaleString("pt-BR")}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {Number(item.saves || 0).toLocaleString("pt-BR")}
                   </TableCell>
                   <TableCell>
                     {item.external_post_id ? (

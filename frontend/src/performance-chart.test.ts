@@ -20,6 +20,7 @@ describe("PerformanceChart helpers (Issue #3)", () => {
       likes: 500,
       comments: 50,
       shares: 10,
+      saves: 2,
     },
     {
       id: "p2",
@@ -36,6 +37,7 @@ describe("PerformanceChart helpers (Issue #3)", () => {
       likes: 1200,
       comments: 100,
       shares: 40,
+      saves: 25,
     },
     {
       id: "p3",
@@ -52,6 +54,7 @@ describe("PerformanceChart helpers (Issue #3)", () => {
       likes: 200,
       comments: 20,
       shares: 5,
+      saves: 1,
     },
   ];
 

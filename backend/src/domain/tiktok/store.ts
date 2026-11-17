@@ -193,11 +193,12 @@ export async function upsertTikTokPost(
         likes,
         comments,
         shares,
+        saves,
         metrics_note,
         created_at,
         updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
       ON CONFLICT (run_id) DO UPDATE SET
         tracking_mode = EXCLUDED.tracking_mode,
         video_id = COALESCE(EXCLUDED.video_id, tiktok_posts.video_id),
@@ -207,10 +208,11 @@ export async function upsertTikTokPost(
         likes = EXCLUDED.likes,
         comments = EXCLUDED.comments,
         shares = EXCLUDED.shares,
+        saves = EXCLUDED.saves,
         metrics_note = COALESCE(EXCLUDED.metrics_note, tiktok_posts.metrics_note),
         updated_at = NOW()
       RETURNING id, run_id, tracking_mode, video_id, video_url, published_at,
-                views, likes, comments, shares, metrics_note, provider,
+                views, likes, comments, shares, saves, metrics_note, provider,
                 external_post_id, publish_status, scheduled_at, last_polled_at,
                 raw_response, created_at, updated_at
     `;
@@ -225,6 +227,7 @@ export async function upsertTikTokPost(
       likes,
       comments,
       shares,
+      saves,
       metricsNote,
     ]);
 
@@ -275,7 +278,7 @@ export async function getTikTokPostByRunId(
   const p = poolInstance || getPool();
   const res = await p.query(
     `SELECT id, run_id, tracking_mode, video_id, video_url, published_at,
-            views, likes, comments, shares, metrics_note, provider,
+            views, likes, comments, shares, saves, metrics_note, provider,
             external_post_id, publish_status, scheduled_at, last_polled_at,
             raw_response, created_at, updated_at
      FROM tiktok_posts
@@ -308,6 +311,7 @@ export async function listTikTokPerformance(
     likes: "tp.likes",
     comments: "tp.comments",
     shares: "tp.shares",
+    saves: "tp.saves",
     published_at: "COALESCE(tp.published_at, tp.created_at)",
     created_at: "tp.created_at",
   };
@@ -337,6 +341,7 @@ export async function listTikTokPerformance(
       tp.likes,
       tp.comments,
       tp.shares,
+      tp.saves,
       tp.metrics_note,
       tp.provider,
       tp.external_post_id,
@@ -358,10 +363,24 @@ export async function listTikTokPerformance(
       r.generated_at,
       r.created_at AS run_created_at,
       r.updated_at AS run_updated_at,
-      a.display_name AS account_display_name
+      a.display_name AS account_display_name,
+      slides.slides
     FROM tiktok_posts tp
     JOIN carousel_runs r ON tp.run_id = r.id
     LEFT JOIN accounts a ON r.account_id = a.id
+    LEFT JOIN LATERAL (
+      SELECT json_agg(
+               json_build_object(
+                 'id', cs.id,
+                 'run_id', cs.run_id,
+                 'position', cs.position,
+                 'storage_path', cs.storage_path,
+                 'media_id', cs.media_id
+               ) ORDER BY cs.position ASC
+             ) AS slides
+      FROM carousel_slides cs
+      WHERE cs.run_id = r.id
+    ) slides ON TRUE
     ${whereClause}
     ORDER BY ${sortColumn} ${sortDirection}, tp.created_at DESC
     ${paginationClause}

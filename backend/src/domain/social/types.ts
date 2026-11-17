@@ -50,6 +50,7 @@ export interface PostMetrics {
   likes: number;
   comments: number;
   shares: number;
+  saves: number;
   collectedAt: string; // ISO-8601
   postUrl?: string | null;
 }

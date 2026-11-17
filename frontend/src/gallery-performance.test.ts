@@ -382,6 +382,7 @@ describe("Task 20: Galeria & Desempenho (TDD)", () => {
         likes: 800,
         comments: 50,
         shares: 20,
+        saves: 8,
         published_at: "2026-11-14T10:00:00Z",
         created_at: "2026-11-14T08:00:00Z",
       },
@@ -399,6 +400,7 @@ describe("Task 20: Galeria & Desempenho (TDD)", () => {
         likes: 2100,
         comments: 140,
         shares: 90,
+        saves: 35,
         published_at: "2026-11-15T12:00:00Z",
         created_at: "2026-11-15T09:00:00Z",
       },
@@ -416,6 +418,7 @@ describe("Task 20: Galeria & Desempenho (TDD)", () => {
         likes: 300,
         comments: 20,
         shares: 10,
+        saves: 3,
         published_at: "2026-11-13T10:00:00Z",
         created_at: "2026-11-13T07:00:00Z",
       },
@@ -457,6 +460,7 @@ describe("Task 20: Galeria & Desempenho (TDD)", () => {
       assert.equal(stats.totalLikes, 3200);
       assert.equal(stats.totalComments, 210);
       assert.equal(stats.totalShares, 120);
+      assert.equal(stats.totalSaves, 46);
       assert.equal(stats.avgViewsPerPost, Math.round(40000 / 3));
     });
 

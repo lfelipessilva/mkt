@@ -71,6 +71,7 @@ interface ZernioPostAnalytics {
   likes?: number;
   comments?: number;
   shares?: number;
+  saves?: number;
   lastUpdated?: string | null;
 }
 
@@ -279,6 +280,7 @@ export class ZernioPublisherAdapter implements SocialPublisherProvider {
       likes: Number(analytics.likes || 0),
       comments: Number(analytics.comments || 0),
       shares: Number(analytics.shares || 0),
+      saves: Number(analytics.saves || 0),
     };
 
     // A zeroed payload without a sync timestamp means Zernio has not collected
@@ -288,7 +290,8 @@ export class ZernioPublisherAdapter implements SocialPublisherProvider {
       metrics.views === 0 &&
       metrics.likes === 0 &&
       metrics.comments === 0 &&
-      metrics.shares === 0
+      metrics.shares === 0 &&
+      metrics.saves === 0
     ) {
       return null;
     }

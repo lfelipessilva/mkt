@@ -7,7 +7,7 @@ import { closePool } from "../../src/shared/db/client.js";
 import { buildApp } from "../../src/app.js";
 import type { FastifyInstance } from "fastify";
 import { upsertAccount } from "../../src/domain/accounts/store.js";
-import { createCarouselRun, getCarouselRun } from "../../src/domain/runs/store.js";
+import { createCarouselRun, createCarouselSlides, getCarouselRun } from "../../src/domain/runs/store.js";
 import {
   upsertTikTokPost,
   getTikTokPostByRunId,
@@ -284,8 +284,42 @@ describe("Task 16: TikTok manual publish & Desempenho query", { timeout: 60000 }
       assert.equal(list[2].archetype_title, "Post Baixo");
     });
 
-    it("returns Zernio provider, external post id and publish status in performance items", async () => {
+    it("includes the carousel slides in performance items so cards can render the cover", async () => {
       const run = await createCarouselRun({
+        account_id: "acc_female",
+        account_role: "single_woman",
+        archetype_title: "Post com capa",
+        legenda: "Legenda com capa",
+        status: "generated",
+      });
+
+      await createCarouselSlides([
+        {
+          run_id: run.id,
+          position: 2,
+          storage_path: "single_woman/random/slide-2.jpg",
+        },
+        {
+          run_id: run.id,
+          position: 1,
+          storage_path: "single_woman/cover/slide-1.jpg",
+        },
+      ]);
+
+      await upsertTikTokPost(run.id, { views: 42, saves: 7 });
+
+      const perf = await listTikTokPerformance({ accountId: "acc_female" });
+      const item = perf.find((entry) => entry.run_id === run.id);
+      assert.ok(item);
+      assert.equal(item.saves, 7);
+      assert.equal(item.post.saves, 7);
+      assert.ok(item.run.slides);
+      assert.equal(item.run.slides.length, 2);
+      assert.equal(item.run.slides[0].position, 1);
+      assert.equal(item.run.slides[0].storage_path, "single_woman/cover/slide-1.jpg");
+    });
+
+    it("returns Zernio provider, external post id and publish status in performance items", async () => {      const run = await createCarouselRun({
         account_id: "acc_female",
         account_role: "single_woman",
         archetype_title: "Post Zernio",

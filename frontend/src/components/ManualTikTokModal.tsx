@@ -20,6 +20,7 @@ export function validateManualTikTokInput(input: {
   likes?: number;
   comments?: number;
   shares?: number;
+  saves?: number;
   video_url?: string | null;
 }): { valid: boolean; error?: string } {
   if (input.views !== undefined && input.views < 0) {
@@ -33,6 +34,9 @@ export function validateManualTikTokInput(input: {
   }
   if (input.shares !== undefined && input.shares < 0) {
     return { valid: false, error: "Compartilhamentos não pode ser negativo" };
+  }
+  if (input.saves !== undefined && input.saves < 0) {
+    return { valid: false, error: "Salvos não pode ser negativo" };
   }
   return { valid: true };
 }
@@ -94,6 +98,7 @@ export function ManualTikTokModal({
   const [likes, setLikes] = useState<number>(0);
   const [comments, setComments] = useState<number>(0);
   const [shares, setShares] = useState<number>(0);
+  const [saves, setSaves] = useState<number>(0);
   const [metricsNote, setMetricsNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -108,6 +113,7 @@ export function ManualTikTokModal({
         setLikes(performanceItem.likes ?? 0);
         setComments(performanceItem.comments ?? 0);
         setShares(performanceItem.shares ?? 0);
+        setSaves(performanceItem.saves ?? 0);
         setMetricsNote(performanceItem.metrics_note || "");
         if (performanceItem.published_at) {
           try {
@@ -126,6 +132,7 @@ export function ManualTikTokModal({
         setLikes(0);
         setComments(0);
         setShares(0);
+        setSaves(0);
         setMetricsNote("");
         setPublishedAt(new Date().toISOString().slice(0, 16));
       }
@@ -145,6 +152,7 @@ export function ManualTikTokModal({
       likes,
       comments,
       shares,
+      saves,
       video_url: videoUrl,
     });
 
@@ -165,6 +173,7 @@ export function ManualTikTokModal({
         likes: Number(likes) || 0,
         comments: Number(comments) || 0,
         shares: Number(shares) || 0,
+        saves: Number(saves) || 0,
         metrics_note: metricsNote.trim() || null,
         tracking_mode:
           performanceItem?.tracking_mode === "api" ? "api" : "manual",
@@ -287,7 +296,7 @@ export function ManualTikTokModal({
           <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
             Métricas Atuais
           </span>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
             <MetricInput
               id="metric-views"
               label="Visualizações"
@@ -307,6 +316,13 @@ export function ManualTikTokModal({
               label="Comentários"
               value={comments}
               onChange={setComments}
+              disabled={isSubmitting}
+            />
+            <MetricInput
+              id="metric-saves"
+              label="Salvos"
+              value={saves}
+              onChange={setSaves}
               disabled={isSubmitting}
             />
             <MetricInput

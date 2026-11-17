@@ -287,6 +287,7 @@ export interface TikTokPost {
   likes: number;
   comments: number;
   shares: number;
+  saves: number;
   metrics_note?: string | null;
   provider?: string | null;
   external_post_id?: string | null;
@@ -323,6 +324,7 @@ export interface TikTokPerformanceItem {
   likes: number;
   comments: number;
   shares: number;
+  saves: number;
   metrics_note?: string | null;
   generated_at?: string | null;
   created_at?: string;
@@ -339,6 +341,7 @@ export interface UpsertTikTokPostInput {
   likes?: number;
   comments?: number;
   shares?: number;
+  saves?: number;
   metrics_note?: string | null;
   tracking_mode?: TikTokTrackingMode;
 }
@@ -348,6 +351,7 @@ export type TikTokPerformanceSortField =
   | "likes"
   | "comments"
   | "shares"
+  | "saves"
   | "published_at"
   | "created_at";
 
