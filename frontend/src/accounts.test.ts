@@ -273,6 +273,88 @@ describe("Accounts configuration & CRUD", () => {
       assert.equal(result.social_provider, "buffer");
     });
 
+    it("updateAccount passes zernio_api_key when provided", async () => {
+      let requestedUrl = "";
+      let requestedMethod = "";
+      let requestedHeaders: Headers | undefined;
+      let requestedBody = "";
+
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        requestedUrl = String(input);
+        requestedMethod = init?.method ?? "GET";
+        requestedHeaders = new Headers(init?.headers);
+        requestedBody = String(init?.body);
+
+        return new Response(
+          JSON.stringify({
+            id: "maria_clara",
+            role: "single_woman",
+            persona: "Updated persona",
+            enabled: true,
+            zernio_api_key: "zk_live_123456",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      };
+
+      const result = await updateAccount("maria_clara", {
+        zernio_api_key: "zk_live_123456",
+      });
+
+      assert.equal(requestedUrl, "/api/v1/accounts/maria_clara");
+      assert.equal(requestedMethod, "PATCH");
+      assert.equal(requestedHeaders?.get("Authorization"), "Bearer test-token-123");
+      assert.deepEqual(JSON.parse(requestedBody), {
+        zernio_api_key: "zk_live_123456",
+      });
+      assert.equal(result.zernio_api_key, "zk_live_123456");
+    });
+
+    it("createAccount passes zernio_api_key when provided", async () => {
+      let requestedUrl = "";
+      let requestedMethod = "";
+      let requestedHeaders: Headers | undefined;
+      let requestedBody = "";
+
+      globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+        requestedUrl = String(input);
+        requestedMethod = init?.method ?? "GET";
+        requestedHeaders = new Headers(init?.headers);
+        requestedBody = String(init?.body);
+
+        return new Response(
+          JSON.stringify({
+            id: "maria_clara",
+            role: "single_woman",
+            persona: "Persona test",
+            enabled: true,
+            zernio_api_key: "zk_live_create_123",
+          }),
+          { status: 201, headers: { "Content-Type": "application/json" } }
+        );
+      };
+
+      const result = await createAccount({
+        id: "maria_clara",
+        role: "single_woman",
+        persona: "Persona test",
+        enabled: true,
+        zernio_api_key: "zk_live_create_123",
+      });
+
+      assert.equal(requestedUrl, "/api/v1/accounts");
+      assert.equal(requestedMethod, "POST");
+      assert.equal(requestedHeaders?.get("Authorization"), "Bearer test-token-123");
+      assert.deepEqual(JSON.parse(requestedBody), {
+        id: "maria_clara",
+        role: "single_woman",
+        persona: "Persona test",
+        enabled: true,
+        zernio_api_key: "zk_live_create_123",
+      });
+      assert.equal(result.zernio_api_key, "zk_live_create_123");
+    });
+
     it("getBufferLinkageStatus returns correct label and linkage state", () => {
       const unlinked = getBufferLinkageStatus({
         id: "acc_1",

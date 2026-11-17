@@ -16,7 +16,7 @@ import {
   deleteAccount,
   syncSocialAccounts,
 } from "../../api";
-import { RefreshCw, UserPlus, Users } from "lucide-react";
+import { Eye, EyeOff, RefreshCw, UserPlus, Users } from "lucide-react";
 import {
   Button,
   CheckboxField,
@@ -49,6 +49,7 @@ interface AccountFormState {
   tiktok_open_id: string;
   external_account_id: string;
   social_provider: string;
+  zernio_api_key: string;
 }
 
 const emptyFormState: AccountFormState = {
@@ -61,6 +62,7 @@ const emptyFormState: AccountFormState = {
   tiktok_open_id: "",
   external_account_id: "",
   social_provider: "zernio",
+  zernio_api_key: "",
 };
 
 function StatusToggle({
@@ -119,6 +121,8 @@ function AccountForm({
   onCancel,
   submitLabel,
 }: AccountFormProps): React.JSX.Element {
+  const [showApiKey, setShowApiKey] = useState(false);
+
   return (
     <>
       <form
@@ -217,6 +221,39 @@ function AccountForm({
           </Field>
         </div>
 
+        <Field
+          label="Chave API Zernio (opcional)"
+          htmlFor="account-zernio-api-key"
+          hint="Se vazio, usa a chave padrão do sistema (ZERNIO_API_KEY do .env)."
+        >
+          <div className="relative">
+            <Input
+              id="account-zernio-api-key"
+              type={showApiKey ? "text" : "password"}
+              placeholder="zk_..."
+              value={form.zernio_api_key}
+              onChange={(e) =>
+                setForm({ ...form, zernio_api_key: e.target.value })
+              }
+              className="pr-10"
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              onClick={() => setShowApiKey(!showApiKey)}
+              className="absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-600 focus:outline-none"
+              title={showApiKey ? "Ocultar chave API" : "Exibir chave API"}
+              aria-label={showApiKey ? "Ocultar chave API" : "Exibir chave API"}
+            >
+              {showApiKey ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        </Field>
+
         <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
           <CheckboxField
             label="Habilitar esta conta para gerações automáticas"
@@ -283,6 +320,7 @@ export function AccountsPage(): React.JSX.Element {
       tiktok_open_id: acc.tiktok_open_id || "",
       external_account_id: acc.external_account_id || "",
       social_provider: acc.social_provider || "zernio",
+      zernio_api_key: acc.zernio_api_key || "",
     });
     setFormError(null);
   };
@@ -333,6 +371,7 @@ export function AccountsPage(): React.JSX.Element {
         tiktok_open_id: createForm.tiktok_open_id.trim() || null,
         external_account_id: createForm.external_account_id.trim() || null,
         social_provider: createForm.social_provider.trim() || null,
+        zernio_api_key: createForm.zernio_api_key ? createForm.zernio_api_key.trim() : null,
       };
 
       await createAccount(payload);
@@ -363,6 +402,7 @@ export function AccountsPage(): React.JSX.Element {
         tiktok_open_id: editForm.tiktok_open_id.trim() || null,
         external_account_id: editForm.external_account_id.trim() || null,
         social_provider: editForm.social_provider.trim() || null,
+        zernio_api_key: editForm.zernio_api_key ? editForm.zernio_api_key.trim() : null,
       };
 
       await updateAccount(editingAccount.id, payload);

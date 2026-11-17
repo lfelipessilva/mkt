@@ -28,6 +28,7 @@ export interface Account {
   tiktok_open_id?: string | null;
   social_provider?: string | null;
   external_account_id?: string | null;
+  zernio_api_key?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -42,6 +43,7 @@ export interface CreateAccountInput {
   tiktok_open_id?: string | null;
   social_provider?: string | null;
   external_account_id?: string | null;
+  zernio_api_key?: string | null;
 }
 
 export interface UpdateAccountInput {
@@ -53,6 +55,7 @@ export interface UpdateAccountInput {
   tiktok_open_id?: string | null;
   social_provider?: string | null;
   external_account_id?: string | null;
+  zernio_api_key?: string | null;
 }
 
 export interface SyncAccountsResult {
