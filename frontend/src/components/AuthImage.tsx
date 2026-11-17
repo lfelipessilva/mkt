@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
+import { ImageOff } from "lucide-react";
 import { fetchMediaBlob } from "../api";
+import { cn, Spinner } from "../ui";
 
 export interface AuthImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   storagePath?: string;
@@ -12,7 +14,7 @@ export function AuthImage({
   storagePath,
   src,
   alt = "Imagem",
-  className = "",
+  className,
   style,
   fallbackText,
   ...rest
@@ -35,14 +37,12 @@ export function AuthImage({
     setLoading(true);
     setError(false);
 
-    // If it's already a data URL or blob URL, use directly
     if (targetPath.startsWith("data:") || targetPath.startsWith("blob:")) {
       setBlobUrl(targetPath);
       setLoading(false);
       return;
     }
 
-    // Clean storagePath if full URL or API URL was passed
     let cleanPath = targetPath;
     if (cleanPath.includes("/api/v1/media/file?path=")) {
       const parts = cleanPath.split("/api/v1/media/file?path=");
@@ -76,17 +76,29 @@ export function AuthImage({
 
   if (loading) {
     return (
-      <div className={`auth-image-placeholder loading ${className}`} style={style}>
-        <span className="spinner-sm" />
+      <div
+        className={cn(
+          "flex h-full w-full items-center justify-center bg-slate-100 text-slate-400",
+          className
+        )}
+        style={style}
+      >
+        <Spinner size="sm" />
       </div>
     );
   }
 
   if (error || !blobUrl) {
     return (
-      <div className={`auth-image-placeholder error ${className}`} style={style}>
-        <span className="placeholder-icon">📷</span>
-        <span className="placeholder-text">{fallbackText || "Erro ao carregar"}</span>
+      <div
+        className={cn(
+          "flex h-full w-full flex-col items-center justify-center gap-1.5 bg-slate-100 px-3 py-4 text-center text-xs text-slate-400",
+          className
+        )}
+        style={style}
+      >
+        <ImageOff className="h-5 w-5" />
+        <span>{fallbackText || "Erro ao carregar"}</span>
       </div>
     );
   }
@@ -95,7 +107,7 @@ export function AuthImage({
     <img
       src={blobUrl}
       alt={alt}
-      className={`auth-image ${className}`}
+      className={cn("block", className)}
       style={style}
       {...rest}
     />

@@ -149,6 +149,33 @@ describe("Task 6: Polling Worker (pollPendingPostsJob)", { timeout: 60000 }, () 
     assert.equal(runCheck.rows[0].status, "published");
   });
 
+  it("reconciles a run to published when its post is already published", async () => {
+    const { runId } = await createTestRunAndPost({
+      publishStatus: "published",
+      externalPostId: "ext_post_already_published",
+    });
+
+    const mockProvider: SocialPublisherProvider = {
+      providerName: "zernio",
+      async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
+      async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
+        throw new Error("not called");
+      },
+      async getPostStatus(_id: string): Promise<PublishPostResponse> {
+        throw new Error("not called");
+      },
+      async getPostMetrics(_id: string): Promise<PostMetrics | null> { return null; },
+    };
+
+    await pollPendingPostsJob(pool, mockProvider);
+
+    const runCheck = await pool.query(
+      "SELECT status FROM carousel_runs WHERE id = $1",
+      [runId]
+    );
+    assert.equal(runCheck.rows[0].status, "published");
+  });
+
   it("transitions post to 'failed' when Buffer returns 'failed'", async () => {
     const { runId } = await createTestRunAndPost({
       publishStatus: "processing",

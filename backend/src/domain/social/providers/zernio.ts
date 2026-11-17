@@ -30,6 +30,12 @@ export interface ZernioSdk {
       error?: ZernioError;
     }>;
   };
+  analytics: {
+    getAnalytics(options?: { query?: { postId?: string } }): Promise<{
+      data?: ZernioAnalyticsResponse;
+      error?: ZernioError;
+    }>;
+  };
   connect: {
     getConnectUrl(options: {
       path: { platform: "tiktok" };
@@ -60,6 +66,28 @@ interface ZernioTrack {
   clip?: { id?: string };
 }
 
+interface ZernioPostAnalytics {
+  views?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  lastUpdated?: string | null;
+}
+
+interface ZernioAnalyticsResponse {
+  postId?: string;
+  status?: string;
+  syncStatus?: "synced" | "pending" | "partial" | "unavailable";
+  platformPostUrl?: string | null;
+  analytics?: ZernioPostAnalytics | null;
+  platformAnalytics?: Array<{
+    platform?: string;
+    analytics?: ZernioPostAnalytics | null;
+    syncStatus?: string;
+    platformPostUrl?: string | null;
+  }>;
+}
+
 function fail(result: { error?: ZernioError }, fallback: string): void {
   if (!result.error) return;
   const message = result.error.error || result.error.message || fallback;
@@ -73,7 +101,7 @@ export function musicSoundId(tracks: ZernioTrack[] | undefined): string | null {
 }
 
 function mapStatus(status: string | undefined): PublishStatus {
-  if (status === "published") return "published";
+  if (status === "published" || status === "partial") return "published";
   if (status === "failed" || status === "cancelled") return "failed";
   return "processing";
 }
@@ -225,7 +253,51 @@ export class ZernioPublisherAdapter implements SocialPublisherProvider {
     };
   }
 
-  async getPostMetrics(): Promise<PostMetrics | null> {
-    return null;
+  async getPostMetrics(externalPostId: string): Promise<PostMetrics | null> {
+    const result = await this.sdk().analytics.getAnalytics({
+      query: { postId: externalPostId },
+    });
+    fail(result, "Zernio analytics failed");
+
+    const data = result.data;
+    if (!data) return null;
+    if (data.syncStatus === "pending" || data.syncStatus === "unavailable") {
+      return null;
+    }
+
+    const analytics =
+      data.analytics ||
+      data.platformAnalytics?.find((item) => item.platform === "tiktok")?.analytics ||
+      null;
+    if (!analytics) return null;
+
+    const platform = data.platformAnalytics?.find((item) => item.platform === "tiktok");
+    const postUrl = data.platformPostUrl || platform?.platformPostUrl || null;
+
+    const metrics = {
+      views: Number(analytics.views || 0),
+      likes: Number(analytics.likes || 0),
+      comments: Number(analytics.comments || 0),
+      shares: Number(analytics.shares || 0),
+    };
+
+    // A zeroed payload without a sync timestamp means Zernio has not collected
+    // this post yet; return null so the daily job never overwrites good data.
+    if (
+      !analytics.lastUpdated &&
+      metrics.views === 0 &&
+      metrics.likes === 0 &&
+      metrics.comments === 0 &&
+      metrics.shares === 0
+    ) {
+      return null;
+    }
+
+    return {
+      externalPostId,
+      ...metrics,
+      collectedAt: analytics.lastUpdated || new Date().toISOString(),
+      postUrl,
+    };
   }
 }

@@ -25,6 +25,12 @@ function mapGenerationJobRow(row: any): GenerationJob {
 }
 
 function mapCarouselRunRow(row: any): CarouselRun {
+  const hasTikTokPost = Boolean(
+    row.tiktok_provider ||
+      row.tiktok_external_post_id ||
+      row.tiktok_publish_status
+  );
+
   return {
     id: row.id,
     job_id: row.job_id ?? null,
@@ -42,6 +48,20 @@ function mapCarouselRunRow(row: any): CarouselRun {
     buffer_dispatched_at: row.buffer_dispatched_at ? new Date(row.buffer_dispatched_at) : null,
     created_at: new Date(row.created_at),
     updated_at: new Date(row.updated_at),
+    tiktok_post: hasTikTokPost
+      ? {
+          provider: row.tiktok_provider ?? null,
+          external_post_id: row.tiktok_external_post_id ?? null,
+          publish_status: row.tiktok_publish_status ?? null,
+          published_at: row.tiktok_published_at
+            ? new Date(row.tiktok_published_at)
+            : null,
+          last_polled_at: row.tiktok_last_polled_at
+            ? new Date(row.tiktok_last_polled_at)
+            : null,
+          video_url: row.tiktok_video_url ?? null,
+        }
+      : null,
   };
 }
 
@@ -110,8 +130,19 @@ export async function getCarouselRun(
 ): Promise<CarouselRun | null> {
   const p = poolInstance || getPool();
   const result = await p.query(
-    `SELECT id, job_id, auto_post_slot_id, account_id, account_role, archetype_title, bait_body, tema,
-            legenda, status, output_dir, error_message, generated_at, created_at, updated_at,
+    `SELECT carousel_runs.id, carousel_runs.job_id, carousel_runs.auto_post_slot_id,
+            carousel_runs.account_id, carousel_runs.account_role,
+            carousel_runs.archetype_title, carousel_runs.bait_body,
+            carousel_runs.tema, carousel_runs.legenda, carousel_runs.status,
+            carousel_runs.output_dir, carousel_runs.error_message,
+            carousel_runs.generated_at, carousel_runs.created_at,
+            carousel_runs.updated_at,
+            tp.provider AS tiktok_provider,
+            tp.external_post_id AS tiktok_external_post_id,
+            tp.publish_status AS tiktok_publish_status,
+            tp.published_at AS tiktok_published_at,
+            tp.last_polled_at AS tiktok_last_polled_at,
+            tp.video_url AS tiktok_video_url,
             (
               SELECT de.sent_at
               FROM dispatch_events de
@@ -122,7 +153,8 @@ export async function getCarouselRun(
               LIMIT 1
             ) AS buffer_dispatched_at
      FROM carousel_runs
-     WHERE id = $1`,
+     LEFT JOIN tiktok_posts tp ON tp.run_id = carousel_runs.id
+     WHERE carousel_runs.id = $1`,
     [id]
   );
   if (!result.rows[0]) return null;
@@ -217,15 +249,15 @@ export async function listCarouselRuns(
 
   if (filters.accountId) {
     params.push(filters.accountId);
-    conditions.push(`account_id = $${params.length}`);
+    conditions.push(`carousel_runs.account_id = $${params.length}`);
   }
   if (filters.jobId) {
     params.push(filters.jobId);
-    conditions.push(`job_id = $${params.length}`);
+    conditions.push(`carousel_runs.job_id = $${params.length}`);
   }
   if (filters.status) {
     params.push(filters.status);
-    conditions.push(`status = $${params.length}`);
+    conditions.push(`carousel_runs.status = $${params.length}`);
   }
 
   const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
@@ -233,8 +265,19 @@ export async function listCarouselRuns(
   const offsetClause = filters.offset ? `OFFSET ${Number(filters.offset)}` : "";
 
   const query = `
-    SELECT id, job_id, auto_post_slot_id, account_id, account_role, archetype_title, bait_body, tema,
-           legenda, status, output_dir, error_message, generated_at, created_at, updated_at,
+    SELECT carousel_runs.id, carousel_runs.job_id, carousel_runs.auto_post_slot_id,
+           carousel_runs.account_id, carousel_runs.account_role,
+           carousel_runs.archetype_title, carousel_runs.bait_body,
+           carousel_runs.tema, carousel_runs.legenda, carousel_runs.status,
+           carousel_runs.output_dir, carousel_runs.error_message,
+           carousel_runs.generated_at, carousel_runs.created_at,
+           carousel_runs.updated_at,
+           tp.provider AS tiktok_provider,
+           tp.external_post_id AS tiktok_external_post_id,
+           tp.publish_status AS tiktok_publish_status,
+           tp.published_at AS tiktok_published_at,
+           tp.last_polled_at AS tiktok_last_polled_at,
+           tp.video_url AS tiktok_video_url,
            (
              SELECT de.sent_at
              FROM dispatch_events de
@@ -245,8 +288,9 @@ export async function listCarouselRuns(
              LIMIT 1
            ) AS buffer_dispatched_at
     FROM carousel_runs
+    LEFT JOIN tiktok_posts tp ON tp.run_id = carousel_runs.id
     ${whereClause}
-    ORDER BY created_at DESC
+    ORDER BY carousel_runs.created_at DESC
     ${limitClause} ${offsetClause}
   `;
 

@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from "react";
-import type { CarouselRun, TikTokPerformanceItem, TikTokPost, UpsertTikTokPostInput } from "../types";
+import type {
+  CarouselRun,
+  TikTokPerformanceItem,
+  TikTokPost,
+  UpsertTikTokPostInput,
+} from "../types";
 import { upsertTikTokPost } from "../api";
-import { X } from "lucide-react";
+import {
+  Button,
+  Field,
+  InlineAlert,
+  Input,
+  Modal,
+  Textarea,
+} from "../ui";
 
 export function validateManualTikTokInput(input: {
   views?: number;
@@ -33,6 +45,34 @@ export interface ManualTikTokModalProps {
   onSuccess: (updatedRun: CarouselRun, post: TikTokPost) => void;
 }
 
+function MetricInput({
+  id,
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  label: string;
+  value: number;
+  onChange: (value: number) => void;
+  disabled: boolean;
+}): React.JSX.Element {
+  return (
+    <Field label={label} htmlFor={id}>
+      <Input
+        id={id}
+        type="number"
+        min="0"
+        className="font-mono"
+        value={value}
+        onChange={(e) => onChange(Math.max(0, parseInt(e.target.value, 10) || 0))}
+        disabled={disabled}
+      />
+    </Field>
+  );
+}
+
 export function ManualTikTokModal({
   isOpen,
   run,
@@ -40,9 +80,11 @@ export function ManualTikTokModal({
   onClose,
   onSuccess,
 }: ManualTikTokModalProps): React.JSX.Element | null {
-  const targetRunId = run?.id || performanceItem?.run_id || performanceItem?.id || "";
+  const targetRunId =
+    run?.id || performanceItem?.run_id || performanceItem?.id || "";
   const targetAccountId = run?.account_id || performanceItem?.account_id || "";
-  const targetArchetype = run?.archetype_title || performanceItem?.archetype_title || "";
+  const targetArchetype =
+    run?.archetype_title || performanceItem?.archetype_title || "";
   const targetTema = run?.tema || performanceItem?.tema || "";
 
   const [videoUrl, setVideoUrl] = useState("");
@@ -59,7 +101,6 @@ export function ManualTikTokModal({
   useEffect(() => {
     if (isOpen) {
       setErrorMessage(null);
-      // Pre-fill from existing performanceItem or defaults
       if (performanceItem) {
         setVideoUrl(performanceItem.video_url || "");
         setVideoId(performanceItem.video_id || "");
@@ -117,185 +158,178 @@ export function ManualTikTokModal({
       const payload: UpsertTikTokPostInput = {
         video_url: videoUrl.trim() || null,
         video_id: videoId.trim() || null,
-        published_at: publishedAt ? new Date(publishedAt).toISOString() : new Date().toISOString(),
+        published_at: publishedAt
+          ? new Date(publishedAt).toISOString()
+          : new Date().toISOString(),
         views: Number(views) || 0,
         likes: Number(likes) || 0,
         comments: Number(comments) || 0,
         shares: Number(shares) || 0,
         metrics_note: metricsNote.trim() || null,
-        tracking_mode: "manual",
+        tracking_mode:
+          performanceItem?.tracking_mode === "api" ? "api" : "manual",
       };
 
       const result = await upsertTikTokPost(targetRunId, payload);
       onSuccess(result.run, result.post);
       onClose();
     } catch (err: any) {
-      setErrorMessage(err.message || "Erro ao salvar publicação manual do TikTok");
+      setErrorMessage(
+        err.message || "Erro ao salvar publicação manual do TikTok"
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div
-        className="modal-card manual-tiktok-modal"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="modal-header">
-          <div>
-            <h4>Marcar como Publicado Manualmente</h4>
-            <span className="modal-subtitle">
-              Conta: @{targetAccountId} {targetArchetype ? `• ${targetArchetype}` : ""}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="modal-close-btn p-1.5 hover:bg-slate-100 rounded-md transition-colors"
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="md"
+      title={
+        performanceItem?.provider === "zernio"
+          ? "Editar métricas"
+          : "Marcar como Publicado Manualmente"
+      }
+      subtitle={`Conta: @${targetAccountId}${
+        targetArchetype ? ` • ${targetArchetype}` : ""
+      }`}
+      footer={
+        <>
+          <Button
+            variant="outline"
             onClick={onClose}
-            aria-label="Fechar"
+            disabled={isSubmitting}
           >
-            <X className="w-4 h-4 text-slate-500" />
-          </button>
+            Cancelar
+          </Button>
+          <Button
+            type="submit"
+            form="manual-tiktok-form"
+            variant="primary"
+            isLoading={isSubmitting}
+          >
+            {isSubmitting ? "Salvando..." : "Salvar Publicação"}
+          </Button>
+        </>
+      }
+    >
+      <form
+        id="manual-tiktok-form"
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
+        {errorMessage && <InlineAlert tone="error">{errorMessage}</InlineAlert>}
+
+        {performanceItem?.provider === "zernio" && (
+          <InlineAlert tone="info">
+            <span>
+              Post rastreado pelo Zernio. As métricas são sincronizadas
+              automaticamente; uma edição manual não remove o rastreamento.
+            </span>
+            {performanceItem.external_post_id && (
+              <div className="mt-1 break-all font-mono text-[11px]">
+                ID Zernio: {performanceItem.external_post_id}
+              </div>
+            )}
+          </InlineAlert>
+        )}
+
+        {targetTema && (
+          <div className="flex gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
+            <span className="font-semibold text-slate-500">Tema:</span>
+            <span className="text-slate-800">{targetTema}</span>
+          </div>
+        )}
+
+        <Field
+          label="URL da Publicação no TikTok"
+          htmlFor="tiktok-video-url"
+          hint="Link do vídeo publicado no TikTok (opcional, mas recomendado)."
+        >
+          <Input
+            id="tiktok-video-url"
+            type="url"
+            placeholder="https://www.tiktok.com/@conta/video/..."
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            disabled={isSubmitting}
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field
+            label="Data e Hora da Publicação"
+            htmlFor="tiktok-published-at"
+          >
+            <Input
+              id="tiktok-published-at"
+              type="datetime-local"
+              value={publishedAt}
+              onChange={(e) => setPublishedAt(e.target.value)}
+              disabled={isSubmitting}
+            />
+          </Field>
+          <Field label="ID do Vídeo (Opcional)" htmlFor="tiktok-video-id">
+            <Input
+              id="tiktok-video-id"
+              type="text"
+              placeholder="Ex: 7391823901..."
+              value={videoId}
+              onChange={(e) => setVideoId(e.target.value)}
+              disabled={isSubmitting}
+            />
+          </Field>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
-          {errorMessage && (
-            <div className="form-error-alert" role="alert">
-              {errorMessage}
-            </div>
-          )}
-
-          {targetTema && (
-            <div className="run-preview-box">
-              <span className="preview-label">Tema:</span>
-              <span className="preview-value">{targetTema}</span>
-            </div>
-          )}
-
-          <div className="form-group">
-            <label htmlFor="tiktok-video-url">URL da Publicação no TikTok</label>
-            <input
-              id="tiktok-video-url"
-              type="url"
-              placeholder="https://www.tiktok.com/@conta/video/..."
-              value={videoUrl}
-              onChange={(e) => setVideoUrl(e.target.value)}
+        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            Métricas Atuais
+          </span>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricInput
+              id="metric-views"
+              label="Visualizações"
+              value={views}
+              onChange={setViews}
               disabled={isSubmitting}
             />
-            <span className="form-hint">
-              Link do vídeo publicado no TikTok (opcional, mas recomendado).
-            </span>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="tiktok-published-at">Data e Hora da Publicação</label>
-              <input
-                id="tiktok-published-at"
-                type="datetime-local"
-                value={publishedAt}
-                onChange={(e) => setPublishedAt(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="tiktok-video-id">ID do Vídeo (Opcional)</label>
-              <input
-                id="tiktok-video-id"
-                type="text"
-                placeholder="Ex: 7391823901..."
-                value={videoId}
-                onChange={(e) => setVideoId(e.target.value)}
-                disabled={isSubmitting}
-              />
-            </div>
-          </div>
-
-          <div className="metrics-inputs-section">
-            <label className="section-label">Métricas Atuais</label>
-            <div className="metrics-grid">
-              <div className="metric-input-field">
-                <label htmlFor="metric-views">Visualizações</label>
-                <input
-                  id="metric-views"
-                  type="number"
-                  min="0"
-                  value={views}
-                  onChange={(e) => setViews(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="metric-input-field">
-                <label htmlFor="metric-likes">Curtidas</label>
-                <input
-                  id="metric-likes"
-                  type="number"
-                  min="0"
-                  value={likes}
-                  onChange={(e) => setLikes(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="metric-input-field">
-                <label htmlFor="metric-comments">Comentários</label>
-                <input
-                  id="metric-comments"
-                  type="number"
-                  min="0"
-                  value={comments}
-                  onChange={(e) => setComments(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  disabled={isSubmitting}
-                />
-              </div>
-
-              <div className="metric-input-field">
-                <label htmlFor="metric-shares">Compartilhamentos</label>
-                <input
-                  id="metric-shares"
-                  type="number"
-                  min="0"
-                  value={shares}
-                  onChange={(e) => setShares(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="tiktok-note">Notas / Observações</label>
-            <textarea
-              id="tiktok-note"
-              rows={2}
-              placeholder="Ex: Teve alto engajamento nos primeiros 30 minutos..."
-              value={metricsNote}
-              onChange={(e) => setMetricsNote(e.target.value)}
+            <MetricInput
+              id="metric-likes"
+              label="Curtidas"
+              value={likes}
+              onChange={setLikes}
+              disabled={isSubmitting}
+            />
+            <MetricInput
+              id="metric-comments"
+              label="Comentários"
+              value={comments}
+              onChange={setComments}
+              disabled={isSubmitting}
+            />
+            <MetricInput
+              id="metric-shares"
+              label="Compartilhamentos"
+              value={shares}
+              onChange={setShares}
               disabled={isSubmitting}
             />
           </div>
+        </div>
 
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Salvando..." : "Salvar Publicação"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <Field label="Notas / Observações" htmlFor="tiktok-note">
+          <Textarea
+            id="tiktok-note"
+            rows={2}
+            placeholder="Ex: Teve alto engajamento nos primeiros 30 minutos..."
+            value={metricsNote}
+            onChange={(e) => setMetricsNote(e.target.value)}
+            disabled={isSubmitting}
+          />
+        </Field>
+      </form>
+    </Modal>
   );
 }

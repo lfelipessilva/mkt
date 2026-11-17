@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -167,10 +168,15 @@ export async function generateOneCarousel(
   );
 
   const outputRoot = getOutputDir(options.outputDir);
-  const dateStamp = dayStamp(options.now ? new Date(options.now) : new Date());
+  const now = new Date(options.now ?? Date.now());
+  const dateStamp = dayStamp(now);
   const accountDayDir = path.join(outputRoot, dateStamp, account.id);
-  const index = nextPostIndex(accountDayDir);
-  const outDir = path.join(accountDayDir, `post_${String(index).padStart(2, "0")}`);
+  const timeStamp = now.toISOString().slice(11, 19).replace(/:/g, "");
+  const generationId = crypto.randomUUID().slice(0, 8);
+  const outDir = path.join(
+    accountDayDir,
+    `post_${timeStamp}_${generationId}`
+  );
   fs.mkdirSync(outDir, { recursive: true });
 
   if (!options.skipRender) {

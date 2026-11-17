@@ -1,6 +1,6 @@
 {
   "antigravity": {
-    "model": "gemini-3.8-flash-medium"
+    "model": "gemini-3.8-flash-high"
   },
   "defaults": {
     "effort": "medium"

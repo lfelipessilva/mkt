@@ -35,7 +35,8 @@ export async function syncTikTokMetricsDailyJob(
     const candidatePostsRes = await p.query(
       `SELECT id, run_id, external_post_id, published_at
        FROM tiktok_posts
-       WHERE external_post_id IS NOT NULL
+       WHERE provider = 'zernio'
+         AND external_post_id IS NOT NULL
          AND publish_status = 'published'
          AND published_at IS NOT NULL
          AND published_at >= NOW() - INTERVAL '30 days'`
@@ -59,9 +60,17 @@ export async function syncTikTokMetricsDailyJob(
                  likes = $2,
                  comments = $3,
                  shares = $4,
+                 video_url = COALESCE(video_url, $6),
                  updated_at = NOW()
              WHERE id = $5`,
-            [metrics.views, metrics.likes, metrics.comments, metrics.shares, post.id]
+            [
+              metrics.views,
+              metrics.likes,
+              metrics.comments,
+              metrics.shares,
+              post.id,
+              metrics.postUrl ?? null,
+            ]
           );
 
           await client.query(

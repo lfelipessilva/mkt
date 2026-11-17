@@ -180,6 +180,41 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     assert.equal(events[0].status, "sent");
   });
 
+  it("marks the run as published when the provider confirms it is already live", async () => {
+    const runId = await createSampleRun();
+
+    const mockProvider: SocialPublisherProvider = {
+      async listConnectedAccounts() {
+        return [];
+      },
+      async publishPost(): Promise<PublishPostResponse> {
+        return {
+          externalPostId: "ext_buf_published_1",
+          status: "published",
+          publishedAt: new Date().toISOString(),
+          rawResponse: { id: "ext_buf_published_1", status: "published" },
+        };
+      },
+      async getPostStatus(id: string) {
+        return { externalPostId: id, status: "published", rawResponse: {} };
+      },
+      async getPostMetrics(id: string) {
+        return { externalPostId: id, views: 0, likes: 0, comments: 0, shares: 0 };
+      },
+    };
+
+    const res = await dispatchCarouselRun({
+      runId,
+      channel: "zernio",
+      pool,
+      socialPublisherProvider: mockProvider,
+    });
+
+    assert.equal(res.run.status, "published");
+    const runRes = await pool.query(`SELECT status FROM carousel_runs WHERE id = $1`, [runId]);
+    assert.equal(runRes.rows[0].status, "published");
+  });
+
   it("fails when account has no external_account_id configured", async () => {
     // Account without external_account_id
     await pool.query(
@@ -266,7 +301,7 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     );
 
     const runRes = await pool.query(`SELECT status FROM carousel_runs WHERE id = $1`, [runId]);
-    assert.equal(runRes.rows[0].status, "generated");
+    assert.equal(runRes.rows[0].status, "failed");
 
     const postRes = await pool.query(
       `SELECT publish_status, external_post_id FROM tiktok_posts WHERE run_id = $1`,

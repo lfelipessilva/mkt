@@ -9,8 +9,6 @@ import {
   Send,
   CheckCircle2,
   Edit3,
-  AlertCircle,
-  Check,
   Share2,
   Layers,
   ChevronDown,
@@ -20,6 +18,14 @@ import {
   MessageSquare,
   Repeat2,
 } from "lucide-react";
+import {
+  Badge,
+  Button,
+  InlineAlert,
+  RoleBadge,
+  StatusBadge,
+  cn,
+} from "../ui";
 
 export interface RunCardMetrics {
   views?: number | null;
@@ -85,44 +91,131 @@ export function formatCardMetrics(
   };
 }
 
+function isZernioLinked(account: Account | null | undefined): boolean {
+  return Boolean(
+    account &&
+      account.external_account_id &&
+      account.external_account_id.trim() !== "" &&
+      account.social_provider?.trim().toLowerCase() === "zernio"
+  );
+}
+
+export function shouldShowTelegram(
+  account: Account | null | undefined,
+  run: CarouselRun
+): boolean {
+  if (!isZernioLinked(account)) return true;
+  return resolveBufferPublishState(account, run).zernioFailed;
+}
+
+export function shouldShowManualTikTok(
+  account: Account | null | undefined,
+  run: CarouselRun
+): boolean {
+  const zernioManaged = Boolean(
+    isZernioLinked(account) && run.tiktok_post?.external_post_id
+  );
+  if (!zernioManaged) return true;
+  return resolveBufferPublishState(account, run).zernioFailed;
+}
+
+export interface RunCardPublishState {
+  visible: boolean;
+  disabled: boolean;
+  label: string;
+  published: boolean;
+  zernioFailed: boolean;
+}
+
 export function resolveBufferPublishState(
   account: Account | null | undefined,
   run: CarouselRun
-): { visible: boolean; disabled: boolean; label: string } {
-  const isLinked = Boolean(
-    account &&
-    account.external_account_id &&
-    account.external_account_id.trim() !== "" &&
-    account.social_provider?.trim().toLowerCase() === "zernio"
-  );
+): RunCardPublishState {
+  const isLinked = isZernioLinked(account);
 
-  // 1. Se run.buffer_dispatched_at existe e run.status !== 'failed' → visible: true, disabled: true, label 'Enviado ao Buffer'
-  if (run.buffer_dispatched_at && run.status !== "failed") {
-    return { visible: true, disabled: true, label: "Enviado ao Zernio" };
-  }
+  const postStatus = run.tiktok_post?.publish_status?.trim().toLowerCase();
+  const published =
+    postStatus === "published" || run.status === "published";
+  const zernioFailed =
+    postStatus === "failed" ||
+    (!published && run.status === "failed");
 
-  // 2. Se run.buffer_dispatched_at existe e run.status === 'failed' → visible: true, disabled: false, label 'Reenviar ao Buffer'
-  if (run.buffer_dispatched_at && run.status === "failed") {
-    return { visible: true, disabled: false, label: "Reenviar ao Zernio" };
-  }
-
-  // 3. Se run está aguardando aprovação da rotina (status = 'awaiting_approval' ou slot vinculado em awaiting_approval)
-  if (run.status === "awaiting_approval") {
-    return { visible: true, disabled: false, label: "Confirmar envio" };
-  }
-
-  // Conta sem vínculo → invisível
   if (!isLinked) {
-    return { visible: false, disabled: false, label: "" };
+    return {
+      visible: false,
+      disabled: false,
+      label: "",
+      published,
+      zernioFailed: false,
+    };
   }
 
-  // 4. Se não existe buffer_dispatched_at e run.status === 'published' → visible: true, disabled: true, label 'Já publicado'
-  if (run.status === "published") {
-    return { visible: true, disabled: true, label: "Já publicado" };
+  if (published) {
+    return {
+      visible: true,
+      disabled: true,
+      label: "Publicado",
+      published: true,
+      zernioFailed: false,
+    };
   }
 
-  // 5. Se não existe buffer_dispatched_at, a conta está vinculada e o run não está published → visible: true, disabled: false, label 'Publicar no Buffer'
-  return { visible: true, disabled: false, label: "Publicar no Zernio" };
+  if (
+    postStatus === "queued" ||
+    postStatus === "processing" ||
+    (run.buffer_dispatched_at && !zernioFailed)
+  ) {
+    return {
+      visible: true,
+      disabled: true,
+      label: "Enviado ao Zernio",
+      published: false,
+      zernioFailed: false,
+    };
+  }
+
+  if (zernioFailed) {
+    return {
+      visible: true,
+      disabled: false,
+      label: "Reenviar ao Zernio",
+      published: false,
+      zernioFailed: true,
+    };
+  }
+
+  if (run.status === "awaiting_approval") {
+    return {
+      visible: true,
+      disabled: false,
+      label: "Confirmar envio",
+      published: false,
+      zernioFailed: false,
+    };
+  }
+
+  return {
+    visible: true,
+    disabled: false,
+    label: "Publicar no Zernio",
+    published: false,
+    zernioFailed: false,
+  };
+}
+
+interface MetricProps {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}
+
+function Metric({ icon, label, value }: MetricProps): React.JSX.Element {
+  return (
+    <div className="flex items-center justify-center gap-1.5 px-2 py-2" title={label}>
+      {icon}
+      <span className="font-semibold text-slate-700">{value}</span>
+    </div>
+  );
 }
 
 export function RunCard({
@@ -164,6 +257,10 @@ export function RunCard({
   );
 
   const bufferState = resolveBufferPublishState(account, run);
+  const showTelegram = shouldShowTelegram(account, run);
+  const manualVisible =
+    Boolean(onOpenManualPublish) && shouldShowManualTikTok(account, run);
+  const tiktokUrl = metrics?.video_url || run.tiktok_post?.video_url || null;
 
   const handleSendTelegram = async () => {
     if (isSending) return;
@@ -211,10 +308,21 @@ export function RunCard({
           buffer_dispatched_at: new Date().toISOString(),
         };
       }
-      setBufferSuccess("Carrossel enviado ao Zernio");
+      setBufferSuccess(
+        updatedRun.status === "published"
+          ? "Publicado no TikTok via Zernio"
+          : "Carrossel enviado ao Zernio"
+      );
       if (onDispatched) onDispatched(updatedRun);
       if (onRunUpdated) onRunUpdated(updatedRun);
-      if (onToast) onToast("Carrossel enviado ao Zernio", "success");
+      if (onToast) {
+        onToast(
+          updatedRun.status === "published"
+            ? "Publicado no TikTok via Zernio"
+            : "Carrossel enviado ao Zernio",
+          "success"
+        );
+      }
       setTimeout(() => setBufferSuccess(null), 4000);
     } catch (err: any) {
       const msg = err.message || "Erro ao publicar no Zernio";
@@ -229,35 +337,50 @@ export function RunCard({
     <>
       <div
         id={`run-card-${run.id}`}
-        className={resolveRunCardClassName(run.status, isFocused)}
+        className={cn(
+          resolveRunCardClassName(run.status, isFocused),
+          "flex flex-col gap-3 rounded-xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md",
+          isFocused
+            ? "border-blue-500 ring-2 ring-blue-500/25"
+            : "border-slate-200"
+        )}
         data-testid={`run-card-${run.id}`}
       >
-        {/* Top Header */}
-        <div className="run-card-header">
-          <div className="run-card-account">
-            <span className="account-handle font-semibold">@{run.account_id}</span>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="truncate text-sm font-bold text-slate-900">
+              @{run.account_id}
+            </span>
             {run.account_role && (
-              <span className="account-role-tag">
-                {ROLE_LABELS[run.account_role] || run.account_role}
-              </span>
+              <RoleBadge
+                role={run.account_role}
+                label={ROLE_LABELS[run.account_role] || run.account_role}
+              />
             )}
           </div>
 
-          <div className="run-card-badges flex items-center gap-1.5">
+          <div className="flex flex-none flex-wrap items-center justify-end gap-1.5">
             {isLinked && (
-              <span className="buffer-badge" title={`Conta vinculada ao Zernio (${account?.external_account_id})`}>
+              <Badge
+                tone="blue"
+                pill
+                title={`Conta vinculada ao Zernio (${account?.external_account_id})`}
+              >
                 Zernio
-              </span>
+              </Badge>
             )}
-            <span className={`status-pill status-${run.status}`}>
-              {STATUS_LABELS[run.status] || run.status}
-            </span>
+            <StatusBadge
+              status={run.status}
+              label={STATUS_LABELS[run.status] || run.status}
+            />
           </div>
         </div>
 
-        {/* Collapsed Images Section */}
         <div
-          className={`run-collapsed-media-wrapper ${slides.length > 0 ? "cursor-pointer group" : "cursor-default"}`}
+          className={cn(
+            "group relative",
+            slides.length > 0 ? "cursor-pointer" : "cursor-default"
+          )}
           onClick={() => {
             if (slides.length > 0) setSlidesModalOpen(true);
           }}
@@ -268,64 +391,81 @@ export function RunCard({
               setSlidesModalOpen(true);
             }
           }}
-          title={slides.length > 0 ? "Clique para visualizar todos os slides" : undefined}
+          title={
+            slides.length > 0
+              ? "Clique para visualizar todos os slides"
+              : undefined
+          }
         >
           {coverSlide ? (
-            <div className="run-collapsed-media-stack">
-              <div className="run-collapsed-cover-thumb">
+            <div className="relative">
+              <div
+                className="absolute inset-x-2.5 -top-1 h-4 rounded-t-lg border border-b-0 border-slate-200 bg-slate-100"
+                aria-hidden="true"
+              />
+              <div className="relative h-[240px] w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                 <AuthImage
                   storagePath={coverSlide.storage_path}
                   alt={`Capa do carrossel @${run.account_id}`}
-                  className="run-collapsed-img"
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                 />
-                <div className="run-collapsed-overlay">
-                  <span className="run-collapsed-badge">
-                    <Layers className="w-3.5 h-3.5 inline mr-1" />
+                <div className="pointer-events-none absolute inset-0 flex flex-col justify-between bg-gradient-to-b from-slate-900/35 via-transparent to-slate-900/60 p-2.5">
+                  <span className="inline-flex w-fit items-center gap-1 rounded-md border border-white/20 bg-slate-900/80 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur">
+                    <Layers className="h-3 w-3" />
                     {formatCollapsedSlideCountBadge(slides.length)}
                   </span>
-                  <span className="run-collapsed-hint">Ver todos</span>
+                  <span className="self-end rounded-md bg-slate-900/80 px-2 py-0.5 text-[11px] font-medium text-slate-50 backdrop-blur transition-colors group-hover:bg-blue-600 group-hover:text-white">
+                    Ver todos
+                  </span>
                 </div>
               </div>
             </div>
           ) : (
-            <div className="run-collapsed-empty">
-              <span>Nenhum slide renderizado</span>
+            <div className="flex h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-400">
+              Nenhum slide renderizado
             </div>
           )}
         </div>
 
-        {/* Optional Metrics Row */}
         {formattedMetrics && (
-          <div className="run-card-metrics-row flex items-center justify-between text-xs bg-slate-50 rounded px-2.5 py-1.5 border border-slate-100">
-            <div className="flex items-center gap-1 text-slate-700" title="Visualizações">
-              <Eye className="w-3.5 h-3.5 text-blue-600" />
-              <span className="font-medium">{formattedMetrics.views}</span>
-            </div>
-            <div className="flex items-center gap-1 text-slate-700" title="Curtidas">
-              <Heart className="w-3.5 h-3.5 text-rose-500" />
-              <span className="font-medium">{formattedMetrics.likes}</span>
-            </div>
-            <div className="flex items-center gap-1 text-slate-700" title="Comentários">
-              <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-              <span className="font-medium">{formattedMetrics.comments}</span>
-            </div>
-            <div className="flex items-center gap-1 text-slate-700" title="Compartilhamentos">
-              <Repeat2 className="w-3.5 h-3.5 text-indigo-500" />
-              <span className="font-medium">{formattedMetrics.shares}</span>
-            </div>
+          <div className="grid grid-cols-4 divide-x divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 text-xs">
+            <Metric
+              icon={<Eye className="h-3.5 w-3.5 text-blue-600" />}
+              label="Visualizações"
+              value={formattedMetrics.views}
+            />
+            <Metric
+              icon={<Heart className="h-3.5 w-3.5 text-rose-500" />}
+              label="Curtidas"
+              value={formattedMetrics.likes}
+            />
+            <Metric
+              icon={<MessageSquare className="h-3.5 w-3.5 text-emerald-600" />}
+              label="Comentários"
+              value={formattedMetrics.comments}
+            />
+            <Metric
+              icon={<Repeat2 className="h-3.5 w-3.5 text-indigo-500" />}
+              label="Compartilhamentos"
+              value={formattedMetrics.shares}
+            />
           </div>
         )}
 
-        {/* Primary Description (Legenda) */}
         {run.legenda && (
-          <div className="run-card-caption">
-            <p className={`caption-text ${expandedCaption ? "expanded" : "collapsed"}`}>
+          <div className="rounded-r-lg border-l-2 border-blue-500 bg-slate-50 px-3 py-2.5">
+            <p
+              className={cn(
+                "whitespace-pre-wrap text-xs leading-relaxed text-slate-600",
+                !expandedCaption && "line-clamp-2"
+              )}
+            >
               {run.legenda}
             </p>
             {run.legenda.length > 90 && (
               <button
                 type="button"
-                className="btn-toggle-caption text-blue-600 hover:text-blue-800"
+                className="mt-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline"
                 onClick={() => setExpandedCaption(!expandedCaption)}
               >
                 {expandedCaption ? "Ver menos" : "Ver legenda completa"}
@@ -334,148 +474,137 @@ export function RunCard({
           </div>
         )}
 
-        {/* Secondary Details Accordion */}
-        <div className="run-card-secondary-details">
+        <div className="border-t border-slate-100 pt-1">
           <button
             type="button"
-            className="btn-toggle-details flex items-center justify-between w-full text-xs text-slate-500 hover:text-slate-700 py-1"
+            className="flex w-full items-center justify-between gap-2 py-1 text-xs text-slate-500 transition-colors hover:text-slate-800"
             onClick={() => setShowDetails(!showDetails)}
           >
-            <span>{showDetails ? "Ocultar detalhes" : "Ver detalhes (tema, arquétipo)"}</span>
-            {showDetails ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+            <span>
+              {showDetails
+                ? "Ocultar detalhes"
+                : "Ver detalhes (tema, arquétipo)"}
+            </span>
+            {showDetails ? (
+              <ChevronUp className="h-3.5 w-3.5" />
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5" />
+            )}
           </button>
 
           {showDetails && (
-            <div className="run-card-meta-collapsible mt-1.5 pt-1.5 border-t border-slate-100 text-xs flex flex-col gap-1">
-              <div className="meta-row">
-                <span className="meta-label text-slate-400">Arquétipo:</span>
-                <span className="meta-title font-medium text-slate-700">{run.archetype_title}</span>
-              </div>
+            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1.5 border-t border-slate-100 pt-2 text-xs">
+              <dt className="font-medium text-slate-400">Arquétipo:</dt>
+              <dd className="font-medium text-slate-700">
+                {run.archetype_title}
+              </dd>
               {run.tema && (
-                <div className="meta-row">
-                  <span className="meta-label text-slate-400">Tema:</span>
-                  <span className="meta-tema text-slate-600">{run.tema}</span>
-                </div>
+                <>
+                  <dt className="font-medium text-slate-400">Tema:</dt>
+                  <dd className="text-slate-600">{run.tema}</dd>
+                </>
+              )}
+              {run.tiktok_post?.external_post_id && (
+                <>
+                  <dt className="font-medium text-slate-400">Zernio:</dt>
+                  <dd className="break-all font-mono text-slate-600">
+                    {run.tiktok_post.external_post_id}
+                  </dd>
+                </>
               )}
               {run.bait_body && (
-                <div className="meta-row">
-                  <span className="meta-label text-slate-400">Isca:</span>
-                  <span className="meta-bait text-slate-600 italic">"{run.bait_body}"</span>
-                </div>
+                <>
+                  <dt className="font-medium text-slate-400">Isca:</dt>
+                  <dd className="italic text-slate-600">"{run.bait_body}"</dd>
+                </>
               )}
               {formattedDate && (
-                <div className="meta-row">
-                  <span className="meta-label text-slate-400">Criado:</span>
-                  <span className="meta-date text-slate-500">{formattedDate}</span>
-                </div>
+                <>
+                  <dt className="font-medium text-slate-400">Criado:</dt>
+                  <dd className="text-slate-500">{formattedDate}</dd>
+                </>
               )}
-            </div>
+            </dl>
           )}
         </div>
 
-        {/* Alerts */}
-        {sendError && (
-          <div className="run-card-alert error flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-500" />
-            <span>{sendError}</span>
-          </div>
-        )}
+        {sendError && <InlineAlert tone="error">{sendError}</InlineAlert>}
         {sendSuccess && (
-          <div className="run-card-alert success flex items-center gap-2">
-            <Check className="w-4 h-4 text-emerald-600" />
-            <span>Carrossel despachado com sucesso via Telegram!</span>
-          </div>
+          <InlineAlert tone="success">
+            Carrossel despachado com sucesso via Telegram!
+          </InlineAlert>
         )}
-        {bufferError && (
-          <div className="run-card-alert error flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-500" />
-            <span>{bufferError}</span>
-          </div>
-        )}
+        {bufferError && <InlineAlert tone="error">{bufferError}</InlineAlert>}
         {bufferSuccess && (
-          <div className="run-card-alert success flex items-center gap-2">
-            <Check className="w-4 h-4 text-emerald-600" />
-            <span>{bufferSuccess}</span>
-          </div>
+          <InlineAlert tone="success">{bufferSuccess}</InlineAlert>
         )}
 
-        {/* Actions Bar */}
-        <div className="run-card-actions">
-          <button
-            type="button"
-            className="btn btn-secondary btn-send flex items-center gap-1.5"
-            disabled={isSending}
-            onClick={handleSendTelegram}
-            title="Enviar carrossel para o Telegram"
-          >
-            {isSending ? (
-              <>
-                <span className="spinner-sm" />
-                <span>Enviando...</span>
-              </>
-            ) : (
-              <>
-                <Send className="w-3.5 h-3.5" />
-                <span>Telegram</span>
-              </>
-            )}
-          </button>
-
+        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
           {bufferState.visible && (
-            <button
-              type="button"
-              className="btn btn-secondary btn-buffer flex items-center gap-1.5"
-              disabled={bufferState.disabled || isPublishingBuffer}
+            <Button
+              variant={bufferState.disabled ? "outline" : "primary"}
+              size="sm"
+              disabled={bufferState.disabled}
+              isLoading={isPublishingBuffer}
               onClick={handlePublishBuffer}
               title={bufferState.label}
             >
-              {isPublishingBuffer ? (
-                <>
-                  <span className="spinner-sm" />
-                  <span>Enviando...</span>
-                </>
-              ) : (
-                <>
-                  <Share2 className="w-3.5 h-3.5" />
-                  <span>{bufferState.label}</span>
-                </>
-              )}
-            </button>
+              {!isPublishingBuffer && <Share2 className="h-3.5 w-3.5" />}
+              <span>{isPublishingBuffer ? "Enviando..." : bufferState.label}</span>
+            </Button>
           )}
 
-          {metrics?.video_url && (
+          {showTelegram && (
+            <Button
+              variant="secondary"
+              size="sm"
+              isLoading={isSending}
+              onClick={handleSendTelegram}
+              title={
+                bufferState.zernioFailed
+                  ? "Fallback: enviar carrossel para o Telegram"
+                  : "Enviar carrossel para o Telegram"
+              }
+            >
+              {!isSending && <Send className="h-3.5 w-3.5" />}
+              <span>{isSending ? "Enviando..." : "Telegram"}</span>
+            </Button>
+          )}
+
+          {tiktokUrl && (
             <a
-              href={metrics.video_url}
+              href={tiktokUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn btn-secondary flex items-center gap-1.5 text-xs"
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
               title="Abrir no TikTok"
             >
-              <span>Ver ↗</span>
+              Ver no TikTok ↗
             </a>
           )}
 
-          <button
-            type="button"
-            className={`btn ${run.status === "published" ? "btn-outline" : "btn-primary"} btn-publish-tiktok flex items-center gap-1.5`}
-            onClick={() => onOpenManualPublish && onOpenManualPublish(run)}
-          >
-            {run.status === "published" ? (
-              <>
-                <Edit3 className="w-3.5 h-3.5" />
-                <span>Editar TikTok</span>
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Publicado TikTok</span>
-              </>
-            )}
-          </button>
+          {manualVisible && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenManualPublish && onOpenManualPublish(run)}
+            >
+              {run.status === "published" ? (
+                <>
+                  <Edit3 className="h-3.5 w-3.5" />
+                  <span>Editar TikTok</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  <span>Publicado TikTok</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Modal displaying all slides */}
       <CarouselSlidesModal
         isOpen={slidesModalOpen}
         run={run}

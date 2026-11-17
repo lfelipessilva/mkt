@@ -102,6 +102,7 @@ describe("Task 2: syncSocialAccounts Auto-Import", () => {
             persona,
             role,
             enabled,
+            _autoPostEnabled,
             tiktokOpenId,
             socialProvider,
             externalAccountId,

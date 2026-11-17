@@ -132,7 +132,7 @@ describe("Task 7: Social Accounts Sync Endpoint & Post for Me Phase 2 Stubs", { 
     const body = res.json();
     assert.equal(body.synced, 3);
     assert.equal(body.matched, 2);
-    assert.equal(body.accounts.length, 3);
+    assert.equal(body.accounts.length, 4);
 
     // Verify DB was updated
     const gabrielDb = await pool.query("SELECT * FROM accounts WHERE id = 'gabriel_tech'");

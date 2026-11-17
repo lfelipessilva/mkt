@@ -109,6 +109,91 @@ describe("ZernioPublisherAdapter", () => {
     assert.equal(body?.publishNow, true);
   });
 
+  it("treats a partial post as published for this TikTok-only flow", async () => {
+    const adapter = new ZernioPublisherAdapter(
+      client({
+        posts: {
+          createPost: async () => ({ data: {} }),
+          getPost: async () => ({ data: { post: { _id: "post-partial", status: "partial" } } }),
+        },
+      })
+    );
+
+    const status = await adapter.getPostStatus("post-partial");
+    assert.equal(status.status, "published");
+  });
+
+  it("maps Zernio analytics into post metrics", async () => {
+    const adapter = new ZernioPublisherAdapter(
+      client({
+        analytics: {
+          getAnalytics: async (options) => {
+            assert.equal(options?.query?.postId, "post-metrics");
+            return {
+              data: {
+                postId: "post-metrics",
+                syncStatus: "synced",
+                analytics: {
+                  views: 61,
+                  likes: 6,
+                  comments: 2,
+                  shares: 3,
+                  lastUpdated: "2026-11-16T22:32:14Z",
+                },
+                platformPostUrl: "https://www.tiktok.com/@rebeca.andrade.daily/video/7708859399561055495",
+              },
+            };
+          },
+        },
+      })
+    );
+
+    const metrics = await adapter.getPostMetrics("post-metrics");
+    assert.deepEqual(metrics, {
+      externalPostId: "post-metrics",
+      views: 61,
+      likes: 6,
+      comments: 2,
+      shares: 3,
+      collectedAt: "2026-11-16T22:32:14Z",
+      postUrl: "https://www.tiktok.com/@rebeca.andrade.daily/video/7708859399561055495",
+    });
+  });
+
+  it("does not overwrite metrics while Zernio still reports pending sync", async () => {
+    const adapter = new ZernioPublisherAdapter(
+      client({
+        analytics: {
+          getAnalytics: async () => ({
+            data: {
+              syncStatus: "pending",
+              analytics: { views: 0, likes: 0, comments: 0, shares: 0 },
+            },
+          }),
+        },
+      })
+    );
+
+    assert.equal(await adapter.getPostMetrics("post-pending"), null);
+  });
+
+  it("does not overwrite metrics with a zeroed payload without sync timestamp", async () => {
+    const adapter = new ZernioPublisherAdapter(
+      client({
+        analytics: {
+          getAnalytics: async () => ({
+            data: {
+              syncStatus: "synced",
+              analytics: { views: 0, likes: 0, comments: 0, shares: 0, lastUpdated: null },
+            },
+          }),
+        },
+      })
+    );
+
+    assert.equal(await adapter.getPostMetrics("post-zero"), null);
+  });
+
   it("rejects video posts", async () => {
     const adapter = new ZernioPublisherAdapter(client({}));
     await assert.rejects(

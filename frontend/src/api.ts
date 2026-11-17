@@ -440,6 +440,7 @@ export interface TikTokSyncResult {
   posts_updated: number;
   skipped_manual: number;
   sync_run_id: string;
+  errors?: Array<{ postId: string; error: string }>;
 }
 
 export async function syncTikTok(): Promise<TikTokSyncResult> {

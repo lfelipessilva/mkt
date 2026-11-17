@@ -51,6 +51,7 @@ export interface PostMetrics {
   comments: number;
   shares: number;
   collectedAt: string; // ISO-8601
+  postUrl?: string | null;
 }
 
 export interface SocialPublisherProvider {

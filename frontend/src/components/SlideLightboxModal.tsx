@@ -2,6 +2,7 @@ import React, { useEffect, useCallback } from "react";
 import type { CarouselSlide } from "../types";
 import { AuthImage } from "./AuthImage";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "../ui";
 
 export function formatSlideBadgeLabel(position: number): string {
   if (position === 1) {
@@ -85,62 +86,62 @@ export function SlideLightboxModal({
 
   return (
     <div
-      className="slide-lightbox-backdrop"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/90 p-4 backdrop-blur-md"
       role="dialog"
       aria-modal="true"
       aria-label="Visualização de Slide em Alta Resolução"
       onClick={onClose}
     >
       <div
-        className="slide-lightbox-container"
+        className="relative flex w-full max-w-4xl flex-col gap-3"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header Bar */}
-        <div className="slide-lightbox-header">
-          <div className="slide-lightbox-title-area">
-            <span className="slide-lightbox-counter font-semibold text-white">
+        <div className="flex items-center justify-between gap-4 px-1">
+          <div className="min-w-0 text-sm">
+            <span className="font-semibold text-white">
               Slide {activeIndex + 1} de {total}
             </span>
-            {title && <span className="slide-lightbox-topic text-slate-300"> — {title}</span>}
+            {title && (
+              <span className="ml-1 truncate text-slate-300"> — {title}</span>
+            )}
           </div>
           <button
             type="button"
-            className="slide-lightbox-btn-close text-slate-300 hover:text-white"
+            className="flex h-8 w-8 flex-none items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/10 hover:text-white"
             onClick={onClose}
             aria-label="Fechar preview"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Image Content */}
-        <div className="slide-lightbox-body">
+        <div className="flex items-center justify-center gap-3 sm:gap-5">
           <button
             type="button"
-            className="slide-lightbox-nav prev"
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-white/15 text-white transition-all hover:scale-105 hover:bg-white/30 disabled:pointer-events-none disabled:opacity-20"
             onClick={handlePrev}
             disabled={!canNavigatePrev(activeIndex)}
             aria-label="Slide anterior"
           >
-            <ChevronLeft className="w-6 h-6" />
+            <ChevronLeft className="h-6 w-6" />
           </button>
 
-          <div className="slide-lightbox-img-wrapper">
+          <div className="max-h-[75vh] max-w-[680px] overflow-hidden rounded-xl bg-slate-900 shadow-2xl">
             <AuthImage
               storagePath={currentSlide.storage_path}
               alt={`Slide ${currentSlide.position}`}
-              className="slide-lightbox-img"
+              className={cn("block max-h-[75vh] w-full object-contain")}
             />
           </div>
 
           <button
             type="button"
-            className="slide-lightbox-nav next"
+            className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-white/15 text-white transition-all hover:scale-105 hover:bg-white/30 disabled:pointer-events-none disabled:opacity-20"
             onClick={handleNext}
             disabled={!canNavigateNext(activeIndex, total)}
             aria-label="Próximo slide"
           >
-            <ChevronRight className="w-6 h-6" />
+            <ChevronRight className="h-6 w-6" />
           </button>
         </div>
       </div>

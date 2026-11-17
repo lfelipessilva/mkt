@@ -10,34 +10,193 @@ import {
   type ArchetypeInputItem,
   type BaitInputItem,
 } from "../../types";
+import { getArchetypes, putArchetypes, getBaits, putBaits } from "../../api";
+import { ArrowDown, ArrowUp, FileText, Trash2 } from "lucide-react";
 import {
-  getArchetypes,
-  putArchetypes,
-  getBaits,
-  putBaits,
-} from "../../api";
+  Badge,
+  Button,
+  EmptyState,
+  InlineAlert,
+  Input,
+  LoadingState,
+  PageHeader,
+  ScopeTabs,
+  SectionCard,
+  cn,
+} from "../../ui";
+
+interface TextListPanelProps<T extends { id: string; active: boolean }> {
+  title: string;
+  description: string;
+  emptyMessage: string;
+  placeholder: string;
+  newValue: string;
+  onNewValueChange: (value: string) => void;
+  onAdd: (e: React.FormEvent) => void;
+  items: T[];
+  loading: boolean;
+  saving: boolean;
+  dirty: boolean;
+  loadingMessage: string;
+  saveLabel: string;
+  getValue: (item: T) => string;
+  onUpdate: (index: number, value: string) => void;
+  onToggle: (index: number) => void;
+  onRemove: (index: number) => void;
+  onMove: (index: number, direction: "up" | "down") => void;
+  onSave: () => void;
+}
+
+function TextListPanel<T extends { id: string; active: boolean }>({
+  title,
+  description,
+  emptyMessage,
+  placeholder,
+  newValue,
+  onNewValueChange,
+  onAdd,
+  items,
+  loading,
+  saving,
+  dirty,
+  loadingMessage,
+  saveLabel,
+  getValue,
+  onUpdate,
+  onToggle,
+  onRemove,
+  onMove,
+  onSave,
+}: TextListPanelProps<T>): React.JSX.Element {
+  return (
+    <SectionCard
+      title={`${title} (${items.length})`}
+      description={description}
+      actions={
+        <>
+          {dirty && <Badge tone="amber">Alterações não salvas</Badge>}
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={onSave}
+            disabled={saving || !dirty}
+            isLoading={saving}
+          >
+            {saving ? "Salvando..." : saveLabel}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <form onSubmit={onAdd} className="flex gap-2">
+          <Input
+            type="text"
+            placeholder={placeholder}
+            value={newValue}
+            onChange={(e) => onNewValueChange(e.target.value)}
+            disabled={loading || saving}
+          />
+          <Button
+            type="submit"
+            variant="outline"
+            size="md"
+            disabled={!newValue.trim() || saving}
+          >
+            + Adicionar
+          </Button>
+        </form>
+
+        {loading ? (
+          <LoadingState label={loadingMessage} className="py-8" />
+        ) : items.length === 0 ? (
+          <EmptyState title={emptyMessage} />
+        ) : (
+          <ul className="flex max-h-[520px] flex-col gap-2 overflow-y-auto pr-1">
+            {items.map((item, index) => (
+              <li
+                key={item.id}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-1.5 transition-opacity",
+                  !item.active && "opacity-55"
+                )}
+              >
+                <span className="w-6 flex-none text-center text-[11px] font-semibold text-slate-400">
+                  #{index + 1}
+                </span>
+                <Input
+                  type="text"
+                  className="h-8 flex-1 border-transparent bg-transparent px-2 shadow-none focus:border-blue-500 focus:bg-white"
+                  value={getValue(item)}
+                  onChange={(e) => onUpdate(index, e.target.value)}
+                />
+                <div className="flex flex-none items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Mover para cima"
+                    disabled={index === 0}
+                    onClick={() => onMove(index, "up")}
+                  >
+                    <ArrowUp className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    title="Mover para baixo"
+                    disabled={index === items.length - 1}
+                    onClick={() => onMove(index, "down")}
+                  >
+                    <ArrowDown className="h-3.5 w-3.5" />
+                  </Button>
+                  <button
+                    type="button"
+                    className={cn(
+                      "rounded-md px-1.5 py-0.5 text-[10px] font-semibold transition-colors",
+                      item.active
+                        ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                        : "bg-slate-200 text-slate-500 hover:bg-slate-300"
+                    )}
+                    onClick={() => onToggle(index)}
+                    title="Alternar ativo/inativo"
+                  >
+                    {item.active ? "Ativo" : "Inativo"}
+                  </button>
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                    title="Remover"
+                    onClick={() => onRemove(index)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </SectionCard>
+  );
+}
 
 export function TextsPage(): React.JSX.Element {
   const { selectedAccountId, selectedAccount } = useAccount();
 
-  // Step 4: Default scope opens pinned account role or "shared"
   const [activeScope, setActiveScope] = useState<ContentScope>(() =>
     resolveDefaultScope(selectedAccountId, selectedAccount)
   );
 
-  // Sync active scope when pinned account changes
   useEffect(() => {
     setActiveScope(resolveDefaultScope(selectedAccountId, selectedAccount));
   }, [selectedAccountId, selectedAccount]);
 
-  // Archetypes state
   const [archetypes, setArchetypes] = useState<Archetype[]>([]);
   const [newArchetypeTitle, setNewArchetypeTitle] = useState("");
   const [loadingArchetypes, setLoadingArchetypes] = useState(false);
   const [savingArchetypes, setSavingArchetypes] = useState(false);
   const [archetypesDirty, setArchetypesDirty] = useState(false);
 
-  // Baits state
   const [baits, setBaits] = useState<Bait[]>([]);
   const [newBaitBody, setNewBaitBody] = useState("");
   const [loadingBaits, setLoadingBaits] = useState(false);
@@ -79,7 +238,6 @@ export function TextsPage(): React.JSX.Element {
     void loadData(activeScope);
   }, [activeScope, loadData]);
 
-  // Archetype actions
   const handleAddArchetype = (e: React.FormEvent) => {
     e.preventDefault();
     const title = newArchetypeTitle.trim();
@@ -151,15 +309,13 @@ export function TextsPage(): React.JSX.Element {
     } catch (err) {
       setFeedback({
         type: "error",
-        message:
-          err instanceof Error ? err.message : "Erro ao salvar arquétipos",
+        message: err instanceof Error ? err.message : "Erro ao salvar arquétipos",
       });
     } finally {
       setSavingArchetypes(false);
     }
   };
 
-  // Bait actions
   const handleAddBait = (e: React.FormEvent) => {
     e.preventDefault();
     const body = newBaitBody.trim();
@@ -238,275 +394,81 @@ export function TextsPage(): React.JSX.Element {
     }
   };
 
+  const scopeOptions = CONTENT_SCOPES.map((scope) => ({
+    id: scope,
+    label: SCOPE_LABELS[scope],
+    pinned: selectedAccountId !== "all" && selectedAccount?.role === scope,
+  }));
+
   return (
-    <div className="settings-page texts-page">
-      <div className="page-section-header">
-        <div>
-          <h3>Biblioteca de Textos & Ganchos</h3>
-          <p className="section-description">
-            Gerencie arquétipos de temas e ganchos (baits) por escopo de persona
-            ou compartilhados (shared).
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        icon={<FileText className="h-5 w-5" />}
+        title="Biblioteca de Textos & Ganchos"
+        description="Gerencie arquétipos de temas e ganchos (baits) por escopo de persona ou compartilhados (shared)."
+      />
 
       {feedback && (
-        <div
-          className={`alert-banner ${
-            feedback.type === "success" ? "alert-success" : "error-banner"
-          }`}
+        <InlineAlert
+          tone={feedback.type === "success" ? "success" : "error"}
+          onClose={() => setFeedback(null)}
         >
-          <span>{feedback.message}</span>
-          <button
-            type="button"
-            className="btn-icon"
-            onClick={() => setFeedback(null)}
-          >
-            ✕
-          </button>
-        </div>
+          {feedback.message}
+        </InlineAlert>
       )}
 
-      {/* Scope navigation tabs */}
-      <div className="scope-tabs-container">
-        <label className="scope-label">Escopo de Conteúdo:</label>
-        <div className="scope-tabs" role="tablist">
-          {CONTENT_SCOPES.map((scope) => {
-            const isActive = activeScope === scope;
-            const isPinnedDefault =
-              selectedAccountId !== "all" && selectedAccount?.role === scope;
+      <ScopeTabs
+        label="Escopo de Conteúdo"
+        ariaLabel="Escopo de conteúdo"
+        options={scopeOptions}
+        value={activeScope}
+        onChange={(id) => setActiveScope(id as ContentScope)}
+      />
 
-            return (
-              <button
-                key={scope}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                className={`scope-tab ${isActive ? "active" : ""}`}
-                onClick={() => setActiveScope(scope)}
-              >
-                <span>{SCOPE_LABELS[scope]}</span>
-                {isPinnedDefault && (
-                  <span className="scope-pinned-tag" title="Role da conta em foco">
-                    pinned
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <TextListPanel<Archetype>
+          title="Arquétipos"
+          description="Títulos e ângulos conceituais para os carrosséis"
+          emptyMessage="Nenhum arquétipo configurado neste escopo."
+          placeholder="Adicionar novo arquétipo..."
+          newValue={newArchetypeTitle}
+          onNewValueChange={setNewArchetypeTitle}
+          onAdd={handleAddArchetype}
+          items={archetypes}
+          loading={loadingArchetypes}
+          loadingMessage="Carregando arquétipos..."
+          saving={savingArchetypes}
+          dirty={archetypesDirty}
+          saveLabel="Salvar Arquétipos"
+          getValue={(item) => item.title}
+          onUpdate={handleUpdateArchetypeTitle}
+          onToggle={handleToggleArchetypeActive}
+          onRemove={handleRemoveArchetype}
+          onMove={handleMoveArchetype}
+          onSave={() => void handleSaveArchetypes()}
+        />
 
-      <div className="texts-sections-grid">
-        {/* Archetypes Section */}
-        <section className="text-section-card">
-          <div className="section-card-header">
-            <div>
-              <h4>Arquétipos ({archetypes.length})</h4>
-              <span className="card-sub">
-                Títulos e ângulos conceituais para os carrosséis
-              </span>
-            </div>
-            <div className="card-header-actions">
-              {archetypesDirty && (
-                <span className="dirty-indicator">Alterações não salvas</span>
-              )}
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => void handleSaveArchetypes()}
-                disabled={savingArchetypes || !archetypesDirty}
-              >
-                {savingArchetypes ? "Salvando..." : "Salvar Arquétipos"}
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleAddArchetype} className="add-item-form">
-            <input
-              type="text"
-              placeholder="Adicionar novo arquétipo..."
-              value={newArchetypeTitle}
-              onChange={(e) => setNewArchetypeTitle(e.target.value)}
-              disabled={loadingArchetypes || savingArchetypes}
-            />
-            <button
-              type="submit"
-              className="btn btn-outline btn-sm"
-              disabled={!newArchetypeTitle.trim() || savingArchetypes}
-            >
-              + Adicionar
-            </button>
-          </form>
-
-          {loadingArchetypes ? (
-            <div className="loading-indicator">Carregando arquétipos...</div>
-          ) : archetypes.length === 0 ? (
-            <div className="empty-state">
-              Nenhum arquétipo configurado neste escopo.
-            </div>
-          ) : (
-            <ul className="text-items-list">
-              {archetypes.map((arch, index) => (
-                <li
-                  key={arch.id}
-                  className={`text-item-row ${!arch.active ? "item-inactive" : ""}`}
-                >
-                  <span className="item-order-badge">#{index + 1}</span>
-                  <input
-                    type="text"
-                    className="item-input"
-                    value={arch.title}
-                    onChange={(e) =>
-                      handleUpdateArchetypeTitle(index, e.target.value)
-                    }
-                  />
-                  <div className="item-actions">
-                    <button
-                      type="button"
-                      className="btn-icon"
-                      title="Mover para cima"
-                      disabled={index === 0}
-                      onClick={() => handleMoveArchetype(index, "up")}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-icon"
-                      title="Mover para baixo"
-                      disabled={index === archetypes.length - 1}
-                      onClick={() => handleMoveArchetype(index, "down")}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-tag ${arch.active ? "tag-active" : "tag-inactive"}`}
-                      onClick={() => handleToggleArchetypeActive(index)}
-                      title="Alternar ativo/inativo"
-                    >
-                      {arch.active ? "Ativo" : "Inativo"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-icon btn-icon-danger"
-                      title="Remover"
-                      onClick={() => handleRemoveArchetype(index)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* Baits Section */}
-        <section className="text-section-card">
-          <div className="section-card-header">
-            <div>
-              <h4>Ganchos / Baits ({baits.length})</h4>
-              <span className="card-sub">
-                Frases de chamada inicial nos slides
-              </span>
-            </div>
-            <div className="card-header-actions">
-              {baitsDirty && (
-                <span className="dirty-indicator">Alterações não salvas</span>
-              )}
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => void handleSaveBaits()}
-                disabled={savingBaits || !baitsDirty}
-              >
-                {savingBaits ? "Salvando..." : "Salvar Ganchos"}
-              </button>
-            </div>
-          </div>
-
-          <form onSubmit={handleAddBait} className="add-item-form">
-            <input
-              type="text"
-              placeholder="Adicionar novo gancho (bait)..."
-              value={newBaitBody}
-              onChange={(e) => setNewBaitBody(e.target.value)}
-              disabled={loadingBaits || savingBaits}
-            />
-            <button
-              type="submit"
-              className="btn btn-outline btn-sm"
-              disabled={!newBaitBody.trim() || savingBaits}
-            >
-              + Adicionar
-            </button>
-          </form>
-
-          {loadingBaits ? (
-            <div className="loading-indicator">Carregando ganchos...</div>
-          ) : baits.length === 0 ? (
-            <div className="empty-state">
-              Nenhum gancho configurado neste escopo.
-            </div>
-          ) : (
-            <ul className="text-items-list">
-              {baits.map((bait, index) => (
-                <li
-                  key={bait.id}
-                  className={`text-item-row ${!bait.active ? "item-inactive" : ""}`}
-                >
-                  <span className="item-order-badge">#{index + 1}</span>
-                  <input
-                    type="text"
-                    className="item-input"
-                    value={bait.body}
-                    onChange={(e) =>
-                      handleUpdateBaitBody(index, e.target.value)
-                    }
-                  />
-                  <div className="item-actions">
-                    <button
-                      type="button"
-                      className="btn-icon"
-                      title="Mover para cima"
-                      disabled={index === 0}
-                      onClick={() => handleMoveBait(index, "up")}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-icon"
-                      title="Mover para baixo"
-                      disabled={index === baits.length - 1}
-                      onClick={() => handleMoveBait(index, "down")}
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className={`btn-tag ${bait.active ? "tag-active" : "tag-inactive"}`}
-                      onClick={() => handleToggleBaitActive(index)}
-                      title="Alternar ativo/inativo"
-                    >
-                      {bait.active ? "Ativo" : "Inativo"}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-icon btn-icon-danger"
-                      title="Remover"
-                      onClick={() => handleRemoveBait(index)}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        <TextListPanel<Bait>
+          title="Ganchos / Baits"
+          description="Frases de chamada inicial nos slides"
+          emptyMessage="Nenhum gancho configurado neste escopo."
+          placeholder="Adicionar novo gancho (bait)..."
+          newValue={newBaitBody}
+          onNewValueChange={setNewBaitBody}
+          onAdd={handleAddBait}
+          items={baits}
+          loading={loadingBaits}
+          loadingMessage="Carregando ganchos..."
+          saving={savingBaits}
+          dirty={baitsDirty}
+          saveLabel="Salvar Ganchos"
+          getValue={(item) => item.body}
+          onUpdate={handleUpdateBaitBody}
+          onToggle={handleToggleBaitActive}
+          onRemove={handleRemoveBait}
+          onMove={handleMoveBait}
+          onSave={() => void handleSaveBaits()}
+        />
       </div>
     </div>
   );

@@ -21,7 +21,28 @@ import {
   Edit3,
   LayoutGrid,
   List,
+  TrendingUp,
 } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  InlineAlert,
+  LoadingState,
+  PageHeader,
+  Select,
+  StatCard,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  Tabs,
+  Toast,
+  useToast,
+} from "../ui";
 
 export function filterPerformanceByAccount(
   items: TikTokPerformanceItem[],
@@ -118,27 +139,17 @@ export function PerformancePage(): React.JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // View mode: Cards vs Table
   const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
 
-  // Sorting
   const [sortField, setSortField] = useState<TikTokPerformanceSortField>("views");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  // Sync state
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [activeItem, setActiveItem] = useState<TikTokPerformanceItem | null>(null);
 
-  // Toast
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-
-  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
+  const { toast, showToast, dismissToast } = useToast();
 
   const loadPerformance = useCallback(async () => {
     setLoading(true);
@@ -166,8 +177,17 @@ export function PerformancePage(): React.JSX.Element {
     setIsSyncing(true);
     try {
       const result = await syncTikTok();
+      if (!result.ok) {
+        const reason =
+          result.errors?.[0]?.error || "erro desconhecido na sincronização";
+        showToast(`Erro na sincronização: ${reason}`, "error");
+        await loadPerformance();
+        return;
+      }
       showToast(
-        `Sincronização TikTok concluída: ${result.posts_updated} atualizados, ${result.skipped_manual} manuais mantidos.`,
+        result.status === "partial"
+          ? `Sincronização parcial: ${result.posts_updated} atualizados, ${result.errors?.length ?? 0} falha(s).`
+          : `Sincronização TikTok concluída: ${result.posts_updated} atualizados, ${result.skipped_manual} manuais mantidos.`,
         "info"
       );
       await loadPerformance();
@@ -212,102 +232,93 @@ export function PerformancePage(): React.JSX.Element {
 
   const stats = useMemo(() => computePerformanceStats(filteredItems), [filteredItems]);
 
+  const sortIndicator = (field: TikTokPerformanceSortField) =>
+    sortField === field ? (
+      <span className="ml-1 text-[10px] text-blue-600">
+        {sortOrder === "asc" ? "▲" : "▼"}
+      </span>
+    ) : null;
+
   return (
-    <div className="performance-page" data-testid="performance-page">
-      {/* Toast Alert */}
-      {toast && (
-        <div className={`toast-alert toast-${toast.type}`} role="status">
-          <span className="toast-message">{toast.message}</span>
-          <button type="button" className="toast-close" onClick={() => setToast(null)}>
-            ×
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col gap-5" data-testid="performance-page">
+      <Toast toast={toast} onClose={dismissToast} />
 
-      {/* Top Header Card */}
-      <div className="performance-header-card">
-        <div className="header-info">
-          <h2>Desempenho de Carrosséis</h2>
-          <p className="page-desc">
-            Acompanhe métricas de engajamento do TikTok (visualizações, curtidas,
-            comentários, compartilhamentos) dos carrosséis publicados.
-          </p>
-        </div>
+      <PageHeader
+        icon={<TrendingUp className="h-5 w-5" />}
+        title="Desempenho de Carrosséis"
+        description="Acompanhe métricas de engajamento do TikTok (visualizações, curtidas, comentários, compartilhamentos) dos carrosséis publicados."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              onClick={handleSyncTikTok}
+              disabled={isSyncing}
+              title="Executar sincronização TikTok"
+            >
+              <Zap
+                className={
+                  isSyncing
+                    ? "h-3.5 w-3.5 animate-pulse"
+                    : "h-3.5 w-3.5 text-amber-500"
+                }
+              />
+              <span>{isSyncing ? "Sincronizando..." : "Sincronizar TikTok"}</span>
+            </Button>
+            <Button variant="secondary" onClick={loadPerformance} disabled={loading}>
+              <RefreshCw
+                className={
+                  loading ? "h-3.5 w-3.5 animate-spin text-blue-600" : "h-3.5 w-3.5"
+                }
+              />
+              <span>{loading ? "Carregando..." : "Atualizar"}</span>
+            </Button>
+          </>
+        }
+      />
 
-        <div className="header-actions flex items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-secondary flex items-center gap-1.5"
-            onClick={handleSyncTikTok}
-            disabled={isSyncing}
-            title="Executar sincronização TikTok"
-          >
-            <Zap className={`w-3.5 h-3.5 ${isSyncing ? "animate-pulse" : "text-amber-500"}`} />
-            <span>{isSyncing ? "Sincronizando..." : "Sincronizar TikTok"}</span>
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-refresh flex items-center gap-1.5"
-            onClick={loadPerformance}
-            disabled={loading}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
-            <span>{loading ? "Carregando..." : "Atualizar"}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Context banner */}
       {selectedAccountId !== "all" && (
-        <div className="context-filter-banner">
-          <span>
-            Exibindo métricas da conta <strong>@{selectedAccount?.id ?? selectedAccountId}</strong>
-          </span>
-        </div>
+        <InlineAlert tone="info">
+          Exibindo métricas da conta{" "}
+          <strong>@{selectedAccount?.id ?? selectedAccountId}</strong>
+        </InlineAlert>
       )}
 
-      {/* KPI Cards */}
-      <div className="metrics-summary-grid">
-        <div className="kpi-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="kpi-label">Total Publicações</span>
-            <BarChart3 className="w-4 h-4 text-slate-400" />
-          </div>
-          <span className="kpi-value">{stats.totalPosts}</span>
-        </div>
-        <div className="kpi-card highlight">
-          <div className="flex items-center justify-between mb-1">
-            <span className="kpi-label text-blue-700 font-semibold">Total de Views</span>
-            <Eye className="w-4 h-4 text-blue-600" />
-          </div>
-          <span className="kpi-value text-blue-900">{stats.totalViews.toLocaleString("pt-BR")}</span>
-        </div>
-        <div className="kpi-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="kpi-label">Total de Curtidas</span>
-            <Heart className="w-4 h-4 text-rose-500" />
-          </div>
-          <span className="kpi-value">{stats.totalLikes.toLocaleString("pt-BR")}</span>
-        </div>
-        <div className="kpi-card">
-          <div className="flex items-center justify-between mb-1">
-            <span className="kpi-label">Média Views / Post</span>
-            <MessageSquare className="w-4 h-4 text-emerald-500" />
-          </div>
-          <span className="kpi-value">{stats.avgViewsPerPost.toLocaleString("pt-BR")}</span>
-        </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total Publicações"
+          value={stats.totalPosts}
+          icon={<BarChart3 className="h-4 w-4" />}
+          tone="slate"
+        />
+        <StatCard
+          label="Total de Views"
+          value={stats.totalViews.toLocaleString("pt-BR")}
+          icon={<Eye className="h-4 w-4" />}
+          tone="blue"
+          highlight
+        />
+        <StatCard
+          label="Total de Curtidas"
+          value={stats.totalLikes.toLocaleString("pt-BR")}
+          icon={<Heart className="h-4 w-4" />}
+          tone="rose"
+        />
+        <StatCard
+          label="Média Views / Post"
+          value={stats.avgViewsPerPost.toLocaleString("pt-BR")}
+          icon={<MessageSquare className="h-4 w-4" />}
+          tone="emerald"
+        />
       </div>
 
-      {/* Engagement Chart Component */}
       {filteredItems.length > 0 && <PerformanceChart items={filteredItems} />}
 
-      {/* Controls Bar: Sort & View Toggle */}
       {filteredItems.length > 0 && (
-        <div className="performance-controls-bar flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-2 text-xs">
+        <Card className="flex flex-col justify-between gap-3 p-3 sm:flex-row sm:items-center">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             <span className="font-medium text-slate-500">Ordenar por:</span>
-            <select
-              className="bg-slate-50 border border-slate-300 rounded px-2.5 py-1 text-slate-700 font-medium focus:outline-none focus:ring-1 focus:ring-blue-500"
+            <Select
+              className="w-auto py-1.5 text-xs"
               value={sortField}
               onChange={(e) => {
                 setSortField(e.target.value as TikTokPerformanceSortField);
@@ -319,84 +330,80 @@ export function PerformancePage(): React.JSX.Element {
               <option value="comments">Comentários</option>
               <option value="shares">Compartilhamentos</option>
               <option value="published_at">Data de Publicação</option>
-            </select>
-            <button
-              type="button"
-              className="px-2 py-1 text-xs border border-slate-300 rounded bg-slate-50 hover:bg-slate-100 text-slate-700 font-medium transition-all"
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-              title={`Alternar ordem (atual: ${sortOrder === "asc" ? "crescente" : "decrescente"})`}
+              title={`Alternar ordem (atual: ${
+                sortOrder === "asc" ? "crescente" : "decrescente"
+              })`}
             >
               {sortOrder === "asc" ? "Crescente ↑" : "Decrescente ↓"}
-            </button>
+            </Button>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-start sm:self-auto">
-            <button
-              type="button"
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                viewMode === "cards"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-              onClick={() => setViewMode("cards")}
-              title="Exibir como cards de carrossel ordenados"
-            >
-              <LayoutGrid className="w-3.5 h-3.5" />
-              <span>Cards Ordenados</span>
-            </button>
-            <button
-              type="button"
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
-                viewMode === "table"
-                  ? "bg-white text-blue-600 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-              onClick={() => setViewMode("table")}
-              title="Exibir como tabela detalhada"
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>Tabela</span>
-            </button>
-          </div>
-        </div>
+          <Tabs
+            ariaLabel="Modo de visualização"
+            value={viewMode}
+            onChange={(id) => setViewMode(id as "cards" | "table")}
+            items={[
+              {
+                id: "cards",
+                label: (
+                  <>
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    Cards Ordenados
+                  </>
+                ),
+              },
+              {
+                id: "table",
+                label: (
+                  <>
+                    <List className="h-3.5 w-3.5" />
+                    Tabela
+                  </>
+                ),
+              },
+            ]}
+          />
+        </Card>
       )}
 
-      {/* Error state */}
       {error && (
-        <div className="error-card" role="alert">
-          <p>{error}</p>
-          <button type="button" className="btn btn-secondary" onClick={loadPerformance}>
-            Tentar novamente
-          </button>
-        </div>
+        <InlineAlert tone="error">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={loadPerformance}>
+              Tentar novamente
+            </Button>
+          </div>
+        </InlineAlert>
       )}
 
-      {/* Loading state */}
       {loading && items.length === 0 && (
-        <div className="loading-state">
-          <span className="spinner-md" />
-          <p>Carregando métricas de desempenho...</p>
-        </div>
+        <LoadingState label="Carregando métricas de desempenho..." />
       )}
 
-      {/* Empty state */}
       {!loading && filteredItems.length === 0 && !error && (
-        <div className="performance-empty-state">
-          <div className="empty-icon">📊</div>
-          <h3>Nenhum dado de desempenho registrado</h3>
-          <p>
-            Vá até a aba <strong>Galeria</strong> e clique em{" "}
-            <strong>"Publicado TikTok"</strong> em qualquer carrossel para registrar
-            as métricas manuais.
-          </p>
-        </div>
+        <EmptyState
+          icon={<BarChart3 className="h-5 w-5" />}
+          title="Nenhum dado de desempenho registrado"
+          description={
+            <>
+              Vá até a aba <strong>Galeria</strong> e clique em{" "}
+              <strong>"Publicado TikTok"</strong> em qualquer carrossel para
+              registrar as métricas manuais.
+            </>
+          }
+        />
       )}
 
-      {/* View Mode 1: Cards View (Ordered) */}
       {filteredItems.length > 0 && viewMode === "cards" && (
-        <div className="runs-grid">
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filteredItems.map((item) => {
-            const synthesizedRun: CarouselRun = item.run
+            const baseRun: CarouselRun = item.run
               ? item.run
               : {
                   id: item.run_id,
@@ -410,6 +417,26 @@ export function PerformancePage(): React.JSX.Element {
                   output_dir: item.output_dir,
                   slides: [],
                 };
+
+            const synthesizedRun: CarouselRun = {
+              ...baseRun,
+              status:
+                item.publish_status === "published"
+                  ? "published"
+                  : baseRun.status,
+              tiktok_post:
+                baseRun.tiktok_post ??
+                (item.external_post_id
+                  ? {
+                      provider: item.provider ?? null,
+                      external_post_id: item.external_post_id,
+                      publish_status: item.publish_status ?? null,
+                      published_at: item.published_at ?? null,
+                      last_polled_at: item.last_polled_at ?? null,
+                      video_url: item.video_url ?? null,
+                    }
+                  : null),
+            };
 
             return (
               <RunCard
@@ -431,122 +458,140 @@ export function PerformancePage(): React.JSX.Element {
         </div>
       )}
 
-      {/* View Mode 2: Detailed Data Table */}
       {filteredItems.length > 0 && viewMode === "table" && (
-        <div className="table-wrapper">
-          <table className="performance-table" aria-label="Tabela de Desempenho do TikTok">
-            <thead>
-              <tr>
-                <th>Conta</th>
-                <th>Carrossel / Tema</th>
-                <th
-                  className="sortable-th"
-                  onClick={() => handleSortChange("published_at")}
+        <Table aria-label="Tabela de Desempenho do TikTok">
+          <TableHead>
+            <TableRow className="hover:bg-transparent">
+              <TableHeaderCell>Conta</TableHeaderCell>
+              <TableHeaderCell>Carrossel / Tema</TableHeaderCell>
+              <TableHeaderCell
+                className="cursor-pointer select-none hover:text-slate-800"
+                onClick={() => handleSortChange("published_at")}
+              >
+                Data Publicação
+                {sortIndicator("published_at")}
+              </TableHeaderCell>
+              {(
+                [
+                  ["views", "Visualizações"],
+                  ["likes", "Curtidas"],
+                  ["comments", "Comentários"],
+                  ["shares", "Compartilhamentos"],
+                ] as const
+              ).map(([field, label]) => (
+                <TableHeaderCell
+                  key={field}
+                  className="cursor-pointer select-none text-right hover:text-slate-800"
+                  onClick={() => handleSortChange(field)}
                 >
-                  Data Publicação {sortField === "published_at" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
-                </th>
-                <th
-                  className="sortable-th number-cell"
-                  onClick={() => handleSortChange("views")}
-                >
-                  Visualizações {sortField === "views" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
-                </th>
-                <th
-                  className="sortable-th number-cell"
-                  onClick={() => handleSortChange("likes")}
-                >
-                  Curtidas {sortField === "likes" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
-                </th>
-                <th
-                  className="sortable-th number-cell"
-                  onClick={() => handleSortChange("comments")}
-                >
-                  Comentários {sortField === "comments" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
-                </th>
-                <th
-                  className="sortable-th number-cell"
-                  onClick={() => handleSortChange("shares")}
-                >
-                  Compartilhamentos {sortField === "shares" ? (sortOrder === "asc" ? "▲" : "▼") : ""}
-                </th>
-                <th>Modo</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredItems.map((item) => {
-                const pubDate = item.published_at
-                  ? new Date(item.published_at).toLocaleDateString("pt-BR", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                    })
-                  : "—";
+                  {label}
+                  {sortIndicator(field)}
+                </TableHeaderCell>
+              ))}
+              <TableHeaderCell>Zernio</TableHeaderCell>
+              <TableHeaderCell>Modo</TableHeaderCell>
+              <TableHeaderCell>Ações</TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filteredItems.map((item) => {
+              const pubDate = item.published_at
+                ? new Date(item.published_at).toLocaleDateString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })
+                : "—";
 
-                return (
-                  <tr key={item.id || item.tiktok_post_id}>
-                    <td>
-                      <span className="account-tag">@{item.account_id}</span>
-                    </td>
-                    <td>
-                      <div className="perf-theme-cell">
-                        <strong className="theme-title">
-                          {item.tema || item.archetype_title}
-                        </strong>
-                        {item.tema && item.archetype_title && (
-                          <span className="theme-sub">{item.archetype_title}</span>
-                        )}
+              return (
+                <TableRow key={item.id || item.tiktok_post_id}>
+                  <TableCell>
+                    <span className="font-semibold text-blue-700">
+                      @{item.account_id}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-col gap-0.5">
+                      <strong className="font-semibold text-slate-800">
+                        {item.tema || item.archetype_title}
+                      </strong>
+                      {item.tema && item.archetype_title && (
+                        <span className="text-[11px] text-slate-400">
+                          {item.archetype_title}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{pubDate}</TableCell>
+                  <TableCell className="text-right font-mono font-bold text-slate-800">
+                    {Number(item.views || 0).toLocaleString("pt-BR")}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {Number(item.likes || 0).toLocaleString("pt-BR")}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {Number(item.comments || 0).toLocaleString("pt-BR")}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {Number(item.shares || 0).toLocaleString("pt-BR")}
+                  </TableCell>
+                  <TableCell>
+                    {item.external_post_id ? (
+                      <div className="flex flex-col gap-0.5">
+                        <code
+                          className="break-all text-[11px] font-mono text-slate-600"
+                          title={item.external_post_id}
+                        >
+                          {item.external_post_id}
+                        </code>
+                        <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                          {item.publish_status || "—"}
+                        </span>
                       </div>
-                    </td>
-                    <td>{pubDate}</td>
-                    <td className="number-cell font-mono font-bold">
-                      {Number(item.views || 0).toLocaleString("pt-BR")}
-                    </td>
-                    <td className="number-cell font-mono">
-                      {Number(item.likes || 0).toLocaleString("pt-BR")}
-                    </td>
-                    <td className="number-cell font-mono">
-                      {Number(item.comments || 0).toLocaleString("pt-BR")}
-                    </td>
-                    <td className="number-cell font-mono">
-                      {Number(item.shares || 0).toLocaleString("pt-BR")}
-                    </td>
-                    <td>
-                      <span className={`tracking-mode-badge mode-${item.tracking_mode}`}>
-                        {item.tracking_mode === "manual" ? "Manual" : "API"}
-                      </span>
-                    </td>
-                    <td className="actions-cell">
-                      <button
-                        type="button"
-                        className="btn-action edit flex items-center gap-1"
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      tone={item.tracking_mode === "manual" ? "amber" : "blue"}
+                      pill
+                    >
+                      {item.tracking_mode === "manual" ? "Manual" : "API"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="text-xs"
                         onClick={() => handleOpenEditModal(item)}
                         title="Editar métricas"
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="h-3 w-3" />
                         <span>Editar</span>
-                      </button>
+                      </Button>
                       {item.video_url && (
                         <a
                           href={item.video_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="btn-action link"
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:underline"
                           title="Abrir no TikTok"
                         >
                           Ver ↗
                         </a>
                       )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       )}
 
-      {/* Modal */}
       <ManualTikTokModal
         isOpen={modalOpen}
         performanceItem={activeItem}

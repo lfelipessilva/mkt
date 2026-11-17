@@ -236,6 +236,15 @@ export type RunStatus =
   | "published"
   | "failed";
 
+export interface CarouselRunTikTokPost {
+  provider?: string | null;
+  external_post_id?: string | null;
+  publish_status?: string | null;
+  published_at?: string | null;
+  last_polled_at?: string | null;
+  video_url?: string | null;
+}
+
 export interface CarouselRun {
   id: string;
   job_id?: string | null;
@@ -254,6 +263,7 @@ export interface CarouselRun {
   created_at?: string;
   updated_at?: string;
   slides?: CarouselSlide[];
+  tiktok_post?: CarouselRunTikTokPost | null;
 }
 
 export interface DispatchResult {
@@ -278,6 +288,11 @@ export interface TikTokPost {
   comments: number;
   shares: number;
   metrics_note?: string | null;
+  provider?: string | null;
+  external_post_id?: string | null;
+  publish_status?: string | null;
+  scheduled_at?: string | null;
+  last_polled_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -298,6 +313,11 @@ export interface TikTokPerformanceItem {
   tracking_mode: TikTokTrackingMode | string;
   video_id?: string | null;
   video_url?: string | null;
+  provider?: string | null;
+  external_post_id?: string | null;
+  publish_status?: string | null;
+  scheduled_at?: string | null;
+  last_polled_at?: string | null;
   published_at?: string | null;
   views: number;
   likes: number;

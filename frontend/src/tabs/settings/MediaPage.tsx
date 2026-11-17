@@ -11,7 +11,17 @@ import {
 } from "../../types";
 import { getMedia, uploadMedia, deleteMedia } from "../../api";
 import { AuthImage } from "../../components/AuthImage";
-import { UploadCloud, Trash2 } from "lucide-react";
+import { FolderArchive, Trash2, UploadCloud } from "lucide-react";
+import {
+  Button,
+  Card,
+  EmptyState,
+  InlineAlert,
+  LoadingState,
+  PageHeader,
+  ScopeTabs,
+  Tabs,
+} from "../../ui";
 
 const CATEGORY_LABELS: Record<MediaCategory, string> = {
   cover: "Cover (Slide 1)",
@@ -29,17 +39,14 @@ function formatBytes(bytes?: number | null): string {
 export function MediaPage(): React.JSX.Element {
   const { selectedAccountId, selectedAccount } = useAccount();
 
-  // Step 4: Default scope opens pinned account role or "shared"
   const [activeScope, setActiveScope] = useState<MediaScope>(() =>
     resolveDefaultScope(selectedAccountId, selectedAccount)
   );
 
-  // Sync active scope when pinned account changes
   useEffect(() => {
     setActiveScope(resolveDefaultScope(selectedAccountId, selectedAccount));
   }, [selectedAccountId, selectedAccount]);
 
-  // Valid categories for current scope
   const validCategories = useMemo(() => {
     return MEDIA_CATEGORIES_FOR_SCOPE[activeScope] || [];
   }, [activeScope]);
@@ -48,7 +55,6 @@ export function MediaPage(): React.JSX.Element {
     validCategories[0] || "random"
   );
 
-  // Keep active category in sync if scope switches to one where current category is not allowed
   useEffect(() => {
     if (!validCategories.includes(activeCategory)) {
       setActiveCategory(validCategories[0] || "random");
@@ -108,7 +114,10 @@ export function MediaPage(): React.JSX.Element {
     setFeedback(null);
     try {
       const uploaded = await uploadMedia(selectedFile, activeScope, activeCategory);
-      setAssets((prev) => [uploaded, ...prev.filter((a) => a.storage_path !== uploaded.storage_path)]);
+      setAssets((prev) => [
+        uploaded,
+        ...prev.filter((a) => a.storage_path !== uploaded.storage_path),
+      ]);
       setSelectedFile(null);
       setFileInputKey((k) => k + 1);
       setFeedback({
@@ -136,7 +145,9 @@ export function MediaPage(): React.JSX.Element {
     setFeedback(null);
     try {
       await deleteMedia(asset.storage_path);
-      setAssets((prev) => prev.filter((a) => a.storage_path !== asset.storage_path));
+      setAssets((prev) =>
+        prev.filter((a) => a.storage_path !== asset.storage_path)
+      );
       setFeedback({
         type: "success",
         message: `Arquivo "${asset.filename}" excluído com sucesso!`,
@@ -153,93 +164,62 @@ export function MediaPage(): React.JSX.Element {
   };
 
   return (
-    <div className="settings-page media-page">
-      <div className="page-section-header">
-        <div>
-          <h3>Biblioteca de Mídias</h3>
-          <p className="section-description">
-            Gerencie o repositório de fotos por escopo (geral ou específico de
-            cada persona) e categoria de carrossel.
-          </p>
-        </div>
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        icon={<FolderArchive className="h-5 w-5" />}
+        title="Biblioteca de Mídias"
+        description="Gerencie o repositório de fotos por escopo (geral ou específico de cada persona) e categoria de carrossel."
+      />
 
       {feedback && (
-        <div
-          className={`alert-banner ${
-            feedback.type === "success" ? "alert-success" : "error-banner"
-          }`}
+        <InlineAlert
+          tone={feedback.type === "success" ? "success" : "error"}
+          onClose={() => setFeedback(null)}
         >
-          <span>{feedback.message}</span>
-          <button
-            type="button"
-            className="btn-icon"
-            onClick={() => setFeedback(null)}
-          >
-            ✕
-          </button>
-        </div>
+          {feedback.message}
+        </InlineAlert>
       )}
 
-      {/* Scope navigation tabs */}
-      <div className="scope-tabs-container">
-        <label className="scope-label">Escopo:</label>
-        <div className="scope-tabs" role="tablist">
-          {MEDIA_SCOPES.map((scope) => {
-            const isActive = activeScope === scope;
-            const isPinnedDefault =
-              selectedAccountId !== "all" && selectedAccount?.role === scope;
+      <ScopeTabs
+        label="Escopo"
+        ariaLabel="Escopo de mídia"
+        options={MEDIA_SCOPES.map((scope) => ({
+          id: scope,
+          label: MEDIA_SCOPE_LABELS[scope],
+          pinned: selectedAccountId !== "all" && selectedAccount?.role === scope,
+        }))}
+        value={activeScope}
+        onChange={(id) => setActiveScope(id as MediaScope)}
+      />
 
-            return (
-              <button
-                key={scope}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                className={`scope-tab ${isActive ? "active" : ""}`}
-                onClick={() => setActiveScope(scope)}
-              >
-                <span>{MEDIA_SCOPE_LABELS[scope]}</span>
-                {isPinnedDefault && (
-                  <span className="scope-pinned-tag" title="Role da conta em foco">
-                    pinned
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center sm:gap-4">
+        <span className="flex-none text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          Categoria
+        </span>
+        <Tabs
+          variant="pills"
+          ariaLabel="Categoria de mídia"
+          value={activeCategory}
+          onChange={(id) => setActiveCategory(id as MediaCategory)}
+          items={validCategories.map((cat) => ({
+            id: cat,
+            label: CATEGORY_LABELS[cat] || cat,
+          }))}
+        />
       </div>
 
-      {/* Category sub-tabs */}
-      <div className="category-subtabs-container">
-        <label className="category-label">Categoria:</label>
-        <div className="category-tabs" role="tablist">
-          {validCategories.map((cat) => {
-            const isActive = activeCategory === cat;
-            return (
-              <button
-                key={cat}
-                type="button"
-                role="tab"
-                aria-selected={isActive}
-                className={`category-pill ${isActive ? "active" : ""}`}
-                onClick={() => setActiveCategory(cat)}
-              >
-                {CATEGORY_LABELS[cat] || cat}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Upload card */}
-      <div className="upload-media-card">
-        <form onSubmit={handleUpload} className="upload-media-form">
-          <div className="upload-input-group">
-            <label htmlFor="media-file-input" className="file-input-label">
-              <UploadCloud className="w-4 h-4 text-blue-600" />
-              <span>
+      <Card className="border-dashed p-4">
+        <form
+          onSubmit={handleUpload}
+          className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center"
+        >
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="media-file-input"
+              className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-2.5 text-sm text-slate-600 transition-colors hover:border-blue-400 hover:bg-blue-50/50 hover:text-slate-900"
+            >
+              <UploadCloud className="h-4 w-4 flex-none text-blue-600" />
+              <span className="truncate">
                 {selectedFile
                   ? selectedFile.name
                   : "Selecionar imagem do computador (JPG, PNG, WebP)"}
@@ -251,72 +231,79 @@ export function MediaPage(): React.JSX.Element {
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleFileChange}
-              className="hidden-file-input"
+              className="hidden"
             />
           </div>
 
-          <button
+          <Button
             type="submit"
-            className="btn btn-primary"
+            variant="primary"
             disabled={!selectedFile || uploading}
+            isLoading={uploading}
           >
             {uploading ? "Enviando arquivo..." : "Fazer Upload"}
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
-      {/* Media Grid */}
-      <div className="media-grid-section">
-        <div className="media-grid-header">
-          <h4>
-            Mídias ({assets.length}) — {MEDIA_SCOPE_LABELS[activeScope]} /{" "}
-            {CATEGORY_LABELS[activeCategory]}
-          </h4>
+      <div className="flex flex-col gap-4">
+        <div>
+          <h3 className="text-base font-semibold tracking-tight text-slate-900">
+            Mídias ({assets.length})
+          </h3>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {MEDIA_SCOPE_LABELS[activeScope]} / {CATEGORY_LABELS[activeCategory]}
+          </p>
         </div>
 
         {loading ? (
-          <div className="loading-indicator">Carregando mídias...</div>
+          <LoadingState label="Carregando mídias..." />
         ) : assets.length === 0 ? (
-          <div className="empty-state">
-            <p>Nenhuma mídia encontrada nesta categoria/escopo.</p>
-            <span className="empty-sub">
-              Faça upload de imagens acima para compor os carrosséis.
-            </span>
-          </div>
+          <EmptyState
+            icon={<FolderArchive className="h-5 w-5" />}
+            title="Nenhuma mídia encontrada"
+            description="Faça upload de imagens acima para compor os carrosséis."
+          />
         ) : (
-          <div className="media-grid">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {assets.map((asset) => (
-              <div key={asset.storage_path} className="media-card">
-                <div className="media-preview-container">
+              <div
+                key={asset.storage_path}
+                className="group flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md"
+              >
+                <div className="relative aspect-[4/5] w-full overflow-hidden bg-slate-100">
                   <AuthImage
                     storagePath={asset.storage_path}
                     alt={asset.filename}
-                    className="media-thumbnail"
+                    className="h-full w-full object-cover"
                   />
-                  <div className="media-card-badge">
+                  <span className="absolute right-1.5 top-1.5 rounded-md bg-slate-900/70 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur">
                     {asset.width && asset.height
                       ? `${asset.width}×${asset.height}`
                       : asset.category}
-                  </div>
+                  </span>
                 </div>
 
-                <div className="media-card-details">
-                  <span className="media-card-filename" title={asset.filename}>
+                <div className="flex flex-col gap-1.5 p-2.5">
+                  <span
+                    className="truncate text-xs font-medium text-slate-700"
+                    title={asset.filename}
+                  >
                     {asset.filename}
                   </span>
-                  <div className="media-card-meta">
-                    <span className="media-size">
-                      {formatBytes(asset.byte_size)}
-                    </span>
+                  <div className="flex items-center justify-between text-[11px] text-slate-400">
+                    <span>{formatBytes(asset.byte_size)}</span>
                     <button
                       type="button"
-                      className="btn-delete-media flex items-center gap-1 hover:text-red-700"
+                      className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-red-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
                       title="Excluir mídia"
                       disabled={deletingPath === asset.storage_path}
                       onClick={() => void handleDelete(asset)}
                     >
-                      <Trash2 className="w-3 h-3" />
-                      <span>{deletingPath === asset.storage_path ? "..." : "Excluir"}</span>
+                      <Trash2 className="h-3 w-3" />
+                      <span>
+                        {deletingPath === asset.storage_path ? "..." : "Excluir"}
+                      </span>
                     </button>
                   </div>
                 </div>

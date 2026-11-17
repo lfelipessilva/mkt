@@ -284,6 +284,84 @@ describe("Task 16: TikTok manual publish & Desempenho query", { timeout: 60000 }
       assert.equal(list[2].archetype_title, "Post Baixo");
     });
 
+    it("returns Zernio provider, external post id and publish status in performance items", async () => {
+      const run = await createCarouselRun({
+        account_id: "acc_female",
+        account_role: "single_woman",
+        archetype_title: "Post Zernio",
+        legenda: "Legenda Zernio",
+        status: "published",
+      });
+
+      await pool.query(
+        `INSERT INTO tiktok_posts (
+          run_id, tracking_mode, provider, external_post_id, publish_status,
+          published_at, views, likes, comments, shares, created_at, updated_at
+        ) VALUES ($1, 'api', 'zernio', $2, 'published', NOW(), 61, 6, 0, 3, NOW(), NOW())`,
+        [run.id, "6afb5ec26de75df48d6160c9"]
+      );
+
+      const res = await app.inject({
+        method: "GET",
+        url: "/api/v1/tiktok/performance",
+        headers: authHeaders,
+      });
+
+      assert.equal(res.statusCode, 200);
+      const item = res.json().find((entry: any) => entry.run_id === run.id);
+      assert.ok(item);
+      assert.equal(item.provider, "zernio");
+      assert.equal(item.external_post_id, "6afb5ec26de75df48d6160c9");
+      assert.equal(item.publish_status, "published");
+      assert.equal(item.post.provider, "zernio");
+      assert.equal(item.post.external_post_id, "6afb5ec26de75df48d6160c9");
+
+      const runRes = await app.inject({
+        method: "GET",
+        url: `/api/v1/carousels/runs/${run.id}`,
+        headers: authHeaders,
+      });
+      assert.equal(runRes.statusCode, 200);
+      const runBody = runRes.json();
+      assert.equal(runBody.tiktok_post.provider, "zernio");
+      assert.equal(runBody.tiktok_post.external_post_id, "6afb5ec26de75df48d6160c9");
+      assert.equal(runBody.tiktok_post.publish_status, "published");
+    });
+
+    it("keeps Zernio tracking and existing metrics when editing manually", async () => {
+      const run = await createCarouselRun({
+        account_id: "acc_female",
+        account_role: "single_woman",
+        archetype_title: "Post Zernio Edit",
+        legenda: "Legenda Zernio Edit",
+        status: "published",
+      });
+
+      await pool.query(
+        `INSERT INTO tiktok_posts (
+          run_id, tracking_mode, provider, external_post_id, publish_status,
+          published_at, views, likes, comments, shares, created_at, updated_at
+        ) VALUES ($1, 'api', 'zernio', $2, 'published', NOW(), 61, 6, 0, 3, NOW(), NOW())`,
+        [run.id, "6afb5ec26de75df48d6160c9"]
+      );
+
+      const res = await app.inject({
+        method: "PUT",
+        url: `/api/v1/tiktok/posts/${run.id}`,
+        headers: authHeaders,
+        payload: { metrics_note: "Ajuste manual" },
+      });
+
+      assert.equal(res.statusCode, 200);
+      const post = res.json();
+      assert.equal(post.tracking_mode, "api");
+      assert.equal(post.external_post_id, "6afb5ec26de75df48d6160c9");
+      assert.equal(post.views, 61);
+      assert.equal(post.likes, 6);
+      assert.equal(post.shares, 3);
+      assert.equal(post.metrics_note, "Ajuste manual");
+    });
+
     it("GET /api/v1/tiktok/performance filters by accountId", async () => {
       const runF = await createCarouselRun({
         account_id: "acc_female",

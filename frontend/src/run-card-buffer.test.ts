@@ -6,7 +6,11 @@ import {
   dispatchCarouselRun,
   approveAutomationRun,
 } from "./api";
-import { resolveBufferPublishState } from "./components/RunCard";
+import {
+  resolveBufferPublishState,
+  shouldShowManualTikTok,
+  shouldShowTelegram,
+} from "./components/RunCard";
 import type { Account, CarouselRun } from "./types";
 
 describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
@@ -63,6 +67,8 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
         visible: true,
         disabled: false,
         label: "Publicar no Zernio",
+        published: false,
+        zernioFailed: false,
       });
     });
 
@@ -125,6 +131,8 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
         visible: true,
         disabled: true,
         label: "Enviado ao Zernio",
+        published: false,
+        zernioFailed: false,
       });
     });
 
@@ -139,11 +147,13 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
         visible: true,
         disabled: false,
         label: "Reenviar ao Zernio",
+        published: false,
+        zernioFailed: true,
       });
     });
 
-    // 8. resolveBufferPublishState: run.status='published' sem buffer_dispatched_at → visível, desabilitado, “Já publicado”.
-    it("8. resolveBufferPublishState: run.status='published' sem buffer_dispatched_at → visível, desabilitado, 'Já publicado'", () => {
+    // 8. resolveBufferPublishState: run.status='published' sem buffer_dispatched_at → publicado, desabilitado, 'Publicado'.
+    it("8. resolveBufferPublishState: run.status='published' sem buffer_dispatched_at → publicado, desabilitado, 'Publicado'", () => {
       const state = resolveBufferPublishState(linkedAccount, {
         ...baseRun,
         status: "published",
@@ -152,7 +162,69 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
       assert.deepEqual(state, {
         visible: true,
         disabled: true,
-        label: "Já publicado",
+        label: "Publicado",
+        published: true,
+        zernioFailed: false,
+      });
+    });
+
+    it("8b. Zernio post published on the provider wins over buffer_dispatched_at", () => {
+      const state = resolveBufferPublishState(linkedAccount, {
+        ...baseRun,
+        status: "dispatched",
+        buffer_dispatched_at: "2026-11-16T12:00:00.000Z",
+        tiktok_post: {
+          provider: "zernio",
+          external_post_id: "6afb5ec26de75df48d6160c9",
+          publish_status: "published",
+        },
+      });
+      assert.deepEqual(state, {
+        visible: true,
+        disabled: true,
+        label: "Publicado",
+        published: true,
+        zernioFailed: false,
+      });
+    });
+
+    it("8c. queued Zernio post stays disabled to prevent duplicate publishes", () => {
+      const state = resolveBufferPublishState(linkedAccount, {
+        ...baseRun,
+        status: "dispatched",
+        buffer_dispatched_at: null,
+        tiktok_post: {
+          provider: "zernio",
+          external_post_id: "6afb5ec26de75df48d6160c9",
+          publish_status: "queued",
+        },
+      });
+      assert.deepEqual(state, {
+        visible: true,
+        disabled: true,
+        label: "Enviado ao Zernio",
+        published: false,
+        zernioFailed: false,
+      });
+    });
+
+    it("8d. failed Zernio post offers resend and fallback", () => {
+      const state = resolveBufferPublishState(linkedAccount, {
+        ...baseRun,
+        status: "failed",
+        buffer_dispatched_at: null,
+        tiktok_post: {
+          provider: "zernio",
+          external_post_id: "6afb5ec26de75df48d6160c9",
+          publish_status: "failed",
+        },
+      });
+      assert.deepEqual(state, {
+        visible: true,
+        disabled: false,
+        label: "Reenviar ao Zernio",
+        published: false,
+        zernioFailed: true,
       });
     });
 
@@ -167,7 +239,65 @@ describe("Task 11: Frontend Buffer button + API channel (TDD)", () => {
         visible: true,
         disabled: false,
         label: "Confirmar envio",
+        published: false,
+        zernioFailed: false,
       });
+    });
+  });
+
+  describe("Telegram fallback and manual publish visibility", () => {
+    it("hides Telegram while Zernio can publish", () => {
+      assert.equal(
+        shouldShowTelegram(linkedAccount, { ...baseRun, status: "generated" }),
+        false
+      );
+    });
+
+    it("shows Telegram when the account is not linked", () => {
+      assert.equal(
+        shouldShowTelegram(unlinkedAccount, {
+          ...baseRun,
+          account_id: unlinkedAccount.id,
+          status: "generated",
+        }),
+        true
+      );
+    });
+
+    it("shows Telegram only as fallback after a Zernio failure", () => {
+      assert.equal(
+        shouldShowTelegram(linkedAccount, {
+          ...baseRun,
+          status: "failed",
+          tiktok_post: { provider: "zernio", publish_status: "failed" },
+        }),
+        true
+      );
+    });
+
+    it("hides manual TikTok publishing for a published Zernio post", () => {
+      assert.equal(
+        shouldShowManualTikTok(linkedAccount, {
+          ...baseRun,
+          status: "published",
+          tiktok_post: {
+            provider: "zernio",
+            external_post_id: "6afb5ec26de75df48d6160c9",
+            publish_status: "published",
+          },
+        }),
+        false
+      );
+    });
+
+    it("keeps manual TikTok publishing for legacy posts without a Zernio post", () => {
+      assert.equal(
+        shouldShowManualTikTok(linkedAccount, {
+          ...baseRun,
+          status: "generated",
+        }),
+        true
+      );
     });
   });
 

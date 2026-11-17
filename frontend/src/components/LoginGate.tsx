@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { getToken, setToken, clearToken, verifyToken } from "../api";
-import { ShieldCheck, KeyRound, AlertCircle } from "lucide-react";
+import { ShieldCheck, KeyRound } from "lucide-react";
+import { Button, Field, InlineAlert, Input } from "../ui";
 
 interface AuthContextType {
   token: string | null;
@@ -24,7 +25,6 @@ export function LoginGate({ children }: LoginGateProps): React.JSX.Element {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Sync token state if local storage changes
   useEffect(() => {
     setStoredToken(getToken());
   }, []);
@@ -69,24 +69,32 @@ export function LoginGate({ children }: LoginGateProps): React.JSX.Element {
 
   if (!token) {
     return (
-      <div className="login-screen">
-        <div className="login-card">
-          <div className="login-header">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold uppercase tracking-wider mb-3">
-              <ShieldCheck className="w-3.5 h-3.5" />
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-100 via-slate-50 to-blue-50 p-5">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-900/5 sm:p-8">
+          <div className="mb-6 text-center">
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-blue-700">
+              <ShieldCheck className="h-3.5 w-3.5" />
               <span>Listo Ops Studio</span>
             </div>
-            <h2>Marketing Carousel Ops</h2>
-            <p>Insira seu Bearer Token para acessar o painel de operações.</p>
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900">
+              Marketing Carousel Ops
+            </h1>
+            <p className="mt-1.5 text-sm text-slate-500">
+              Insira seu Bearer Token para acessar o painel de operações.
+            </p>
           </div>
 
-          <form onSubmit={handleLogin} className="login-form">
-            <div className="form-group">
-              <label htmlFor="token-input" className="flex items-center gap-1.5">
-                <KeyRound className="w-3.5 h-3.5 text-slate-500" />
-                <span>API Bearer Token</span>
-              </label>
-              <input
+          <form onSubmit={handleLogin} className="flex flex-col gap-4">
+            <Field
+              label={
+                <span className="inline-flex items-center gap-1.5">
+                  <KeyRound className="h-3.5 w-3.5 text-slate-400" />
+                  API Bearer Token
+                </span>
+              }
+              htmlFor="token-input"
+            >
+              <Input
                 id="token-input"
                 type="password"
                 placeholder="Insira o API Token..."
@@ -95,22 +103,19 @@ export function LoginGate({ children }: LoginGateProps): React.JSX.Element {
                 autoFocus
                 disabled={loading}
               />
-            </div>
+            </Field>
 
-            {error && (
-              <div className="error-banner flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
+            {error && <InlineAlert tone="error">{error}</InlineAlert>}
 
-            <button
+            <Button
               type="submit"
-              className="btn btn-primary btn-block"
-              disabled={loading || !inputVal.trim()}
+              variant="primary"
+              block
+              isLoading={loading}
+              disabled={!inputVal.trim()}
             >
               {loading ? "Verificando..." : "Entrar no Painel"}
-            </button>
+            </Button>
           </form>
         </div>
       </div>

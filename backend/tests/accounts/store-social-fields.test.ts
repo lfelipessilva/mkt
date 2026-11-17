@@ -23,7 +23,7 @@ describe("accounts store - social fields persistence", () => {
 
         // If INSERT query
         if (queryText.includes("INSERT INTO accounts")) {
-          const rawMetadata = queryValues?.[8];
+          const rawMetadata = queryValues?.[9];
           const metadata = typeof rawMetadata === "string" ? JSON.parse(rawMetadata) : rawMetadata;
           return {
             rows: [
@@ -33,9 +33,10 @@ describe("accounts store - social fields persistence", () => {
                 persona: queryValues?.[2],
                 role: queryValues?.[3],
                 enabled: queryValues?.[4],
-                tiktok_open_id: queryValues?.[5],
-                social_provider: queryValues?.[6],
-                external_account_id: queryValues?.[7],
+                auto_post_enabled: queryValues?.[5],
+                tiktok_open_id: queryValues?.[6],
+                social_provider: queryValues?.[7],
+                external_account_id: queryValues?.[8],
                 social_account_metadata: metadata,
                 created_at: new Date(),
                 updated_at: new Date(),
@@ -102,6 +103,9 @@ describe("accounts store - social fields persistence", () => {
         }
 
         if (queryText.includes("INSERT INTO accounts")) {
+          const rawMetadata = queryValues?.[9];
+          const metadata =
+            typeof rawMetadata === "string" ? JSON.parse(rawMetadata) : rawMetadata;
           return {
             rows: [
               {
@@ -110,10 +114,11 @@ describe("accounts store - social fields persistence", () => {
                 persona: queryValues?.[2],
                 role: queryValues?.[3],
                 enabled: queryValues?.[4],
-                tiktok_open_id: queryValues?.[5],
-                social_provider: queryValues?.[6],
-                external_account_id: queryValues?.[7],
-                social_account_metadata: queryValues?.[8],
+                auto_post_enabled: queryValues?.[5],
+                tiktok_open_id: queryValues?.[6],
+                social_provider: queryValues?.[7],
+                external_account_id: queryValues?.[8],
+                social_account_metadata: metadata,
                 created_at: existingAccount.created_at,
                 updated_at: new Date(),
               },

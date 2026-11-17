@@ -9,6 +9,8 @@ describe("resolveCarouselSlidePublicUrls", () => {
 
   beforeEach(() => {
     process.env.SILO_SERVER_URL = "https://personal-minio.adaygq.easypanel.host";
+    process.env.SILO_ACCESS_KEY = "test";
+    process.env.SILO_SECRET_KEY = "test";
     process.env.SILO_CAROUSELS_BUCKET = "carousels";
   });
 
@@ -16,7 +18,7 @@ describe("resolveCarouselSlidePublicUrls", () => {
     process.env = { ...originalEnv };
   });
 
-  it("given a run with slides sorted by position (1, 2, 3), returns array of public URLs", () => {
+  it("given a run with slides sorted by position (1, 2, 3), returns array of public URLs", async () => {
     const run: CarouselRun = {
       id: "11111111-1111-1111-1111-111111111111",
       account_id: "gabriel",
@@ -47,7 +49,9 @@ describe("resolveCarouselSlidePublicUrls", () => {
       ],
     };
 
-    const urls = resolveCarouselSlidePublicUrls(run);
+    const urls = (await resolveCarouselSlidePublicUrls(run)).map(
+      (url) => url.split("?")[0]
+    );
 
     assert.deepEqual(urls, [
       "https://personal-minio.adaygq.easypanel.host/carousels/2026-11-15/gabriel/post_1/slide_1.jpg",
@@ -56,7 +60,7 @@ describe("resolveCarouselSlidePublicUrls", () => {
     ]);
   });
 
-  it("extracts relative path when storage_path contains output/ prefix", () => {
+  it("extracts relative path when storage_path contains output/ prefix", async () => {
     const run: CarouselRun = {
       id: "22222222-2222-2222-2222-222222222222",
       account_id: "lucas",
@@ -74,13 +78,15 @@ describe("resolveCarouselSlidePublicUrls", () => {
       ],
     };
 
-    const urls = resolveCarouselSlidePublicUrls(run);
+    const urls = (await resolveCarouselSlidePublicUrls(run)).map(
+      (url) => url.split("?")[0]
+    );
     assert.deepEqual(urls, [
       "https://personal-minio.adaygq.easypanel.host/carousels/2026-11-15/lucas/post_2/slide_1.jpg",
     ]);
   });
 
-  it("derives slide key from output_dir and position if storage_path is just slide filename or basename", () => {
+  it("derives slide key from output_dir and position if storage_path is just slide filename or basename", async () => {
     const run: CarouselRun = {
       id: "33333333-3333-3333-3333-333333333333",
       account_id: "ana",
@@ -99,13 +105,15 @@ describe("resolveCarouselSlidePublicUrls", () => {
       ],
     };
 
-    const urls = resolveCarouselSlidePublicUrls(run);
+    const urls = (await resolveCarouselSlidePublicUrls(run)).map(
+      (url) => url.split("?")[0]
+    );
     assert.deepEqual(urls, [
       "https://personal-minio.adaygq.easypanel.host/carousels/2026-11-15/ana/post_1/slide_1.jpg",
     ]);
   });
 
-  it("throws AppError('silo_not_configured', 400) if SILO_SERVER_URL is absent or empty", () => {
+  it("throws AppError('silo_not_configured', 400) if SILO_SERVER_URL is absent or empty", async () => {
     delete process.env.SILO_SERVER_URL;
 
     const run: CarouselRun = {
@@ -125,7 +133,7 @@ describe("resolveCarouselSlidePublicUrls", () => {
       ],
     };
 
-    assert.throws(
+    await assert.rejects(
       () => resolveCarouselSlidePublicUrls(run),
       (err: any) => {
         assert(err instanceof AppError);
@@ -136,7 +144,7 @@ describe("resolveCarouselSlidePublicUrls", () => {
     );
   });
 
-  it("throws AppError('no_slides', 400) if run has 0 slides or undefined slides", () => {
+  it("throws AppError('no_slides', 400) if run has 0 slides or undefined slides", async () => {
     const runWithoutSlides: CarouselRun = {
       id: "55555555-5555-5555-5555-555555555555",
       account_id: "gabriel",
@@ -146,7 +154,7 @@ describe("resolveCarouselSlidePublicUrls", () => {
       status: "generated",
     };
 
-    assert.throws(
+    await assert.rejects(
       () => resolveCarouselSlidePublicUrls(runWithoutSlides),
       (err: any) => {
         assert(err instanceof AppError);
@@ -161,7 +169,7 @@ describe("resolveCarouselSlidePublicUrls", () => {
       slides: [],
     };
 
-    assert.throws(
+    await assert.rejects(
       () => resolveCarouselSlidePublicUrls(runWithEmptySlides),
       (err: any) => {
         assert(err instanceof AppError);

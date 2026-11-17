@@ -8,12 +8,12 @@ export const UpsertTikTokPostSchema = z.object({
   video_url: z.string().optional().nullable(),
   video_id: z.string().optional().nullable(),
   published_at: z.union([z.string(), z.date()]).optional().nullable(),
-  views: z.coerce.number().int().nonnegative().optional().default(0),
-  likes: z.coerce.number().int().nonnegative().optional().default(0),
-  comments: z.coerce.number().int().nonnegative().optional().default(0),
-  shares: z.coerce.number().int().nonnegative().optional().default(0),
+  views: z.coerce.number().int().nonnegative().optional(),
+  likes: z.coerce.number().int().nonnegative().optional(),
+  comments: z.coerce.number().int().nonnegative().optional(),
+  shares: z.coerce.number().int().nonnegative().optional(),
   metrics_note: z.string().optional().nullable(),
-  tracking_mode: TikTokTrackingModeSchema.optional().default("manual"),
+  tracking_mode: TikTokTrackingModeSchema.optional(),
 });
 export type UpsertTikTokPostInput = z.infer<typeof UpsertTikTokPostSchema>;
 
@@ -68,6 +68,11 @@ export interface TikTokPerformanceItem {
   tracking_mode: TikTokTrackingMode;
   video_id: string | null;
   video_url: string | null;
+  provider?: string;
+  external_post_id?: string | null;
+  publish_status?: string;
+  scheduled_at?: Date | null;
+  last_polled_at?: Date | null;
   published_at: Date | null;
   views: number;
   likes: number;
@@ -87,4 +92,5 @@ export interface TikTokSyncResult {
   posts_updated: number;
   skipped_manual: number;
   sync_run_id: string;
+  errors?: Array<{ postId: string; error: string }>;
 }

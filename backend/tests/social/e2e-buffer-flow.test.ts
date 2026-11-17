@@ -20,6 +20,12 @@ import type {
   PostMetrics,
   SocialAccount,
 } from "../../src/domain/social/types.js";
+import {
+  enableMockSilo,
+  disableMockSilo,
+  resetMockSilo,
+  uploadCarouselToSilo,
+} from "../../src/shared/storage/silo.js";
 
 const { Pool } = pg;
 
@@ -52,6 +58,7 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     process.env.SILO_SECRET_KEY = "test";
     process.env.SILO_CAROUSELS_BUCKET = "carousels";
 
+    enableMockSilo();
     app = await buildApp();
   });
 
@@ -69,9 +76,11 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     if (tmpOutputDir && fs.existsSync(tmpOutputDir)) {
       fs.rmSync(tmpOutputDir, { recursive: true, force: true });
     }
+    disableMockSilo();
   });
 
   beforeEach(async () => {
+    resetMockSilo();
     await pool.query(
       "TRUNCATE TABLE tiktok_sync_runs, tiktok_metrics, tiktok_posts, dispatch_events, media_usage, carousel_slides, carousel_runs, generation_jobs, media_assets, baits, archetypes, accounts CASCADE;"
     );
@@ -98,6 +107,15 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     const slide2Path = path.join(runDir, "slide_2.jpg");
     fs.writeFileSync(slide1Path, "image-content-slide-1");
     fs.writeFileSync(slide2Path, "image-content-slide-2");
+
+    await uploadCarouselToSilo(
+      "acc_e2e_tiktok/post_e2e_1/slide_1.jpg",
+      fs.readFileSync(slide1Path)
+    );
+    await uploadCarouselToSilo(
+      "acc_e2e_tiktok/post_e2e_1/slide_2.jpg",
+      fs.readFileSync(slide2Path)
+    );
 
     const runRes = await pool.query(
       `INSERT INTO carousel_runs (
@@ -195,10 +213,16 @@ describe("Task 8: Full End-to-End Verification of Buffer TikTok Publishing", { t
     assert.equal(dispatchedPayload.publishMode, "immediate");
     assert.equal(dispatchedPayload.scheduledAt, undefined);
     assert.equal(dispatchedPayload.media.type, "carousel");
-    assert.deepEqual((dispatchedPayload.media as any).imageUrls, [
-      "https://personal-minio.adaygq.easypanel.host/carousels/acc_e2e_tiktok/post_e2e_1/slide_1.jpg",
-      "https://personal-minio.adaygq.easypanel.host/carousels/acc_e2e_tiktok/post_e2e_1/slide_2.jpg",
-    ]);
+    const imageUrls = (dispatchedPayload.media as { imageUrls: string[] }).imageUrls;
+    assert.equal(imageUrls.length, 2);
+    assert.match(
+      imageUrls[0],
+      /^https:\/\/personal-minio\.adaygq\.easypanel\.host\/carousels\/acc_e2e_tiktok\/post_e2e_1\/slide_1\.jpg/
+    );
+    assert.match(
+      imageUrls[1],
+      /^https:\/\/personal-minio\.adaygq\.easypanel\.host\/carousels\/acc_e2e_tiktok\/post_e2e_1\/slide_2\.jpg/
+    );
 
     // Verify initial tiktok_posts state
     const initialPostRes = await pool.query(

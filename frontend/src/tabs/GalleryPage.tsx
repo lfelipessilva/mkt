@@ -4,7 +4,19 @@ import type { Account, CarouselRun, CarouselSlide } from "../types";
 import { getCarouselRuns, generateCarousels, pollGenerationJob } from "../api";
 import { RunCard } from "../components/RunCard";
 import { ManualTikTokModal } from "../components/ManualTikTokModal";
-import { RefreshCw, Search, Sparkles, X } from "lucide-react";
+import { Images, RefreshCw, Search, Sparkles, X } from "lucide-react";
+import {
+  Button,
+  Card,
+  EmptyState,
+  InlineAlert,
+  Input,
+  LoadingState,
+  PageHeader,
+  Tabs,
+  Toast,
+  useToast,
+} from "../ui";
 
 export function resolveGalleryTargetAccountIds(
   selectedAccountId: string,
@@ -159,17 +171,10 @@ export function GalleryPage({ focusedRunId }: GalleryPageProps = {}): React.JSX.
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [activeModalRun, setActiveModalRun] = useState<CarouselRun | null>(null);
 
-  // Toast state
-  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
-
-  const showToast = (message: string, type: "success" | "error" | "info" = "success") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 5000);
-  };
+  const { toast, showToast, dismissToast } = useToast();
 
   const loadRuns = useCallback(async () => {
     setLoading(true);
@@ -203,7 +208,7 @@ export function GalleryPage({ focusedRunId }: GalleryPageProps = {}): React.JSX.
 
   const handlePublishSuccess = (updatedRun: CarouselRun) => {
     handleRunUpdated(updatedRun);
-    showToast(`Carrossel marcado como publicado no TikTok com sucesso!`, "success");
+    showToast("Carrossel marcado como publicado no TikTok com sucesso!", "success");
   };
 
   const handleGenerateCarousels = async () => {
@@ -260,84 +265,69 @@ export function GalleryPage({ focusedRunId }: GalleryPageProps = {}): React.JSX.
     }
   }, [focusedRunId, loading, filteredRuns]);
 
+  const generateLabel = isGenerating
+    ? "Gerando carrossel..."
+    : selectedAccountId !== "all"
+    ? `Gerar Carrossel (@${selectedAccount?.id ?? selectedAccountId})`
+    : "Gerar para Todas as Contas";
+
+  const generateButton = (
+    <Button
+      variant="primary"
+      onClick={handleGenerateCarousels}
+      disabled={isGenerating || loading}
+    >
+      <Sparkles className={isGenerating ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+      <span>{generateLabel}</span>
+    </Button>
+  );
+
   return (
-    <div className="gallery-page" data-testid="gallery-page">
-      {/* Toast Alert */}
-      {toast && (
-        <div className={`toast-alert toast-${toast.type}`} role="status">
-          <span className="toast-message">{toast.message}</span>
-          <button type="button" className="toast-close" onClick={() => setToast(null)}>
-            ×
-          </button>
-        </div>
-      )}
+    <div className="flex flex-col gap-5" data-testid="gallery-page">
+      <Toast toast={toast} onClose={dismissToast} />
 
-      {/* Top Header Card */}
-      <div className="gallery-header-card">
-        <div className="header-info">
-          <h2>Galeria de Carrosséis</h2>
-          <p className="page-desc">
-            Visualize os carrosséis gerados com filmstrip completo de cada slide,
-            despache diretamente para o Telegram e registre publicações manuais no TikTok.
-          </p>
-        </div>
+      <PageHeader
+        icon={<Images className="h-5 w-5" />}
+        title="Galeria de Carrosséis"
+        description="Visualize os carrosséis gerados com filmstrip completo de cada slide, despache diretamente para o Telegram e registre publicações manuais no TikTok."
+        actions={
+          <>
+            {generateButton}
+            <Button
+              variant="secondary"
+              onClick={loadRuns}
+              disabled={loading || isGenerating}
+            >
+              <RefreshCw
+                className={
+                  loading ? "h-3.5 w-3.5 animate-spin text-blue-600" : "h-3.5 w-3.5"
+                }
+              />
+              <span>{loading ? "Carregando..." : "Atualizar"}</span>
+            </Button>
+          </>
+        }
+      />
 
-        <div className="header-actions">
-          <button
-            type="button"
-            className="btn btn-primary flex items-center gap-1.5"
-            onClick={handleGenerateCarousels}
-            disabled={isGenerating || loading}
-          >
-            <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} />
-            <span>
-              {isGenerating
-                ? "Gerando carrossel..."
-                : selectedAccountId !== "all"
-                ? `Gerar Carrossel (@${selectedAccount?.id ?? selectedAccountId})`
-                : `Gerar para Todas as Contas`}
-            </span>
-          </button>
-          <button
-            type="button"
-            className="btn btn-secondary btn-refresh flex items-center gap-1.5"
-            onClick={loadRuns}
-            disabled={loading || isGenerating}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : ""}`} />
-            <span>{loading ? "Carregando..." : "Atualizar"}</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Filter and Search Bar */}
-      <div className="gallery-toolbar">
-        <div className="status-tabs" role="tablist">
-          {[
+      <Card className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs
+          ariaLabel="Filtrar por status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          items={[
             { id: "all", label: "Todos" },
             { id: "generated", label: "Gerados" },
             { id: "dispatched", label: "Despachados" },
             { id: "published", label: "Publicados" },
             { id: "failed", label: "Com Falha" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={statusFilter === tab.id}
-              className={`status-tab ${statusFilter === tab.id ? "active" : ""}`}
-              onClick={() => setStatusFilter(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
+          ]}
+        />
 
-        <div className="search-input-wrapper relative flex items-center">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 pointer-events-none" />
-          <input
+        <div className="relative w-full sm:w-80">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Input
             type="text"
-            className="search-input !pl-9"
+            className="pl-9 pr-9"
             placeholder="Buscar por tema, arquétipo ou conta..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -345,85 +335,64 @@ export function GalleryPage({ focusedRunId }: GalleryPageProps = {}): React.JSX.
           {searchQuery && (
             <button
               type="button"
-              className="clear-search-btn"
+              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
               onClick={() => setSearchQuery("")}
+              aria-label="Limpar busca"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
-      </div>
+      </Card>
 
-      {/* Context info banner if pinned */}
       {selectedAccountId !== "all" && (
-        <div className="context-filter-banner">
-          <span>
-            Exibindo carrosséis da conta <strong>@{selectedAccount?.id ?? selectedAccountId}</strong>
-          </span>
-        </div>
+        <InlineAlert tone="info">
+          Exibindo carrosséis da conta{" "}
+          <strong>@{selectedAccount?.id ?? selectedAccountId}</strong>
+        </InlineAlert>
       )}
 
-      {/* Missing focused run banner */}
       {showMissingBanner && (
-        <div
-          className="focused-run-missing-banner alert-banner flex items-center gap-2"
+        <InlineAlert
+          tone="warning"
           role="alert"
           data-testid="focused-run-missing-banner"
         >
-          <span>Carrossel não encontrado nesta visualização</span>
-        </div>
+          Carrossel não encontrado nesta visualização
+        </InlineAlert>
       )}
 
-      {/* Error state */}
       {error && (
-        <div className="error-card" role="alert">
-          <p>{error}</p>
-          <button type="button" className="btn btn-secondary" onClick={loadRuns}>
-            Tentar novamente
-          </button>
-        </div>
+        <InlineAlert tone="error">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span>{error}</span>
+            <Button variant="outline" size="sm" onClick={loadRuns}>
+              Tentar novamente
+            </Button>
+          </div>
+        </InlineAlert>
       )}
 
-      {/* Loading state */}
       {loading && runs.length === 0 && (
-        <div className="loading-state">
-          <span className="spinner-md" />
-          <p>Carregando carrosséis...</p>
-        </div>
+        <LoadingState label="Carregando carrosséis..." />
       )}
 
-      {/* Empty state */}
       {!loading && filteredRuns.length === 0 && !error && (
-        <div className="gallery-empty-state">
-          <div className="empty-icon">🖼</div>
-          <h3>Nenhum carrossel encontrado</h3>
-          <p>
-            {searchQuery || statusFilter !== "all"
+        <EmptyState
+          icon={<Images className="h-5 w-5" />}
+          title="Nenhum carrossel encontrado"
+          description={
+            searchQuery || statusFilter !== "all"
               ? "Tente ajustar os filtros ou a busca acima."
-              : "Clique em Gerar Carrossel acima para criar novos carrosséis."}
-          </p>
-          {!searchQuery && statusFilter === "all" && (
-            <button
-              type="button"
-              className="btn btn-primary flex items-center gap-1.5"
-              onClick={handleGenerateCarousels}
-              disabled={isGenerating || loading}
-            >
-              <Sparkles className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} />
-              <span>
-                {isGenerating
-                  ? "Gerando carrossel..."
-                  : selectedAccountId !== "all"
-                  ? `Gerar Carrossel (@${selectedAccount?.id ?? selectedAccountId})`
-                  : `Gerar para Todas as Contas`}
-              </span>
-            </button>
-          )}
-        </div>
+              : "Clique em Gerar Carrossel acima para criar novos carrosséis."
+          }
+          action={
+            !searchQuery && statusFilter === "all" ? generateButton : undefined
+          }
+        />
       )}
 
-      {/* Runs Grid */}
-      <div className="runs-grid">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {filteredRuns.map((run) => (
           <RunCard
             key={run.id}
@@ -449,7 +418,6 @@ export function GalleryPage({ focusedRunId }: GalleryPageProps = {}): React.JSX.
         ))}
       </div>
 
-      {/* Manual TikTok Modal */}
       <ManualTikTokModal
         isOpen={modalOpen}
         run={activeModalRun}

@@ -10,8 +10,34 @@ import {
   type CreateAccountInput,
   type UpdateAccountInput,
 } from "../../types";
-import { createAccount, updateAccount, deleteAccount, syncSocialAccounts } from "../../api";
-import { UserPlus, RefreshCw } from "lucide-react";
+import {
+  createAccount,
+  updateAccount,
+  deleteAccount,
+  syncSocialAccounts,
+} from "../../api";
+import { RefreshCw, UserPlus, Users } from "lucide-react";
+import {
+  Button,
+  CheckboxField,
+  EmptyState,
+  Field,
+  InlineAlert,
+  Input,
+  LoadingState,
+  Modal,
+  PageHeader,
+  RoleBadge,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+  Textarea,
+  cn,
+} from "../../ui";
 
 interface AccountFormState {
   id: string;
@@ -36,6 +62,194 @@ const emptyFormState: AccountFormState = {
   external_account_id: "",
   social_provider: "zernio",
 };
+
+function StatusToggle({
+  active,
+  disabled,
+  onClick,
+  title,
+  testId,
+}: {
+  active: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  title: string;
+  testId?: string;
+}): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      className={cn(
+        "rounded-full border px-2.5 py-0.5 text-[11px] font-semibold transition-colors",
+        active
+          ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+          : "border-slate-200 bg-slate-100 text-slate-500 hover:bg-slate-200",
+        disabled && "pointer-events-none opacity-50"
+      )}
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      data-testid={testId}
+    >
+      {active ? "Ativo" : "Inativo"}
+    </button>
+  );
+}
+
+interface AccountFormProps {
+  formId: string;
+  form: AccountFormState;
+  setForm: React.Dispatch<React.SetStateAction<AccountFormState>>;
+  formError: string | null;
+  actionLoading: boolean;
+  showId: boolean;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  submitLabel: string;
+}
+
+function AccountForm({
+  formId,
+  form,
+  setForm,
+  formError,
+  actionLoading,
+  showId,
+  onSubmit,
+  onCancel,
+  submitLabel,
+}: AccountFormProps): React.JSX.Element {
+  return (
+    <>
+      <form
+        id={formId}
+        onSubmit={onSubmit}
+        className="flex flex-col gap-4"
+      >
+        {formError && <InlineAlert tone="error">{formError}</InlineAlert>}
+
+        {showId && (
+          <Field
+            label="ID da Conta (sem @)"
+            htmlFor="account-id"
+            hint="Identificador único no sistema"
+            required
+          >
+            <Input
+              id="account-id"
+              type="text"
+              placeholder="ex: lucas_silva"
+              value={form.id}
+              onChange={(e) => setForm({ ...form, id: e.target.value })}
+              required
+            />
+          </Field>
+        )}
+
+        <Field label="Nome de Exibição" htmlFor="account-name">
+          <Input
+            id="account-name"
+            type="text"
+            placeholder="ex: Lucas Silva"
+            value={form.display_name}
+            onChange={(e) => setForm({ ...form, display_name: e.target.value })}
+          />
+        </Field>
+
+        <Field label="Role (Papel de Conteúdo)" htmlFor="account-role" required>
+          <Select
+            id="account-role"
+            value={form.role}
+            onChange={(e) =>
+              setForm({ ...form, role: e.target.value as AccountRole })
+            }
+          >
+            {ACCOUNT_ROLES.map((role) => (
+              <option key={role} value={role}>
+                {ROLE_LABELS[role]} ({role})
+              </option>
+            ))}
+          </Select>
+        </Field>
+
+        <Field
+          label="Persona (Diretriz de Tom)"
+          htmlFor="account-persona"
+          required
+        >
+          <Textarea
+            id="account-persona"
+            rows={4}
+            placeholder="Descreva o tom, gírias e posicionamento desta persona..."
+            value={form.persona}
+            onChange={(e) => setForm({ ...form, persona: e.target.value })}
+            required
+          />
+        </Field>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="TikTok Open ID (opcional)" htmlFor="account-tiktok">
+            <Input
+              id="account-tiktok"
+              type="text"
+              placeholder="ID da conta no TikTok"
+              value={form.tiktok_open_id}
+              onChange={(e) =>
+                setForm({ ...form, tiktok_open_id: e.target.value })
+              }
+            />
+          </Field>
+
+          <Field
+            label="ID da conta Zernio"
+            htmlFor="account-buffer"
+            hint={`Provider: ${form.social_provider || "zernio"}`}
+          >
+            <Input
+              id="account-buffer"
+              type="text"
+              placeholder="external_account_id"
+              value={form.external_account_id}
+              onChange={(e) =>
+                setForm({ ...form, external_account_id: e.target.value })
+              }
+            />
+          </Field>
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <CheckboxField
+            label="Habilitar esta conta para gerações automáticas"
+            checked={form.enabled}
+            onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+          />
+          <CheckboxField
+            label="Habilitar auto-post na rotina de agendamento diária"
+            checked={form.auto_post_enabled}
+            onChange={(e) =>
+              setForm({ ...form, auto_post_enabled: e.target.checked })
+            }
+            data-testid={`${showId ? "create" : "edit"}-acc-auto-post`}
+          />
+        </div>
+      </form>
+
+      <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-4">
+        <Button variant="outline" onClick={onCancel} disabled={actionLoading}>
+          Cancelar
+        </Button>
+        <Button
+          type="submit"
+          form={formId}
+          variant="primary"
+          isLoading={actionLoading}
+        >
+          {submitLabel}
+        </Button>
+      </div>
+    </>
+  );
+}
 
 export function AccountsPage(): React.JSX.Element {
   const { accounts, loading, error, reloadAccounts } = useAccount();
@@ -84,9 +298,7 @@ export function AccountsPage(): React.JSX.Element {
       );
     } catch (err) {
       alert(
-        err instanceof Error
-          ? err.message
-          : "Erro ao sincronizar contas do Zernio"
+        err instanceof Error ? err.message : "Erro ao sincronizar contas do Zernio"
       );
     } finally {
       setSyncingBuffer(false);
@@ -129,9 +341,7 @@ export function AccountsPage(): React.JSX.Element {
       setCreateForm(emptyFormState);
       setStatusMessage(`Conta @${payload.id} criada com sucesso!`);
     } catch (err) {
-      setFormError(
-        err instanceof Error ? err.message : "Erro ao criar conta"
-      );
+      setFormError(err instanceof Error ? err.message : "Erro ao criar conta");
     } finally {
       setActionLoading(false);
     }
@@ -160,9 +370,7 @@ export function AccountsPage(): React.JSX.Element {
       setEditingAccount(null);
       setStatusMessage(`Conta @${editingAccount.id} atualizada com sucesso!`);
     } catch (err) {
-      setFormError(
-        err instanceof Error ? err.message : "Erro ao atualizar conta"
-      );
+      setFormError(err instanceof Error ? err.message : "Erro ao atualizar conta");
     } finally {
       setActionLoading(false);
     }
@@ -178,7 +386,9 @@ export function AccountsPage(): React.JSX.Element {
         `Auto-post da conta @${acc.id} ${nextVal ? "ativado" : "desativado"}`
       );
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro ao alterar status de auto-post");
+      alert(
+        err instanceof Error ? err.message : "Erro ao alterar status de auto-post"
+      );
     } finally {
       setActionLoading(false);
     }
@@ -214,481 +424,229 @@ export function AccountsPage(): React.JSX.Element {
   };
 
   return (
-    <div className="settings-page accounts-page">
-      <div className="page-section-header">
-        <div>
-          <h3>Contas de Personas</h3>
-          <p className="section-description">
-            Gerencie as contas ativas, atribua perfis de persona e configure os 4
-            papéis (roles) para geração direcionada.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="btn btn-outline flex items-center gap-1.5"
-            onClick={() => void handleSyncBuffer()}
-            disabled={actionLoading || syncingBuffer}
-            data-testid="btn-sync-buffer"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncingBuffer ? "animate-spin text-blue-600" : ""}`} />
-            <span>{syncingBuffer ? "Puxando do Zernio..." : "Puxar contas do Zernio"}</span>
-          </button>
-          <button
-            type="button"
-            className="btn btn-primary flex items-center gap-1.5"
-            onClick={handleOpenCreate}
-            data-testid="btn-add-account"
-          >
-            <UserPlus className="w-4 h-4" />
-            <span>Adicionar Conta</span>
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        icon={<Users className="h-5 w-5" />}
+        title="Contas de Personas"
+        description="Gerencie as contas ativas, atribua perfis de persona e configure os 4 papéis (roles) para geração direcionada."
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => void handleSyncBuffer()}
+              disabled={actionLoading || syncingBuffer}
+              data-testid="btn-sync-buffer"
+            >
+              <RefreshCw
+                className={
+                  syncingBuffer
+                    ? "h-4 w-4 animate-spin text-blue-600"
+                    : "h-4 w-4"
+                }
+              />
+              <span>
+                {syncingBuffer ? "Puxando do Zernio..." : "Puxar contas do Zernio"}
+              </span>
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleOpenCreate}
+              data-testid="btn-add-account"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Adicionar Conta</span>
+            </Button>
+          </>
+        }
+      />
 
       {statusMessage && (
-        <div className="alert-banner alert-success">
-          <span>{statusMessage}</span>
-          <button
-            type="button"
-            className="btn-icon"
-            onClick={() => setStatusMessage(null)}
-          >
-            ✕
-          </button>
-        </div>
+        <InlineAlert tone="success" onClose={() => setStatusMessage(null)}>
+          {statusMessage}
+        </InlineAlert>
       )}
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && <InlineAlert tone="error">{error}</InlineAlert>}
 
       {loading && accounts.length === 0 ? (
-        <div className="loading-indicator">Carregando contas...</div>
+        <LoadingState label="Carregando contas..." />
       ) : accounts.length === 0 ? (
-        <div className="empty-state">
-          <p>Nenhuma conta cadastrada ainda.</p>
-          <button
-            type="button"
-            className="btn btn-outline btn-sm"
-            onClick={handleOpenCreate}
-          >
-            Cadastrar primeira conta
-          </button>
-        </div>
+        <EmptyState
+          icon={<Users className="h-5 w-5" />}
+          title="Nenhuma conta cadastrada ainda"
+          description="Cadastre a primeira conta para começar a gerar carrosséis."
+          action={
+            <Button variant="outline" size="sm" onClick={handleOpenCreate}>
+              Cadastrar primeira conta
+            </Button>
+          }
+        />
       ) : (
-        <div className="accounts-table-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Conta / ID</th>
-                <th>Nome de Exibição</th>
-                <th>Role (Papel)</th>
-                <th>Persona</th>
-                <th>Zernio / Canal</th>
-                <th>TikTok Open ID</th>
-                <th>Status</th>
-                <th>Auto-Post</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {accounts.map((acc) => {
-                const bufferStatus = getBufferLinkageStatus(acc);
-                return (
-                <tr key={acc.id} className={!acc.enabled ? "row-disabled" : ""}>
-                  <td className="account-id-cell">
-                    <strong>@{acc.id}</strong>
-                  </td>
-                  <td>{acc.display_name || "-"}</td>
-                  <td>
-                    <span className={`role-badge role-${acc.role}`}>
-                      {ROLE_LABELS[acc.role]}
+        <Table>
+          <TableHead>
+            <TableRow className="hover:bg-transparent">
+              <TableHeaderCell>Conta / ID</TableHeaderCell>
+              <TableHeaderCell>Nome de Exibição</TableHeaderCell>
+              <TableHeaderCell>Role (Papel)</TableHeaderCell>
+              <TableHeaderCell>Persona</TableHeaderCell>
+              <TableHeaderCell>Zernio / Canal</TableHeaderCell>
+              <TableHeaderCell>TikTok Open ID</TableHeaderCell>
+              <TableHeaderCell>Status</TableHeaderCell>
+              <TableHeaderCell>Auto-Post</TableHeaderCell>
+              <TableHeaderCell>Ações</TableHeaderCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {accounts.map((acc) => {
+              const bufferStatus = getBufferLinkageStatus(acc);
+              return (
+                <TableRow key={acc.id} disabled={!acc.enabled}>
+                  <TableCell>
+                    <strong className="font-semibold text-blue-700">
+                      @{acc.id}
+                    </strong>
+                  </TableCell>
+                  <TableCell>{acc.display_name || "-"}</TableCell>
+                  <TableCell>
+                    <RoleBadge role={acc.role} label={ROLE_LABELS[acc.role]} />
+                  </TableCell>
+                  <TableCell className="max-w-[280px]">
+                    <span
+                      className="block truncate text-slate-500"
+                      title={acc.persona}
+                    >
+                      {acc.persona
+                        ? acc.persona.slice(0, 75) +
+                          (acc.persona.length > 75 ? "..." : "")
+                        : "-"}
                     </span>
-                  </td>
-                  <td className="persona-cell">
-                    <span className="persona-text" title={acc.persona}>
-                      {acc.persona ? acc.persona.slice(0, 75) + (acc.persona.length > 75 ? "..." : "") : "-"}
-                    </span>
-                  </td>
-                  <td>
+                  </TableCell>
+                  <TableCell>
                     {bufferStatus.isLinked ? (
-                      <span className="role-badge role-shared" title={`Zernio ID: ${bufferStatus.externalAccountId}`}>
+                      <span
+                        className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-700"
+                        title={`Zernio ID: ${bufferStatus.externalAccountId}`}
+                      >
                         Zernio ({bufferStatus.externalAccountId})
                       </span>
                     ) : (
-                      <span className="text-muted text-sm">Não vinculado</span>
+                      <span className="text-xs text-slate-400">Não vinculado</span>
                     )}
-                  </td>
-                  <td>
-                    <span className="code-snippet">
+                  </TableCell>
+                  <TableCell>
+                    <code className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[11px] text-slate-600">
                       {acc.tiktok_open_id ? acc.tiktok_open_id : "não vinculado"}
-                    </span>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className={`status-toggle ${acc.enabled ? "active" : "inactive"}`}
+                    </code>
+                  </TableCell>
+                  <TableCell>
+                    <StatusToggle
+                      active={acc.enabled}
+                      disabled={actionLoading}
                       onClick={() => void handleToggleEnabled(acc)}
-                      disabled={actionLoading}
                       title="Clique para alternar ativo/inativo"
-                    >
-                      {acc.enabled ? "Ativo" : "Inativo"}
-                    </button>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className={`status-toggle ${acc.auto_post_enabled !== false ? "active" : "inactive"}`}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <StatusToggle
+                      active={acc.auto_post_enabled !== false}
+                      disabled={actionLoading}
                       onClick={() => void handleToggleAutoPost(acc)}
-                      disabled={actionLoading}
                       title="Clique para alternar auto-post ativo/inativo"
-                      data-testid={`toggle-auto-post-${acc.id}`}
-                    >
-                      {acc.auto_post_enabled !== false ? "Ativo" : "Inativo"}
-                    </button>
-                  </td>
-                  <td className="actions-cell">
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      onClick={() => handleStartEdit(acc)}
-                      disabled={actionLoading}
-                    >
-                      Editar
-                    </button>
-                    {deleteConfirmId === acc.id ? (
-                      <span className="confirm-delete-actions">
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-sm"
-                          onClick={() => void handleDelete(acc.id)}
-                          disabled={actionLoading}
-                        >
-                          Confirmar
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => setDeleteConfirmId(null)}
-                        >
-                          Cancelar
-                        </button>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-danger-outline btn-sm"
-                        onClick={() => setDeleteConfirmId(acc.id)}
+                      testId={`toggle-auto-post-${acc.id}`}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleStartEdit(acc)}
                         disabled={actionLoading}
                       >
-                        Excluir
-                      </button>
-                    )}
-                  </td>
-                </tr>
+                        Editar
+                      </Button>
+                      {deleteConfirmId === acc.id ? (
+                        <span className="inline-flex items-center gap-1">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => void handleDelete(acc.id)}
+                            disabled={actionLoading}
+                          >
+                            Confirmar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeleteConfirmId(null)}
+                          >
+                            Cancelar
+                          </Button>
+                        </span>
+                      ) : (
+                        <Button
+                          variant="danger-outline"
+                          size="sm"
+                          onClick={() => setDeleteConfirmId(acc.id)}
+                          disabled={actionLoading}
+                        >
+                          Excluir
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
               );
-              })}
-            </tbody>
-          </table>
-        </div>
+            })}
+          </TableBody>
+        </Table>
       )}
 
-      {/* Modal / Overlay para Criar Conta */}
-      {showCreateModal && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
-            <div className="modal-header">
-              <h4>Adicionar Nova Conta</h4>
-              <button
-                type="button"
-                className="btn-icon"
-                onClick={() => setShowCreateModal(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <form onSubmit={(e) => void handleCreateSubmit(e)} className="modal-form">
-              {formError && <div className="error-banner">{formError}</div>}
-
-              <div className="form-group">
-                <label htmlFor="create-acc-id">ID da Conta (sem @)*</label>
-                <input
-                  id="create-acc-id"
-                  type="text"
-                  placeholder="ex: lucas_silva"
-                  value={createForm.id}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, id: e.target.value })
-                  }
-                  required
-                />
-                <span className="form-hint">Identificador único no sistema</span>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="create-acc-name">Nome de Exibição</label>
-                <input
-                  id="create-acc-name"
-                  type="text"
-                  placeholder="ex: Lucas Silva"
-                  value={createForm.display_name}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, display_name: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="create-acc-role">Role (Papel de Conteúdo)*</label>
-                <select
-                  id="create-acc-role"
-                  value={createForm.role}
-                  onChange={(e) =>
-                    setCreateForm({
-                      ...createForm,
-                      role: e.target.value as AccountRole,
-                    })
-                  }
-                >
-                  {ACCOUNT_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {ROLE_LABELS[role]} ({role})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="create-acc-persona">Persona (Diretriz de Tom)*</label>
-                <textarea
-                  id="create-acc-persona"
-                  rows={4}
-                  placeholder="Descreva o tom, gírias e posicionamento desta persona..."
-                  value={createForm.persona}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, persona: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="create-acc-tiktok">TikTok Open ID (opcional)</label>
-                <input
-                  id="create-acc-tiktok"
-                  type="text"
-                  placeholder="ID da conta no TikTok para postagens"
-                  value={createForm.tiktok_open_id}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, tiktok_open_id: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="create-acc-buffer">ID da conta Zernio (external_account_id)</label>
-                <input
-                  id="create-acc-buffer"
-                  type="text"
-                  placeholder="ex: 64b1f... (deixe em branco se não vinculado)"
-                  value={createForm.external_account_id}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, external_account_id: e.target.value })
-                  }
-                />
-                <span className="form-hint">Provider: {createForm.social_provider || "zernio"}</span>
-              </div>
-
-              <div className="form-checkbox">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={createForm.enabled}
-                    onChange={(e) =>
-                      setCreateForm({ ...createForm, enabled: e.target.checked })
-                    }
-                  />
-                  Habilitar esta conta para gerações automáticas
-                </label>
-              </div>
-
-              <div className="form-checkbox">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={createForm.auto_post_enabled}
-                    onChange={(e) =>
-                      setCreateForm({
-                        ...createForm,
-                        auto_post_enabled: e.target.checked,
-                      })
-                    }
-                    data-testid="create-acc-auto-post"
-                  />
-                  Habilitar auto-post na rotina de agendamento diária
-                </label>
-              </div>
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setShowCreateModal(false)}
-                  disabled={actionLoading}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? "Salvando..." : "Criar Conta"}
-                </button>
-              </div>
-            </form>
-          </div>
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Adicionar Nova Conta"
+        subtitle="Configure a persona e os canais de publicação."
+        size="md"
+        bodyClassName="px-0 py-0"
+      >
+        <div className="px-5 py-5">
+          <AccountForm
+            formId="create-account-form"
+            form={createForm}
+            setForm={setCreateForm}
+            formError={formError}
+            actionLoading={actionLoading}
+            showId
+            onSubmit={(e) => void handleCreateSubmit(e)}
+            onCancel={() => setShowCreateModal(false)}
+            submitLabel={actionLoading ? "Salvando..." : "Criar Conta"}
+          />
         </div>
-      )}
+      </Modal>
 
-      {/* Modal / Overlay para Editar Conta */}
-      {editingAccount && (
-        <div className="modal-backdrop">
-          <div className="modal-card">
-            <div className="modal-header">
-              <h4>Editar Conta: @{editingAccount.id}</h4>
-              <button
-                type="button"
-                className="btn-icon"
-                onClick={() => setEditingAccount(null)}
-              >
-                ✕
-              </button>
-            </div>
-            <form onSubmit={(e) => void handleEditSubmit(e)} className="modal-form">
-              {formError && <div className="error-banner">{formError}</div>}
-
-              <div className="form-group">
-                <label htmlFor="edit-acc-name">Nome de Exibição</label>
-                <input
-                  id="edit-acc-name"
-                  type="text"
-                  value={editForm.display_name}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, display_name: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="edit-acc-role">Role (Papel de Conteúdo)*</label>
-                <select
-                  id="edit-acc-role"
-                  value={editForm.role}
-                  onChange={(e) =>
-                    setEditForm({
-                      ...editForm,
-                      role: e.target.value as AccountRole,
-                    })
-                  }
-                >
-                  {ACCOUNT_ROLES.map((role) => (
-                    <option key={role} value={role}>
-                      {ROLE_LABELS[role]} ({role})
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="edit-acc-persona">Persona (Diretriz de Tom)*</label>
-                <textarea
-                  id="edit-acc-persona"
-                  rows={4}
-                  value={editForm.persona}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, persona: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="edit-acc-tiktok">TikTok Open ID</label>
-                <input
-                  id="edit-acc-tiktok"
-                  type="text"
-                  value={editForm.tiktok_open_id}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, tiktok_open_id: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="edit-acc-buffer">ID da conta Zernio (external_account_id)</label>
-                <input
-                  id="edit-acc-buffer"
-                  type="text"
-                  placeholder="ID da conta no Zernio"
-                  value={editForm.external_account_id}
-                  onChange={(e) =>
-                    setEditForm({ ...editForm, external_account_id: e.target.value })
-                  }
-                />
-                <span className="form-hint">Provider: {editForm.social_provider || "zernio"}</span>
-              </div>
-
-              <div className="form-checkbox">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={editForm.enabled}
-                    onChange={(e) =>
-                      setEditForm({ ...editForm, enabled: e.target.checked })
-                    }
-                  />
-                  Habilitar esta conta para gerações automáticas
-                </label>
-              </div>
-
-              <div className="form-checkbox">
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={editForm.auto_post_enabled}
-                    onChange={(e) =>
-                      setEditForm({
-                        ...editForm,
-                        auto_post_enabled: e.target.checked,
-                      })
-                    }
-                    data-testid="edit-acc-auto-post"
-                  />
-                  Habilitar auto-post na rotina de agendamento diária
-                </label>
-              </div>
-
-              <div className="modal-actions">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setEditingAccount(null)}
-                  disabled={actionLoading}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={actionLoading}
-                >
-                  {actionLoading ? "Salvando..." : "Salvar Alterações"}
-                </button>
-              </div>
-            </form>
-          </div>
+      <Modal
+        isOpen={Boolean(editingAccount)}
+        onClose={() => setEditingAccount(null)}
+        title={`Editar Conta: @${editingAccount?.id ?? ""}`}
+        subtitle="Atualize a persona, vínculos e regras de publicação."
+        size="md"
+        bodyClassName="px-0 py-0"
+      >
+        <div className="px-5 py-5">
+          <AccountForm
+            formId="edit-account-form"
+            form={editForm}
+            setForm={setEditForm}
+            formError={formError}
+            actionLoading={actionLoading}
+            showId={false}
+            onSubmit={(e) => void handleEditSubmit(e)}
+            onCancel={() => setEditingAccount(null)}
+            submitLabel={actionLoading ? "Salvando..." : "Salvar Alterações"}
+          />
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

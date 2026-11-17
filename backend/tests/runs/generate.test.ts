@@ -308,7 +308,7 @@ describe("Task 11: Persist runs + slides on generate", { timeout: 60000 }, () =>
       assert.ok(fs.existsSync(path.join(absOutDir, "meta.json")));
     });
 
-    it("increments postIndex directory on consecutive generations on same day", async () => {
+    it("uses a unique output directory even after the output root is wiped", async () => {
       const run1 = await generateOneCarousel({
         accountId: "acc_woman_elegante",
         mockCopy,
@@ -317,6 +317,11 @@ describe("Task 11: Persist runs + slides on generate", { timeout: 60000 }, () =>
         mediaRoot: tmpMediaDir,
         outputDir: tmpOutputDir,
       });
+
+      // Simulate a container restart: the ephemeral output root is gone,
+      // but the database still points to the previous run.
+      fs.rmSync(tmpOutputDir, { recursive: true, force: true });
+      fs.mkdirSync(tmpOutputDir, { recursive: true });
 
       const run2 = await generateOneCarousel({
         accountId: "acc_woman_elegante",
@@ -327,8 +332,11 @@ describe("Task 11: Persist runs + slides on generate", { timeout: 60000 }, () =>
         outputDir: tmpOutputDir,
       });
 
-      assert.ok(run1.output_dir!.endsWith("post_01"), `Expected post_01 but got ${run1.output_dir}`);
-      assert.ok(run2.output_dir!.endsWith("post_02"), `Expected post_02 but got ${run2.output_dir}`);
+      assert.notEqual(run1.output_dir, run2.output_dir);
+      const paths1 = new Set((run1.slides || []).map((slide) => slide.storage_path));
+      for (const slide of run2.slides || []) {
+        assert.equal(paths1.has(slide.storage_path), false, `shared storage path: ${slide.storage_path}`);
+      }
     });
 
     it("links optional jobId to the carousel_run row", async () => {

@@ -109,6 +109,7 @@ describe("Task 6: Daily Metrics Sync Worker (syncTikTokMetricsDailyJob)", { time
           likes: 320,
           comments: 45,
           shares: 12,
+          postUrl: "https://www.tiktok.com/@metrics_test/video/7708859399561055495",
           collectedAt: new Date().toISOString(),
         };
       },
@@ -119,10 +120,14 @@ describe("Task 6: Daily Metrics Sync Worker (syncTikTokMetricsDailyJob)", { time
 
     // Verify tiktok_posts updated
     const postCheck = await pool.query(
-      "SELECT views, likes, comments, shares FROM tiktok_posts WHERE id = $1",
+      "SELECT views, likes, comments, shares, video_url FROM tiktok_posts WHERE id = $1",
       [postId]
     );
     assert.equal(Number(postCheck.rows[0].views), 1500);
+    assert.equal(
+      postCheck.rows[0].video_url,
+      "https://www.tiktok.com/@metrics_test/video/7708859399561055495"
+    );
     assert.equal(Number(postCheck.rows[0].likes), 320);
     assert.equal(Number(postCheck.rows[0].comments), 45);
     assert.equal(Number(postCheck.rows[0].shares), 12);
@@ -142,6 +147,40 @@ describe("Task 6: Daily Metrics Sync Worker (syncTikTokMetricsDailyJob)", { time
     assert.equal(syncRunCheck.rows.length, 1);
     assert.equal(syncRunCheck.rows[0].status, "completed");
     assert.equal(syncRunCheck.rows[0].posts_updated, 1);
+  });
+
+  it("leaves metrics untouched when the provider has no complete analytics yet", async () => {
+    const publishedRecent = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    const { postId } = await createPublishedPost({
+      externalPostId: "ext_zernio_pending",
+      publishedAt: publishedRecent,
+      views: 42,
+      likes: 7,
+    });
+
+    const mockProvider: SocialPublisherProvider = {
+      providerName: "zernio",
+      async listConnectedAccounts(): Promise<SocialAccount[]> { return []; },
+      async publishPost(_req: PublishPostRequest): Promise<PublishPostResponse> {
+        throw new Error("not called");
+      },
+      async getPostStatus(_id: string): Promise<PublishPostResponse> {
+        throw new Error("not called");
+      },
+      async getPostMetrics(_externalPostId: string): Promise<PostMetrics | null> {
+        return null;
+      },
+    };
+
+    const res = await syncTikTokMetricsDailyJob(pool, mockProvider);
+    assert.equal(res.postsUpdated, 0);
+
+    const postCheck = await pool.query(
+      "SELECT views, likes FROM tiktok_posts WHERE id = $1",
+      [postId]
+    );
+    assert.equal(Number(postCheck.rows[0].views), 42);
+    assert.equal(Number(postCheck.rows[0].likes), 7);
   });
 
   it("skips posts published more than 30 days ago", async () => {

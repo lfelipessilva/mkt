@@ -259,6 +259,7 @@ export async function dispatchCarouselRun(
   // 5. Execute channel send
   try {
     let responsePayload: any = null;
+    let publishedImmediately = false;
 
     if (options.channel === "telegram") {
       const sender =
@@ -331,6 +332,7 @@ export async function dispatchCarouselRun(
       });
 
       responsePayload = publishRes;
+      publishedImmediately = publishRes.status === "published";
 
       const providerName = "zernio";
 
@@ -383,8 +385,13 @@ export async function dispatchCarouselRun(
       [JSON.stringify(responsePayload), eventId]
     );
 
-    // 7. Update run status to 'dispatched'
-    await updateCarouselRun(run.id, { status: "dispatched" }, p);
+    // 7. Update run status to 'dispatched' (or 'published' when the provider
+    //    confirms the post is already live, so the UI stops asking for manual publish).
+    await updateCarouselRun(
+      run.id,
+      { status: publishedImmediately ? "published" : "dispatched" },
+      p
+    );
     const updatedRun = await getCarouselRun(run.id, p);
 
     return {
@@ -397,6 +404,19 @@ export async function dispatchCarouselRun(
     const errorPayload = {
       error: error instanceof Error ? error.message : String(error),
     };
+
+    if (options.channel === "zernio" || options.channel === "social") {
+      await updateCarouselRun(
+        run.id,
+        {
+          status: "failed",
+          error_message: errorPayload.error,
+        },
+        p
+      ).catch((updateErr) => {
+        console.error("[dispatchCarouselRun] failed to mark run failed:", updateErr);
+      });
+    }
 
     await p.query(
       `UPDATE dispatch_events

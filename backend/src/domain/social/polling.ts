@@ -58,6 +58,21 @@ export async function pollPendingPostsJob(
   let internalPendingReleased = 0;
   const errors: Array<{ runId: string; error: string }> = [];
 
+  // Reconcile runs whose post was already confirmed as published, including
+  // posts created before the dispatch started marking runs as published.
+  try {
+    await p.query(
+      `UPDATE carousel_runs cr
+       SET status = 'published', updated_at = NOW()
+       FROM tiktok_posts tp
+       WHERE tp.run_id = cr.id
+         AND tp.publish_status = 'published'
+         AND cr.status <> 'published'`
+    );
+  } catch (err: any) {
+    errors.push({ runId: "published_reconcile", error: err.message || String(err) });
+  }
+
   // 1. Process 'queued' and 'processing' posts
   try {
     const pendingPostsRes = await p.query(
@@ -67,7 +82,7 @@ export async function pollPendingPostsJob(
        JOIN carousel_runs cr ON cr.id = tp.run_id
        WHERE tp.publish_status IN ('queued', 'processing')
          AND tp.external_post_id IS NOT NULL
-         AND tp.created_at >= NOW() - INTERVAL '24 hours'`
+         AND tp.created_at >= NOW() - INTERVAL '7 days'`
     );
 
     for (const row of pendingPostsRes.rows) {

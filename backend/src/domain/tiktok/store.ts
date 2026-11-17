@@ -10,6 +10,7 @@ import type {
   TikTokSyncResult,
 } from "./schemas.js";
 import type { CarouselRun } from "../runs/schemas.js";
+import { syncTikTokMetricsDailyJob } from "../social/metricsSync.js";
 
 export function mapTikTokPostRow(row: any): TikTokPost {
   return {
@@ -48,6 +49,11 @@ function mapPerformanceRow(row: any): TikTokPerformanceItem {
     comments: Number(row.comments || 0),
     shares: Number(row.shares || 0),
     metrics_note: row.metrics_note ?? null,
+    provider: row.provider ?? "manual",
+    external_post_id: row.external_post_id ?? null,
+    publish_status: row.publish_status ?? "published",
+    scheduled_at: row.scheduled_at ? new Date(row.scheduled_at) : null,
+    last_polled_at: row.last_polled_at ? new Date(row.last_polled_at) : null,
     created_at: new Date(row.post_created_at),
     updated_at: new Date(row.post_updated_at),
   };
@@ -67,6 +73,14 @@ function mapPerformanceRow(row: any): TikTokPerformanceItem {
     generated_at: row.generated_at ? new Date(row.generated_at) : null,
     created_at: new Date(row.run_created_at),
     updated_at: new Date(row.run_updated_at),
+    tiktok_post: {
+      provider: row.provider ?? "manual",
+      external_post_id: row.external_post_id ?? null,
+      publish_status: row.publish_status ?? "published",
+      published_at: post.published_at,
+      last_polled_at: post.last_polled_at ?? null,
+      video_url: row.video_url ?? null,
+    },
   };
 
   return {
@@ -85,6 +99,11 @@ function mapPerformanceRow(row: any): TikTokPerformanceItem {
     tracking_mode: row.tracking_mode,
     video_id: row.video_id ?? null,
     video_url: row.video_url ?? null,
+    provider: row.provider ?? "manual",
+    external_post_id: row.external_post_id ?? null,
+    publish_status: row.publish_status ?? "published",
+    scheduled_at: row.scheduled_at ? new Date(row.scheduled_at) : null,
+    last_polled_at: row.last_polled_at ? new Date(row.last_polled_at) : null,
     published_at: post.published_at,
     views: post.views,
     likes: post.likes,
@@ -117,7 +136,9 @@ export async function upsertTikTokPost(
 
   // 2. Check if post already exists to know if this is insert or update
   const existingPostRes = await p.query(
-    "SELECT id, published_at FROM tiktok_posts WHERE run_id = $1",
+    `SELECT id, published_at, tracking_mode, provider, external_post_id,
+            views, likes, comments, shares
+     FROM tiktok_posts WHERE run_id = $1`,
     [runId]
   );
   const existingPost = existingPostRes.rows[0];
@@ -131,13 +152,25 @@ export async function upsertTikTokPost(
     publishedAt = new Date();
   }
 
-  const trackingMode = input.tracking_mode || "manual";
+  // A post published through Zernio keeps API tracking even when the operator
+  // edits its metrics by hand. Manual runs still default to 'manual'.
+  const zernioTracked = Boolean(
+    existingPost &&
+      (existingPost.provider === "zernio" || existingPost.external_post_id)
+  );
+  const trackingMode = zernioTracked
+    ? existingPost.tracking_mode || "api"
+    : input.tracking_mode || "manual";
+
+  const existingValue = (key: "views" | "likes" | "comments" | "shares"): number =>
+    existingPost ? Number(existingPost[key] || 0) : 0;
+
   const videoUrl = input.video_url ?? null;
   const videoId = input.video_id ?? null;
-  const views = input.views ?? 0;
-  const likes = input.likes ?? 0;
-  const comments = input.comments ?? 0;
-  const shares = input.shares ?? 0;
+  const views = input.views ?? existingValue("views");
+  const likes = input.likes ?? existingValue("likes");
+  const comments = input.comments ?? existingValue("comments");
+  const shares = input.shares ?? existingValue("shares");
   const metricsNote = input.metrics_note ?? null;
 
   const client = await p.connect();
@@ -172,7 +205,9 @@ export async function upsertTikTokPost(
         metrics_note = COALESCE(EXCLUDED.metrics_note, tiktok_posts.metrics_note),
         updated_at = NOW()
       RETURNING id, run_id, tracking_mode, video_id, video_url, published_at,
-                views, likes, comments, shares, metrics_note, created_at, updated_at
+                views, likes, comments, shares, metrics_note, provider,
+                external_post_id, publish_status, scheduled_at, last_polled_at,
+                raw_response, created_at, updated_at
     `;
 
     const upsertRes = await client.query(upsertQuery, [
@@ -235,7 +270,9 @@ export async function getTikTokPostByRunId(
   const p = poolInstance || getPool();
   const res = await p.query(
     `SELECT id, run_id, tracking_mode, video_id, video_url, published_at,
-            views, likes, comments, shares, metrics_note, created_at, updated_at
+            views, likes, comments, shares, metrics_note, provider,
+            external_post_id, publish_status, scheduled_at, last_polled_at,
+            raw_response, created_at, updated_at
      FROM tiktok_posts
      WHERE run_id = $1`,
     [runId]
@@ -296,6 +333,11 @@ export async function listTikTokPerformance(
       tp.comments,
       tp.shares,
       tp.metrics_note,
+      tp.provider,
+      tp.external_post_id,
+      tp.publish_status,
+      tp.scheduled_at,
+      tp.last_polled_at,
       tp.created_at AS post_created_at,
       tp.updated_at AS post_updated_at,
       r.job_id,
@@ -332,21 +374,20 @@ export async function runTikTokSyncStub(poolInstance?: Pool): Promise<TikTokSync
   );
   const skippedManual = parseInt(manualCountRes.rows[0].count, 10);
 
-  const postsUpdated = 0;
-
-  const syncRunRes = await p.query(
-    `INSERT INTO tiktok_sync_runs (started_at, finished_at, posts_updated, status)
-     VALUES (NOW(), NOW(), $1, 'completed')
-     RETURNING id, started_at, finished_at, posts_updated, status`,
-    [postsUpdated]
-  );
+  const result = await syncTikTokMetricsDailyJob(p);
+  const status = !result.ok
+    ? "failed"
+    : result.errors.length > 0
+      ? "partial"
+      : "completed";
 
   return {
-    ok: true,
-    status: "completed",
-    posts_updated: postsUpdated,
+    ok: result.ok,
+    status,
+    posts_updated: result.postsUpdated,
     skipped_manual: skippedManual,
-    sync_run_id: syncRunRes.rows[0].id,
+    sync_run_id: result.syncRunId ?? "",
+    errors: result.errors,
   };
 }
 

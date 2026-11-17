@@ -24,6 +24,15 @@ export const CarouselSlideSchema = z.object({
 
 export type CarouselSlide = z.infer<typeof CarouselSlideSchema>;
 
+export const CarouselRunTikTokPostSchema = z.object({
+  provider: z.string().nullable().optional(),
+  external_post_id: z.string().nullable().optional(),
+  publish_status: z.string().nullable().optional(),
+  published_at: z.coerce.date().nullable().optional(),
+  last_polled_at: z.coerce.date().nullable().optional(),
+  video_url: z.string().nullable().optional(),
+});
+
 export const CarouselRunSchema = z.object({
   id: z.string().uuid(),
   job_id: z.string().uuid().nullable().optional(),
@@ -42,6 +51,7 @@ export const CarouselRunSchema = z.object({
   created_at: z.coerce.date().optional(),
   updated_at: z.coerce.date().optional(),
   slides: z.array(CarouselSlideSchema).optional(),
+  tiktok_post: CarouselRunTikTokPostSchema.nullable().optional(),
 });
 
 export type CarouselRun = z.infer<typeof CarouselRunSchema>;
