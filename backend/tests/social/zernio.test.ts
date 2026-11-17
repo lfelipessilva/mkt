@@ -12,6 +12,11 @@ function client(partial: Partial<ZernioSdk>): ZernioSdk {
 }
 
 describe("ZernioPublisherAdapter", () => {
+  it("uses apiKey provided to constructor over env", async () => {
+    const adapter = new ZernioPublisherAdapter(undefined, "zk_custom_test_key");
+    assert.strictEqual((adapter as any).apiKey, "zk_custom_test_key");
+  });
+
   it("uses clip.id, then track id", () => {
     assert.equal(musicSoundId([{ id: "track", clip: { id: "clip" } }]), "clip");
     assert.equal(musicSoundId([{ id: "track" }]), "track");
@@ -155,6 +160,7 @@ describe("ZernioPublisherAdapter", () => {
       likes: 6,
       comments: 2,
       shares: 3,
+      saves: 0,
       collectedAt: "2026-11-16T22:32:14Z",
       postUrl: "https://www.tiktok.com/@rebeca.andrade.daily/video/7708859399561055495",
     });

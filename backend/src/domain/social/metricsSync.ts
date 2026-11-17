@@ -33,19 +33,26 @@ export async function syncTikTokMetricsDailyJob(
 
   try {
     const candidatePostsRes = await p.query(
-      `SELECT id, run_id, external_post_id, published_at
-       FROM tiktok_posts
-       WHERE provider = 'zernio'
-         AND external_post_id IS NOT NULL
-         AND publish_status = 'published'
-         AND published_at IS NOT NULL
-         AND published_at >= NOW() - INTERVAL '30 days'`
+      `SELECT tp.id, tp.run_id, tp.external_post_id, tp.published_at, acc.zernio_api_key
+       FROM tiktok_posts tp
+       JOIN carousel_runs cr ON cr.id = tp.run_id
+       LEFT JOIN accounts acc ON acc.id = cr.account_id
+       WHERE tp.provider = 'zernio'
+         AND tp.external_post_id IS NOT NULL
+         AND tp.publish_status = 'published'
+         AND tp.published_at IS NOT NULL
+         AND tp.published_at >= NOW() - INTERVAL '30 days'`
     );
 
     for (const post of candidatePostsRes.rows) {
       postsChecked++;
       try {
-        const metrics = await provider.getPostMetrics(post.external_post_id);
+        const postProvider =
+          providerInstance ||
+          getSocialPublisherProvider("zernio", {
+            apiKey: post.zernio_api_key?.trim() || undefined,
+          });
+        const metrics = await postProvider.getPostMetrics(post.external_post_id);
         if (!metrics) {
           continue;
         }
@@ -69,7 +76,7 @@ export async function syncTikTokMetricsDailyJob(
               metrics.likes,
               metrics.comments,
               metrics.shares,
-              metrics.saves,
+              metrics.saves ?? 0,
               post.id,
               metrics.postUrl ?? null,
             ]
@@ -84,7 +91,7 @@ export async function syncTikTokMetricsDailyJob(
               metrics.likes,
               metrics.comments,
               metrics.shares,
-              metrics.saves,
+              metrics.saves ?? 0,
             ]
           );
 

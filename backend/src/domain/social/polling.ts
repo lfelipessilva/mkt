@@ -77,9 +77,11 @@ export async function pollPendingPostsJob(
   try {
     const pendingPostsRes = await p.query(
       `SELECT tp.id, tp.run_id, tp.external_post_id, tp.publish_status, tp.notified_at,
-              cr.legenda, cr.auto_post_slot_id, cr.account_id, cr.archetype_title
+              cr.legenda, cr.auto_post_slot_id, cr.account_id, cr.archetype_title,
+              acc.zernio_api_key
        FROM tiktok_posts tp
        JOIN carousel_runs cr ON cr.id = tp.run_id
+       LEFT JOIN accounts acc ON acc.id = cr.account_id
        WHERE tp.publish_status IN ('queued', 'processing')
          AND tp.external_post_id IS NOT NULL
          AND tp.created_at >= NOW() - INTERVAL '7 days'`
@@ -88,7 +90,12 @@ export async function pollPendingPostsJob(
     for (const row of pendingPostsRes.rows) {
       checkedCount++;
       try {
-        const statusRes = await provider.getPostStatus(row.external_post_id);
+        const postProvider =
+          providerInstance ||
+          getSocialPublisherProvider("zernio", {
+            apiKey: row.zernio_api_key?.trim() || undefined,
+          });
+        const statusRes = await postProvider.getPostStatus(row.external_post_id);
 
         if (statusRes.status !== row.publish_status) {
           if (statusRes.status === "published") {
@@ -199,7 +206,7 @@ export async function pollPendingPostsJob(
               cr.id as run_id, cr.account_id, cr.account_role, cr.archetype_title,
               cr.bait_body, cr.tema, cr.legenda, cr.status as run_status,
               cr.output_dir, cr.generated_at,
-              acc.external_account_id
+              acc.external_account_id, acc.zernio_api_key
        FROM tiktok_posts tp
        JOIN carousel_runs cr ON cr.id = tp.run_id
        JOIN accounts acc ON acc.id = cr.account_id
@@ -217,7 +224,13 @@ export async function pollPendingPostsJob(
 
         const imageUrls = await resolveCarouselSlidePublicUrls(fullRun);
 
-        const publishRes = await provider.publishPost({
+        const postProvider =
+          providerInstance ||
+          getSocialPublisherProvider("zernio", {
+            apiKey: row.zernio_api_key?.trim() || undefined,
+          });
+
+        const publishRes = await postProvider.publishPost({
           internalPostId: row.run_id,
           externalAccountId: row.external_account_id,
           caption: fullRun.legenda || "",

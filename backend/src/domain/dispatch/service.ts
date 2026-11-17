@@ -63,6 +63,7 @@ export interface DispatchCarouselRunOptions {
   webhookUrl?: string;
   fetchFn?: typeof fetch;
   socialPublisherProvider?: SocialPublisherProvider;
+  socialPublisherFactory?: (name?: string, options?: { apiKey?: string }) => SocialPublisherProvider;
   carouselBytesLoader?: CarouselBytesLoader;
 }
 
@@ -180,6 +181,7 @@ export async function dispatchCarouselRun(
   let token: string | undefined;
   let webhookUrl: string | undefined;
   let requestPayload: any;
+  let account: any = null;
 
   if (options.channel === "telegram") {
     chatId = options.telegramChatId || process.env.TELEGRAM_CHAT_ID;
@@ -216,7 +218,7 @@ export async function dispatchCarouselRun(
       legenda: run.legenda,
     };
   } else if (options.channel === "zernio" || options.channel === "social") {
-    const account = await getAccount(run.account_id, p);
+    account = await getAccount(run.account_id, p);
     if (!account) {
       throw new AppError(`Account '${run.account_id}' not found`, 404, "not_found");
     }
@@ -315,10 +317,13 @@ export async function dispatchCarouselRun(
         body: parsedBody,
       };
     } else if (options.channel === "zernio" || options.channel === "social") {
+      const accountKey = account?.zernio_api_key?.trim() || undefined;
       const provider =
         options.socialPublisherProvider ||
         customSocialPublisherProvider ||
-        getSocialPublisherProvider();
+        (options.socialPublisherFactory
+          ? options.socialPublisherFactory("zernio", { apiKey: accountKey })
+          : getSocialPublisherProvider("zernio", { apiKey: accountKey }));
 
       const publishRes = await provider.publishPost({
         internalPostId: run.id,

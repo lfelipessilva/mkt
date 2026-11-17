@@ -82,8 +82,9 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     }
   });
 
-  async function createSampleRun(overrides: { status?: string; legenda?: string } = {}) {
-    const runDir = path.join(tmpOutputDir, "acc_buffer_test", "run_1");
+  async function createSampleRun(overrides: { status?: string; legenda?: string; accountId?: string } = {}) {
+    const accountId = overrides.accountId || "acc_buffer_test";
+    const runDir = path.join(tmpOutputDir, accountId, `run_${Math.random().toString(36).substring(2)}`);
     fs.mkdirSync(runDir, { recursive: true });
 
     const slide1Path = path.join(runDir, "slide_1.jpg");
@@ -99,7 +100,7 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
         $2, $3, $4, NOW())
       RETURNING id, status, legenda, output_dir`,
       [
-        "acc_buffer_test",
+        accountId,
         overrides.legenda ?? "Legenda teste #buffer",
         overrides.status || "generated",
         runDir,
@@ -398,5 +399,48 @@ describe("Task 5: Dispatch Service Integration with Social Publisher", { timeout
     assert.equal(publishedReq.publishMode, "immediate");
     assert.equal(publishedReq.schedulingType, undefined);
     assert.equal(publishedReq.scheduledAt, undefined);
+  });
+
+  it("dispatchCarouselRun uses account.zernio_api_key when dispatching to zernio", async () => {
+    await pool.query(
+      `INSERT INTO accounts (id, persona, role, enabled, external_account_id, zernio_api_key)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      ["acc_zernio_custom_key", "Conta Custom Key", "single_woman", true, "ext_acc_custom_1", "zk_test_custom_key_999"]
+    );
+
+    const runId = await createSampleRun({ accountId: "acc_zernio_custom_key" });
+
+    let capturedApiKey: string | undefined;
+    const mockProvider: SocialPublisherProvider = {
+      providerName: "zernio",
+      async listConnectedAccounts() { return []; },
+      async publishPost(req: PublishPostRequest): Promise<PublishPostResponse> {
+        return {
+          externalPostId: "ext_zernio_post_custom",
+          status: "published",
+          rawResponse: { id: "ext_zernio_post_custom" },
+        };
+      },
+      async getPostStatus(id: string) {
+        return { externalPostId: id, status: "published", rawResponse: {} };
+      },
+      async getPostMetrics(id: string) {
+        return { externalPostId: id, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, collectedAt: new Date().toISOString() };
+      },
+    };
+
+    const res = await dispatchCarouselRun({
+      runId,
+      channel: "zernio",
+      pool,
+      socialPublisherFactory: (providerName, options) => {
+        capturedApiKey = options?.apiKey;
+        return mockProvider;
+      },
+    } as any);
+
+    assert.equal(capturedApiKey, "zk_test_custom_key_999");
+    assert.equal(res.event.status, "sent");
+    assert.equal(res.run.status, "published");
   });
 });

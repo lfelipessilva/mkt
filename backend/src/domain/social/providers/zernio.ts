@@ -110,11 +110,14 @@ function mapStatus(status: string | undefined): PublishStatus {
 export class ZernioPublisherAdapter implements SocialPublisherProvider {
   readonly providerName = "zernio" as const;
 
-  constructor(private readonly client?: ZernioSdk) {}
+  constructor(
+    private readonly client?: ZernioSdk,
+    readonly apiKey?: string
+  ) {}
 
   private sdk(): ZernioSdk {
     if (this.client) return this.client;
-    const apiKey = process.env.ZERNIO_API_KEY;
+    const apiKey = this.apiKey?.trim() || process.env.ZERNIO_API_KEY;
     if (!apiKey) {
       throw new AppError("ZERNIO_API_KEY is not configured", 400, "zernio_config");
     }

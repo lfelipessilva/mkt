@@ -9,6 +9,12 @@ describe('Social Publisher Provider Factory', () => {
     assert.equal(provider.providerName, 'zernio');
   });
 
+  it('passes apiKey to zernio provider when provided', () => {
+    const provider = getSocialPublisherProvider('zernio', { apiKey: 'zk_test_custom_key' });
+    assert.equal(provider.providerName, 'zernio');
+    assert.equal((provider as any).apiKey, 'zk_test_custom_key');
+  });
+
   it('returns postforme when asked', () => {
     const provider = getSocialPublisherProvider('postforme');
     assert.equal(provider.providerName, 'postforme');
