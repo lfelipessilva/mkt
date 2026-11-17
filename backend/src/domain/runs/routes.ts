@@ -101,6 +101,17 @@ export const runsRoutes: FastifyPluginAsync = async (app) => {
 
     return reply.send(run);
   });
+
+  // DELETE /api/v1/carousels/runs/:id
+  app.delete("/runs/:id", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const deleted = await deleteCarouselRun(id);
+    if (!deleted) {
+      throw new AppError(`Run '${id}' not found`, 404, "not_found");
+    }
+
+    return reply.send({ ok: true });
+  });
 };
 
 export const carouselsRoutes = runsRoutes;
