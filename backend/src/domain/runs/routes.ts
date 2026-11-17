@@ -9,6 +9,7 @@ import {
   getGenerationJobProgress,
   listCarouselRuns,
   getCarouselRun,
+  deleteCarouselRun,
 } from "./store.js";
 
 export const runsRoutes: FastifyPluginAsync = async (app) => {

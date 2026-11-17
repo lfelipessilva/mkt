@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import type { Account, CarouselRun, CarouselSlide } from "../types";
 import { ROLE_LABELS } from "../types";
 import { AuthImage } from "./AuthImage";
-import { dispatchCarouselRun, approveAutomationRun } from "../api";
+import { dispatchCarouselRun, approveAutomationRun, deleteCarouselRun } from "../api";
 import { orderSlides } from "../tabs/GalleryPage";
 import { CarouselSlidesModal } from "./CarouselSlidesModal";
 import {
@@ -17,6 +17,7 @@ import {
   Heart,
   MessageSquare,
   Repeat2,
+  Trash2,
 } from "lucide-react";
 import {
   Badge,
@@ -42,6 +43,7 @@ export interface RunCardProps {
   onDispatched?: (updatedRun: CarouselRun) => void;
   onOpenManualPublish?: (run: CarouselRun) => void;
   onRunUpdated?: (run: CarouselRun) => void;
+  onDeleted?: (runId: string) => void;
   onToast?: (message: string, type: "success" | "error" | "info") => void;
   isFocused?: boolean;
 }
@@ -225,6 +227,7 @@ export function RunCard({
   onDispatched,
   onOpenManualPublish,
   onRunUpdated,
+  onDeleted,
   onToast,
   isFocused = false,
 }: RunCardProps): React.JSX.Element {
@@ -237,6 +240,7 @@ export function RunCard({
   const [expandedCaption, setExpandedCaption] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [slidesModalOpen, setSlidesModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const slides: CarouselSlide[] = orderSlides(run.slides || []);
   const coverSlide = resolveCoverSlide(slides);
@@ -330,6 +334,21 @@ export function RunCard({
       if (onToast) onToast(msg, "error");
     } finally {
       setIsPublishingBuffer(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (isDeleting) return;
+    if (!window.confirm("Deseja realmente excluir este carrossel?")) return;
+    setIsDeleting(true);
+    try {
+      await deleteCarouselRun(run.id);
+      if (onToast) onToast("Carrossel excluído com sucesso.", "success");
+      if (onDeleted) onDeleted(run.id);
+    } catch (err: any) {
+      if (onToast) onToast(err?.message || "Erro ao excluir carrossel", "error");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -602,6 +621,17 @@ export function RunCard({
               )}
             </Button>
           )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDelete}
+            isLoading={isDeleting}
+            title="Excluir carrossel"
+            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+          >
+            {!isDeleting && <Trash2 className="h-3.5 w-3.5" />}
+            <span>{isDeleting ? "Excluindo..." : "Excluir"}</span>
+          </Button>
         </div>
       </div>
 

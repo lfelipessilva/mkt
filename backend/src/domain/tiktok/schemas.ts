@@ -12,6 +12,7 @@ export const UpsertTikTokPostSchema = z.object({
   likes: z.coerce.number().int().nonnegative().optional(),
   comments: z.coerce.number().int().nonnegative().optional(),
   shares: z.coerce.number().int().nonnegative().optional(),
+  saves: z.coerce.number().int().nonnegative().optional(),
   metrics_note: z.string().optional().nullable(),
   tracking_mode: TikTokTrackingModeSchema.optional(),
 });
@@ -20,7 +21,15 @@ export type UpsertTikTokPostInput = z.infer<typeof UpsertTikTokPostSchema>;
 export const TikTokPerformanceQuerySchema = z.object({
   accountId: z.string().optional(),
   sort: z
-    .enum(["views", "likes", "comments", "shares", "published_at", "created_at"])
+    .enum([
+      "views",
+      "likes",
+      "comments",
+      "shares",
+      "saves",
+      "published_at",
+      "created_at",
+    ])
     .optional()
     .default("views"),
   order: z.enum(["asc", "desc"]).optional().default("desc"),
@@ -41,6 +50,7 @@ export interface TikTokPost {
   likes: number;
   comments: number;
   shares: number;
+  saves: number;
   metrics_note: string | null;
   provider?: string;
   external_post_id?: string | null;
@@ -78,6 +88,7 @@ export interface TikTokPerformanceItem {
   likes: number;
   comments: number;
   shares: number;
+  saves: number;
   metrics_note: string | null;
   generated_at: Date | null;
   created_at: Date;

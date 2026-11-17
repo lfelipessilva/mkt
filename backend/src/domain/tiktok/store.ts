@@ -24,6 +24,7 @@ export function mapTikTokPostRow(row: any): TikTokPost {
     likes: Number(row.likes || 0),
     comments: Number(row.comments || 0),
     shares: Number(row.shares || 0),
+    saves: Number(row.saves || 0),
     metrics_note: row.metrics_note ?? null,
     provider: row.provider ?? "manual",
     external_post_id: row.external_post_id ?? null,
@@ -48,6 +49,7 @@ function mapPerformanceRow(row: any): TikTokPerformanceItem {
     likes: Number(row.likes || 0),
     comments: Number(row.comments || 0),
     shares: Number(row.shares || 0),
+    saves: Number(row.saves || 0),
     metrics_note: row.metrics_note ?? null,
     provider: row.provider ?? "manual",
     external_post_id: row.external_post_id ?? null,
@@ -73,6 +75,7 @@ function mapPerformanceRow(row: any): TikTokPerformanceItem {
     generated_at: row.generated_at ? new Date(row.generated_at) : null,
     created_at: new Date(row.run_created_at),
     updated_at: new Date(row.run_updated_at),
+    slides: Array.isArray(row.slides) ? row.slides : [],
     tiktok_post: {
       provider: row.provider ?? "manual",
       external_post_id: row.external_post_id ?? null,
@@ -109,6 +112,7 @@ function mapPerformanceRow(row: any): TikTokPerformanceItem {
     likes: post.likes,
     comments: post.comments,
     shares: post.shares,
+    saves: post.saves,
     metrics_note: post.metrics_note,
     generated_at: run.generated_at ?? null,
     created_at: post.created_at,
@@ -137,7 +141,7 @@ export async function upsertTikTokPost(
   // 2. Check if post already exists to know if this is insert or update
   const existingPostRes = await p.query(
     `SELECT id, published_at, tracking_mode, provider, external_post_id,
-            views, likes, comments, shares
+            views, likes, comments, shares, saves
      FROM tiktok_posts WHERE run_id = $1`,
     [runId]
   );
@@ -162,7 +166,7 @@ export async function upsertTikTokPost(
     ? existingPost.tracking_mode || "api"
     : input.tracking_mode || "manual";
 
-  const existingValue = (key: "views" | "likes" | "comments" | "shares"): number =>
+  const existingValue = (key: "views" | "likes" | "comments" | "shares" | "saves"): number =>
     existingPost ? Number(existingPost[key] || 0) : 0;
 
   const videoUrl = input.video_url ?? null;
@@ -171,6 +175,7 @@ export async function upsertTikTokPost(
   const likes = input.likes ?? existingValue("likes");
   const comments = input.comments ?? existingValue("comments");
   const shares = input.shares ?? existingValue("shares");
+  const saves = input.saves ?? existingValue("saves");
   const metricsNote = input.metrics_note ?? null;
 
   const client = await p.connect();

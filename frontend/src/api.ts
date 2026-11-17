@@ -386,6 +386,12 @@ export interface ApproveAutomationRunResult {
   run: CarouselRun;
 }
 
+export async function deleteCarouselRun(id: string): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>(`/carousels/runs/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+}
+
 export async function approveAutomationRun(
   runId: string
 ): Promise<ApproveAutomationRunResult> {
