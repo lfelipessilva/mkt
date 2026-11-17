@@ -5,6 +5,9 @@ import {
   RESPONSE_SCHEMA,
   type PromptSlideItem,
 } from "./prompts.js";
+import { generateDeepSeekCopy } from "./deepseek.js";
+
+export type AIProvider = "deepseek" | "gemini";
 
 export interface SchemaDefinition {
   type: string;
@@ -36,10 +39,22 @@ export function toGeminiSchema(schema: SchemaDefinition): ResponseSchema {
 }
 
 export function parseJson<T = any>(text: string): T {
-  const cleaned = text
-    .replace(/^```json\s*/i, "")
-    .replace(/```$/i, "")
-    .trim();
+  let cleaned = text.trim();
+  if (cleaned.startsWith("```json")) {
+    cleaned = cleaned.replace(/^```json\s*/i, "");
+  } else if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```\s*/i, "");
+  }
+  if (cleaned.endsWith("```")) {
+    cleaned = cleaned.replace(/```$/i, "");
+  }
+  cleaned = cleaned.trim();
+
+  const firstBrace = cleaned.indexOf("{");
+  const lastBrace = cleaned.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+  }
   return JSON.parse(cleaned);
 }
 
@@ -56,17 +71,38 @@ export interface GeneratedCarouselCopy {
 }
 
 export interface GenerateCarouselCopyOptions {
-  apiKey: string;
-  model: string;
+  provider?: AIProvider;
+  apiKey?: string;
+  model?: string;
   persona?: string;
   arquetipoTitulo: string;
   baitTrigger?: string | null;
   slides: PromptSlideItem[];
 }
 
-export async function generateCarouselCopy({
-  apiKey,
-  model,
+export function resolveAIProvider(options?: {
+  provider?: AIProvider;
+  model?: string;
+  apiKey?: string;
+}): AIProvider {
+  if (options?.provider) return options.provider;
+
+  if (options?.model?.toLowerCase().startsWith("gemini")) return "gemini";
+  if (options?.model?.toLowerCase().startsWith("deepseek")) return "deepseek";
+
+  const envProvider = (process.env.AI_PROVIDER || "").toLowerCase().trim();
+  if (envProvider === "deepseek") return "deepseek";
+  if (envProvider === "gemini") return "gemini";
+
+  if (process.env.DEEPSEEK_API_KEY) return "deepseek";
+  if (process.env.GEMINI_API_KEY) return "gemini";
+
+  return "deepseek";
+}
+
+export async function generateGeminiCopy({
+  apiKey = process.env.GEMINI_API_KEY || "",
+  model = process.env.GEMINI_MODEL || "gemini-2.5-flash",
   persona = "",
   arquetipoTitulo,
   baitTrigger,
@@ -123,4 +159,27 @@ export async function generateCarouselCopy({
     }
   }
   throw lastError;
+}
+
+export async function generateCarouselCopy(
+  options: GenerateCarouselCopyOptions
+): Promise<GeneratedCarouselCopy> {
+  const provider = resolveAIProvider(options);
+
+  if (provider === "deepseek") {
+    return generateDeepSeekCopy({
+      apiKey: options.apiKey || process.env.DEEPSEEK_API_KEY,
+      model: options.model || process.env.DEEPSEEK_MODEL || "deepseek-chat",
+      persona: options.persona,
+      arquetipoTitulo: options.arquetipoTitulo,
+      baitTrigger: options.baitTrigger,
+      slides: options.slides,
+    });
+  }
+
+  return generateGeminiCopy({
+    ...options,
+    apiKey: options.apiKey || process.env.GEMINI_API_KEY,
+    model: options.model || process.env.GEMINI_MODEL || "gemini-2.5-flash",
+  });
 }

@@ -21,6 +21,7 @@ import { selectCarouselForAccount } from "../../pipeline/select.js";
 import {
   generateCarouselCopy,
   type GeneratedCarouselCopy,
+  type AIProvider,
 } from "../../pipeline/gemini.js";
 import { renderCarousel, type RenderSlideInput } from "../../pipeline/render.js";
 import type { CarouselRun, CarouselSlide, GenerationJobProgress } from "./schemas.js";
@@ -45,6 +46,9 @@ export interface GenerateOneCarouselOptions {
   mediaRoot?: string;
   outputDir?: string;
   mediaBytesLoader?: MediaBytesLoader;
+  aiProvider?: AIProvider;
+  deepseekApiKey?: string;
+  deepseekModel?: string;
   geminiApiKey?: string;
   geminiModel?: string;
   now?: number;
@@ -151,11 +155,16 @@ export async function generateOneCarousel(
   if (options.mockCopy) {
     copy = options.mockCopy;
   } else {
-    const apiKey = options.geminiApiKey || process.env.GEMINI_API_KEY || "";
-    const model = options.geminiModel || process.env.GEMINI_MODEL || "gemini-2.5-flash";
     copy = await generateCarouselCopy({
-      apiKey,
-      model,
+      provider: options.aiProvider,
+      apiKey:
+        options.aiProvider === "gemini"
+          ? options.geminiApiKey
+          : (options.deepseekApiKey || options.geminiApiKey),
+      model:
+        options.aiProvider === "gemini"
+          ? options.geminiModel
+          : (options.deepseekModel || options.geminiModel),
       persona: selection.persona,
       arquetipoTitulo: selection.arquetipoTitulo,
       baitTrigger: selection.baitTrigger,
@@ -337,6 +346,9 @@ export interface GenerateBatchOptions {
   mediaRoot?: string;
   outputDir?: string;
   mediaBytesLoader?: MediaBytesLoader;
+  aiProvider?: AIProvider;
+  deepseekApiKey?: string;
+  deepseekModel?: string;
   geminiApiKey?: string;
   geminiModel?: string;
   now?: number;
@@ -395,6 +407,9 @@ export async function generateBatch(
         mediaRoot: options.mediaRoot,
         outputDir: options.outputDir,
         mediaBytesLoader: options.mediaBytesLoader,
+        aiProvider: options.aiProvider,
+        deepseekApiKey: options.deepseekApiKey,
+        deepseekModel: options.deepseekModel,
         geminiApiKey: options.geminiApiKey,
         geminiModel: options.geminiModel,
         now: options.now,

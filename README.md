@@ -42,7 +42,10 @@ Painel Web: `http://localhost:3000/`
 | `NODE_ENV` | Ambiente (`production`, `development`, `test`) | `production` |
 | `DATABASE_URL` | String de conexão do banco PostgreSQL | `postgresql://user:pass@localhost:5432/shipworm` |
 | `API_TOKEN` / `API_KEY` | Bearer token exigido nas rotas `/api/v1/*` | `your-secret-token` |
-| `GEMINI_API_KEY` | Chave de API Google Gemini para geração de copy | *(obrigatório)* |
+| `AI_PROVIDER` | Provedor de IA para geração de copy (`deepseek`, `gemini`) | `deepseek` |
+| `DEEPSEEK_API_KEY` | Chave de API DeepSeek para geração de copy | *(obrigatório se AI_PROVIDER=deepseek)* |
+| `DEEPSEEK_MODEL` | Modelo DeepSeek utilizado | `deepseek-chat` |
+| `GEMINI_API_KEY` | Chave de API Google Gemini (alternativa) | *(obrigatório se AI_PROVIDER=gemini)* |
 | `GEMINI_MODEL` | Modelo Gemini utilizado | `gemini-2.5-flash` |
 | `TELEGRAM_BOT_TOKEN` | Token do Bot Telegram | *(opcional)* |
 | `TELEGRAM_CHAT_ID` | Chat ID padrão de destino para envios do Telegram | *(opcional)* |
