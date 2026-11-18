@@ -1,7 +1,8 @@
-import { describe, it } from "node:test";
+import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import type { Pool } from "pg";
 import { syncSocialAccounts } from "../../src/domain/social/routes.js";
+import { setSocialPublisherFactory } from "../../src/domain/social/factory.js";
 import type {
   SocialPublisherProvider,
   SocialAccount,
@@ -173,5 +174,130 @@ describe("Task 2: syncSocialAccounts Auto-Import", () => {
     assert.equal(novoCanal.social_provider, "zernio");
     assert.equal(novoCanal.external_account_id, "buf_chan_tiktok_novo");
     assert.equal(novoCanal.enabled, true);
+  });
+
+  afterEach(() => {
+    setSocialPublisherFactory(null);
+  });
+
+  it("pulls channels from every configured Zernio API key", async () => {
+    const accountsDb: Array<Record<string, any>> = [
+      {
+        id: "acc_a",
+        display_name: "Conta A",
+        persona: "Conta A",
+        role: "single_woman",
+        enabled: true,
+        tiktok_open_id: null,
+        social_provider: "zernio",
+        external_account_id: null,
+        social_account_metadata: {},
+        zernio_api_key: "key-aaa",
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id: "acc_b",
+        display_name: "Conta B",
+        persona: "Conta B",
+        role: "single_man",
+        enabled: true,
+        tiktok_open_id: null,
+        social_provider: "zernio",
+        external_account_id: null,
+        social_account_metadata: {},
+        zernio_api_key: "key-bbb",
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+      {
+        id: "acc_c",
+        display_name: "Conta C",
+        persona: "Conta C",
+        role: "single_woman",
+        enabled: true,
+        tiktok_open_id: null,
+        social_provider: "zernio",
+        external_account_id: null,
+        social_account_metadata: {},
+        zernio_api_key: "key-ccc",
+        created_at: new Date(),
+        updated_at: new Date(),
+      },
+    ];
+
+    const mockPool = {
+      async query(sql: string, params: any[] = []) {
+        const normalized = sql.trim();
+        if (normalized.startsWith("SELECT") && normalized.includes("FROM accounts")) {
+          if (normalized.includes("WHERE id = $1")) {
+            const acc = accountsDb.find((a) => a.id === params[0]);
+            return { rows: acc ? [acc] : [], rowCount: acc ? 1 : 0 };
+          }
+          return { rows: [...accountsDb], rowCount: accountsDb.length };
+        }
+        if (normalized.startsWith("UPDATE accounts")) {
+          const acc = accountsDb.find((a) => a.id === params[3]);
+          if (acc) {
+            acc.external_account_id = params[0];
+            acc.social_provider = params[1];
+            acc.zernio_api_key = acc.zernio_api_key ?? params[4];
+          }
+          return { rows: [], rowCount: acc ? 1 : 0 };
+        }
+        if (normalized.startsWith("INSERT INTO accounts")) {
+          return { rows: [{}], rowCount: 1 };
+        }
+        throw new Error(`Unhandled mock query: ${sql}`);
+      },
+    } as unknown as Pool;
+
+    const queriedKeys: string[] = [];
+    setSocialPublisherFactory((_name, options) => {
+      const key = options?.apiKey || "";
+      queriedKeys.push(key);
+      if (key === "key-aaa") {
+        return new MockSocialProvider([
+          {
+            externalAccountId: "chan_a",
+            username: "acc_a",
+            provider: "zernio",
+          },
+        ]);
+      }
+      if (key === "key-bbb") {
+        return new MockSocialProvider([
+          {
+            externalAccountId: "chan_b",
+            username: "acc_b",
+            provider: "zernio",
+          },
+        ]);
+      }
+      throw new Error("invalid key");
+    });
+
+    const previousEnvKey = process.env.ZERNIO_API_KEY;
+    delete process.env.ZERNIO_API_KEY;
+
+    try {
+      const result = await syncSocialAccounts(mockPool);
+
+      assert.deepEqual(queriedKeys.sort(), ["key-aaa", "key-bbb", "key-ccc"]);
+      assert.equal(result.synced, 2);
+      assert.equal(result.matched, 2);
+      assert.deepEqual(
+        accountsDb.map((a) => a.external_account_id).filter(Boolean).sort(),
+        ["chan_a", "chan_b"]
+      );
+      assert.equal(result.errors?.length, 1);
+      assert.match(result.errors?.[0] || "", /invalid key/);
+    } finally {
+      if (previousEnvKey !== undefined) {
+        process.env.ZERNIO_API_KEY = previousEnvKey;
+      } else {
+        delete process.env.ZERNIO_API_KEY;
+      }
+    }
   });
 });

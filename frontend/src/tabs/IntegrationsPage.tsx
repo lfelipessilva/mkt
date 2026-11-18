@@ -336,8 +336,12 @@ export function IntegrationsPage(): React.JSX.Element {
     setStatusMessage(null);
     try {
       const res = await syncSocialAccounts();
+      const failureNote =
+        res.errors && res.errors.length > 0
+          ? ` Avisos: ${res.errors.join("; ")}`
+          : "";
       setStatusMessage(
-        `Sincronização Zernio concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).`
+        `Sincronização Zernio concluída: ${res.synced} canal(is) encontrado(s), ${res.matched} vinculado(s), ${res.created} importado(s).${failureNote}`
       );
     } catch (err) {
       setErrorMessage(

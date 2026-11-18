@@ -69,6 +69,7 @@ export interface SyncAccountsResult {
     social_provider?: string | null;
     username?: string;
   }>;
+  errors?: string[];
 }
 
 export function getBufferLinkageStatus(account: Account): {

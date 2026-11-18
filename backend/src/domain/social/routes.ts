@@ -23,6 +23,69 @@ export interface SyncAccountsResult {
     social_provider: string | null;
     username?: string;
   }>;
+  errors?: string[];
+}
+
+function maskKey(key: string): string {
+  if (key.length <= 4) return "****";
+  return `****${key.slice(-4)}`;
+}
+
+/**
+ * Collects channels from every configured Zernio API key. Each account may
+ * carry its own `zernio_api_key`, so pulling account information must query all
+ * of them (plus the global `ZERNIO_API_KEY` fallback), not just one.
+ */
+async function listAllProvisionedChannels(
+  existingAccounts: Array<{ zernio_api_key?: string | null }>
+): Promise<{
+  channels: SocialAccount[];
+  keyByExternalId: Map<string, string>;
+  errors: string[];
+}> {
+  const channelMap = new Map<string, SocialAccount>();
+  const keyByExternalId = new Map<string, string>();
+  const errors: string[] = [];
+
+  const collect = async (provider: SocialPublisherProvider, persistKey?: string) => {
+    const list = await provider.listConnectedAccounts();
+    for (const channel of list) {
+      if (!channel.externalAccountId || channelMap.has(channel.externalAccountId)) continue;
+      channelMap.set(channel.externalAccountId, channel);
+      if (persistKey) keyByExternalId.set(channel.externalAccountId, persistKey);
+    }
+  };
+
+  const accountKeys = new Set<string>();
+  for (const acc of existingAccounts) {
+    const key = acc.zernio_api_key?.trim();
+    if (key) accountKeys.add(key);
+  }
+  const envKey = process.env.ZERNIO_API_KEY?.trim();
+
+  const keysToQuery = new Set<string>(accountKeys);
+  if (envKey) keysToQuery.add(envKey);
+
+  if (keysToQuery.size === 0) {
+    // No per-account key and no global key: let the default provider report
+    // the missing configuration as before.
+    await collect(getSocialPublisherProvider());
+    return { channels: [...channelMap.values()], keyByExternalId, errors };
+  }
+
+  for (const key of keysToQuery) {
+    try {
+      await collect(
+        getSocialPublisherProvider("zernio", { apiKey: key }),
+        accountKeys.has(key) ? key : undefined
+      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      errors.push(`Chave ${maskKey(key)}: ${message}`);
+    }
+  }
+
+  return { channels: [...channelMap.values()], keyByExternalId, errors };
 }
 
 /**
@@ -34,10 +97,22 @@ export async function syncSocialAccounts(
   providerInstance?: SocialPublisherProvider
 ): Promise<SyncAccountsResult> {
   const p = poolInstance || getPool();
-  const provider = providerInstance || customProvider || getSocialPublisherProvider();
-
-  const channels: SocialAccount[] = await provider.listConnectedAccounts();
   const existingAccounts = await listAccounts(p);
+
+  let channels: SocialAccount[];
+  let keyByExternalId = new Map<string, string>();
+  let syncErrors: string[] = [];
+
+  if (providerInstance) {
+    channels = await providerInstance.listConnectedAccounts();
+  } else if (customProvider) {
+    channels = await customProvider.listConnectedAccounts();
+  } else {
+    const collected = await listAllProvisionedChannels(existingAccounts);
+    channels = collected.channels;
+    keyByExternalId = collected.keyByExternalId;
+    syncErrors = collected.errors;
+  }
 
   const matchedAccounts: Array<{
     id: string;
@@ -71,6 +146,7 @@ export async function syncSocialAccounts(
 
     if (matchedChannel) {
       matchedChannelIds.add(matchedChannel.externalAccountId);
+      const channelKey = keyByExternalId.get(matchedChannel.externalAccountId);
       await p.query(
         `UPDATE accounts
          SET external_account_id = $1,
@@ -80,6 +156,7 @@ export async function syncSocialAccounts(
                '{channel_username}',
                $3::jsonb
              ),
+             zernio_api_key = COALESCE(zernio_api_key, $5),
              updated_at = NOW()
          WHERE id = $4`,
         [
@@ -87,6 +164,7 @@ export async function syncSocialAccounts(
           matchedChannel.provider,
           JSON.stringify(matchedChannel.username),
           acc.id,
+          channelKey ?? null,
         ]
       );
 
@@ -118,6 +196,8 @@ export async function syncSocialAccounts(
         .toLowerCase()
         .trim();
 
+      const channelKey = keyByExternalId.get(ch.externalAccountId);
+
       await upsertAccount(
         {
           id: cleanId,
@@ -130,6 +210,7 @@ export async function syncSocialAccounts(
           social_account_metadata: {
             channel_username: ch.username,
           },
+          zernio_api_key: channelKey ?? null,
         },
         p
       );
@@ -150,6 +231,7 @@ export async function syncSocialAccounts(
     matched: matchedCount,
     created: createdCount,
     accounts: matchedAccounts,
+    ...(syncErrors.length > 0 ? { errors: syncErrors } : {}),
   };
 }
 
