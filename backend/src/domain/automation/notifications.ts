@@ -1,4 +1,5 @@
 import { Api } from "grammy";
+import type { InlineKeyboardMarkup } from "grammy/types";
 
 export type AutomationNotifyEvent =
   | "generation_ok"
@@ -20,7 +21,7 @@ export interface TelegramApiLike {
   sendMessage: (
     chatId: string | number,
     text: string,
-    extra?: { reply_markup?: unknown }
+    extra?: { reply_markup?: InlineKeyboardMarkup }
   ) => Promise<unknown>;
 }
 
@@ -42,7 +43,7 @@ export function getNotifyChatId(
 export function buildApprovalKeyboard(
   runId: string,
   appBaseUrl?: string | null
-): { inline_keyboard: Array<Array<Record<string, string>>> } {
+): InlineKeyboardMarkup {
   const confirm = {
     text: "Confirmar envio",
     callback_data: `approve_zernio:${runId}`,
@@ -102,7 +103,7 @@ export async function notifyAutomation(
   if (!chatId || !api) return;
 
   const text = formatMessage(event, payload);
-  const extra: { reply_markup?: unknown } = {};
+  const extra: { reply_markup?: InlineKeyboardMarkup } = {};
   if (event === "awaiting_approval" && payload.runId) {
     const baseUrl =
       options.appBaseUrl !== undefined
