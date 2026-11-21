@@ -21,7 +21,7 @@ Quem usa: quem opera as personas neste app (sync, conectar TikTok, publicar na h
 
 ## Non-goals
 
-- Escolher a música na interface. A faixa é a primeira do chart.
+- Escolher a música na interface. A faixa vem do chart, escolhida de forma determinística pelo id do run.
 - Narrar o carrossel, gerar MP4 ou hospedar áudio nosso.
 - Publicar em rede que não seja TikTok.
 - Implementar o Post for Me. O stub continua, e conta `postforme` segue sendo pulada com "provider não suportado nesta fase".
@@ -59,7 +59,7 @@ Quem usa: quem opera as personas neste app (sync, conectar TikTok, publicar na h
   ```
 
   Um `mediaItems` por slide, na ordem, URL pública HTTPS que o app já resolve. `content` é a legenda (`run.legenda`), string vazia se não houver. Sem volume, corte, `auto_add_music` ou `draft`. Modo `scheduled` troca `publishNow` por `scheduledFor` (ISO-8601) e não manda os dois.
-- Música: `GET /v1/accounts/{accountId}/tiktok/commercial-music` sem `countryCode` (chart global). Primeira track. `musicSoundId = clip.id` se existir, senão `tracks[].id`.
+- Música: `GET /v1/accounts/{accountId}/tiktok/commercial-music` sem `countryCode` (chart global). A faixa é escolhida por hash do `internalPostId` (id do run) sobre o tamanho do chart, para variar entre posts e repetir a mesma faixa num retry do mesmo run. `musicSoundId = clip.id` se existir, senão `tracks[].id`.
 - Status: `GET /v1/posts/{postId}`. Mapear `published` → `published`; `failed` → `failed`; o resto (`scheduled`, `queued`, `processing`, `draft`) → `processing`. `externalPostId` é `post._id`.
 - `channel` em `auto_post_slots` é TEXT com CHECK (`buffer`, `telegram`, `social`). Precisa de migration.
 

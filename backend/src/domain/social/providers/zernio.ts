@@ -101,6 +101,24 @@ export function musicSoundId(tracks: ZernioTrack[] | undefined): string | null {
   return first.clip?.id || first.id || null;
 }
 
+function hashSeed(seed: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index++) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return hash;
+}
+
+export function pickMusicSoundId(
+  tracks: ZernioTrack[] | undefined,
+  seed?: string
+): string | null {
+  if (!tracks?.length) return null;
+  const index = seed ? hashSeed(seed) % tracks.length : 0;
+  return musicSoundId([tracks[index]]);
+}
+
 function mapStatus(status: string | undefined): PublishStatus {
   if (status === "published" || status === "partial") return "published";
   if (status === "failed" || status === "cancelled") return "failed";
@@ -179,12 +197,12 @@ export class ZernioPublisherAdapter implements SocialPublisherProvider {
       .filter((account) => account.externalAccountId);
   }
 
-  private async requireMusic(accountId: string): Promise<string> {
+  private async requireMusic(accountId: string, seed?: string): Promise<string> {
     const result = await this.sdk().accounts.listTikTokCommercialMusic({
       path: { accountId },
     });
     fail(result, "Zernio commercial music failed");
-    const id = musicSoundId(result.data?.tracks);
+    const id = pickMusicSoundId(result.data?.tracks, seed);
     if (!id) {
       throw new AppError(
         "Nenhuma faixa comercial disponível; o post não foi enviado",
@@ -199,7 +217,10 @@ export class ZernioPublisherAdapter implements SocialPublisherProvider {
     if (request.media.type !== "carousel") {
       throw new AppError("Só publicamos carrossel de imagens", 400, "validation_error");
     }
-    const soundId = await this.requireMusic(request.externalAccountId);
+    const soundId = await this.requireMusic(
+      request.externalAccountId,
+      request.internalPostId
+    );
     const mediaItems = request.media.imageUrls.map((url) => ({ type: "image", url }));
 
     const tiktokSettings: Record<string, unknown> = {

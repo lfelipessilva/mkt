@@ -4,6 +4,7 @@ import { AppError } from "../../src/shared/errors.js";
 import {
   ZernioPublisherAdapter,
   musicSoundId,
+  pickMusicSoundId,
   type ZernioSdk,
 } from "../../src/domain/social/providers/zernio.js";
 
@@ -21,6 +22,55 @@ describe("ZernioPublisherAdapter", () => {
     assert.equal(musicSoundId([{ id: "track", clip: { id: "clip" } }]), "clip");
     assert.equal(musicSoundId([{ id: "track" }]), "track");
     assert.equal(musicSoundId([]), null);
+  });
+
+  it("rotates the chart track by run id instead of always the first", () => {
+    const tracks = Array.from({ length: 10 }, (_, index) => ({ id: `track-${index}` }));
+    const picks = new Set(
+      Array.from({ length: 50 }, (_, index) => pickMusicSoundId(tracks, `run-${index}`))
+    );
+
+    assert.ok(picks.size > 1);
+    assert.equal(pickMusicSoundId(tracks, "run-1"), pickMusicSoundId(tracks, "run-1"));
+    assert.equal(pickMusicSoundId(tracks, "run-1"), "track-6");
+    assert.equal(pickMusicSoundId([], "run-1"), null);
+    assert.equal(pickMusicSoundId([{ id: "only" }], "run-1"), "only");
+    assert.equal(pickMusicSoundId([{ id: "full", clip: { id: "clip" } }], "run-1"), "clip");
+  });
+
+  it("uses a different chart track for different runs", async () => {
+    const soundIds: string[] = [];
+    const tracks = Array.from({ length: 10 }, (_, index) => ({ id: `track-${index}` }));
+    const adapter = new ZernioPublisherAdapter(
+      client({
+        accounts: {
+          listAccounts: async () => ({ data: { accounts: [] } }),
+          listTikTokCommercialMusic: async () => ({ data: { tracks } }),
+        },
+        posts: {
+          createPost: async (options) => {
+            const settings = options.body.tiktokSettings as {
+              musicSoundInfo: { musicSoundId: string };
+            };
+            soundIds.push(settings.musicSoundInfo.musicSoundId);
+            return { data: { post: { _id: "post", status: "published" } } };
+          },
+          getPost: async () => ({ data: {} }),
+        },
+      })
+    );
+
+    for (const internalPostId of ["run-1", "run-2", "run-3"]) {
+      await adapter.publishPost({
+        internalPostId,
+        externalAccountId: "acc",
+        caption: "oi",
+        media: { type: "carousel", imageUrls: ["https://cdn.example/1.jpg"] },
+        publishMode: "immediate",
+      });
+    }
+
+    assert.equal(new Set(soundIds).size, 3);
   });
 
   it("lists only active tiktok accounts", async () => {
